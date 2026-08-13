@@ -62,7 +62,7 @@ Fields:
 id
 name
 timezone
-status
+status: active
 created_at
 updated_at
 ```
@@ -89,7 +89,7 @@ updated_at
 
 Rules:
 
-- `login_name` is normalized before comparison and unique.
+- `login_name` is normalized before storage and comparison and is unique.
 - `display_name` is not required to be a legal name.
 - Default setup display names may be `Dad`, `Mom`, and later `Nanny`.
 - Passwords are stored only as Argon2id hashes.
@@ -122,8 +122,8 @@ Rules:
 
 - identity/relationship and authorization level are separate concepts;
 - Dad and Mom share the same authorization policy even though the UI relationship labels differ;
-- M1 setup creates Dad and Mom;
-- after setup, family admins may create the Nanny account;
+- M1 setup creates exactly one active Dad membership and one active Mom membership;
+- after setup, family admins may create one active Nanny account;
 - adding more admins or arbitrary new relationship types is deferred.
 
 ### 4.4 `babies`
@@ -142,7 +142,7 @@ updated_at
 
 Rules:
 
-- M1 supports one baby;
+- M1 supports one baby per family;
 - initial `display_name` is `xiangxiang`;
 - `birth_date` is nullable until the baby is born and stores date only, not precise birth time;
 - M1 stores no medical identifiers or care preferences.
@@ -169,8 +169,8 @@ Rules:
 - default absolute session lifetime is 30 days;
 - disabled users/memberships cannot authenticate even if an unexpired session row exists;
 - logout revokes the current session;
-- password change revokes all other sessions for that user;
-- admin reset of Nanny credentials revokes every Nanny session;
+- password change revokes **all existing sessions including the old current session**, then issues one new current session token;
+- admin reset of Nanny credentials revokes every Nanny session and does not auto-login the Nanny;
 - session rows are retained long enough for audit/debugging but raw tokens are never recoverable.
 
 Cookie policy:
@@ -185,6 +185,8 @@ Secure = false only in explicitly configured local HTTP development
 
 Cookie name: `baby_care_session`.
 
+The raw session token exists only in the HttpOnly cookie and transient server request memory. It is never stored in browser local/session storage.
+
 ### 4.6 `audit_events`
 
 Fields:
@@ -192,7 +194,7 @@ Fields:
 ```text
 id
 family_id
-actor_user_id nullable for system/setup
+actor_user_id nullable for system/setup/failed-login
 actor_membership_id nullable
 action
 target_type
@@ -206,7 +208,7 @@ occurred_at
 Rules:
 
 - audit events are append-only through normal application APIs;
-- metadata uses an allowlist; never store password, session token, setup token, precise network secrets, or raw authorization headers;
+- metadata uses an allowlist; never store password, session token, setup token, precise network secrets, raw login identifiers from failed authentication, client IP addresses, or raw authorization/cookie headers;
 - authentication/admin actions always create audit evidence;
 - later care records will reuse the same actor/source/trace semantics instead of inventing a second attribution model.
 
@@ -271,7 +273,7 @@ Behavior:
 - on any credential failure return the same generic `401 invalid_credentials` response;
 - do not reveal whether login name or password was wrong.
 
-Add modest route-level throttling for repeated failed login requests. Persistent account lockout is intentionally deferred to avoid creating a family lockout recovery problem in M1.
+Failed-login throttling is in-memory and limited to **10 login attempts per 60 seconds per client address**. The address may be used only as an ephemeral limiter key and must not be persisted or placed into audit/diagnostic metadata. Persistent account lockout is intentionally deferred to avoid creating a family lockout recovery problem in M1.
 
 ### 6.2 Current session
 
@@ -304,12 +306,12 @@ Revokes the current session and clears the cookie. Repeating logout is safe/idem
 
 Requires current password plus new password.
 
-On success:
+On success, in one logical operation:
 
-- replace Argon2id password hash;
-- keep or rotate the current session according to implementation simplicity;
-- revoke all other sessions for that user;
-- emit audit event.
+1. replace the Argon2id password hash;
+2. revoke all existing sessions for the user, including the request's old current session;
+3. create one new session and replace the browser cookie;
+4. emit the password-changed audit event.
 
 ## 7. Authorization policy
 
@@ -396,6 +398,7 @@ POST  /api/family/members/:membershipId/reset-password
 Constraints:
 
 - `POST /api/family/members` creates only a `nanny/caregiver` member in M1;
+- M1 allows only one active Nanny membership at a time;
 - `reset-password` applies only to caregiver/Nanny in M1;
 - write endpoints require same-origin request validation in addition to cookie authentication;
 - API errors use stable machine-readable codes and preserve request `x-trace-id` behavior from M0.
@@ -404,18 +407,19 @@ Constraints:
 
 Cookie authentication requires protection against cross-site state-changing requests.
 
-For unsafe methods (`POST`, `PATCH`, `PUT`, `DELETE`):
+For all browser-facing unsafe methods (`POST`, `PATCH`, `PUT`, `DELETE`):
 
-- require the request `Origin` to match configured Baby Care application origin when Origin is present/expected for browser requests;
-- reject mismatched origins with `403 origin_not_allowed`;
+- require an `Origin` header;
+- require exact scheme/host/port match with configured `BABY_CARE_APP_ORIGIN`;
+- reject a missing or mismatched Origin with `403 origin_not_allowed`;
 - keep `SameSite=Lax` session cookies;
 - do not enable broad CORS in M1.
 
-This is intentionally simpler than introducing a separate CSRF token protocol while Baby Care is a same-origin Web/PWA.
+Tests and Compose probes must send the configured Origin on unsafe requests. This is intentionally simpler than introducing a separate CSRF token protocol while Baby Care is a same-origin Web/PWA.
 
 ## 10. Web/PWA experience
 
-M1 adds only identity/family UI required for real family testing:
+M1 adds only identity/family UI required for real family testing.
 
 ### First-run state
 
@@ -494,11 +498,13 @@ Requirements:
 
 Important indexes/constraints:
 
-- unique normalized `users.login_name`;
+- unique stored normalized `users.login_name`;
 - one membership per `(family_id, user_id)`;
-- one active family/baby invariant enforced by application plus setup transaction for M1;
+- partial uniqueness prevents more than one active Dad, Mom, or Nanny relationship for the family;
+- a PostgreSQL partial unique singleton constraint/index prevents more than one active Family in M1;
+- unique `babies.family_id` enforces one baby per family in M1;
 - unique `sessions.token_hash`;
-- indexes on `sessions.user_id`, `sessions.expires_at`, `audit_events.family_id`, `audit_events.occurred_at`.
+- indexes on `sessions.user_id`, `sessions.expires_at`, `audit_events.family_id`, and `audit_events.occurred_at`.
 
 ## 13. Audit actions
 
@@ -518,7 +524,7 @@ family.updated
 baby.updated
 ```
 
-`auth.login_failed` must not contain the supplied password and should avoid storing an untrusted raw login identifier in audit metadata unless safely normalized/redacted.
+For `auth.login_failed`, use the existing singleton family ID with `actor_user_id = null`; do not persist the submitted login name, password, or client address in audit metadata.
 
 ## 14. Testing strategy
 
@@ -528,10 +534,12 @@ M1 keeps the segmented M0 CI model.
 
 - password hashing/verification contract;
 - session token hashing and expiry/revocation;
+- password-change session rotation;
 - policy matrix for admin/caregiver/public;
 - setup state rules;
 - stable auth/error envelopes;
-- origin guard;
+- strict Origin guard;
+- login throttling boundary;
 - audit metadata redaction.
 
 ### PostgreSQL integration
@@ -543,8 +551,9 @@ Use real PostgreSQL to verify:
 - second setup is rejected;
 - login creates usable session;
 - disabled membership invalidates access;
-- password change/reset invalidates required sessions;
-- membership/login uniqueness constraints;
+- password change rotates the current session and invalidates all older sessions;
+- Nanny password reset invalidates all Nanny sessions;
+- membership/login/singleton uniqueness constraints;
 - audit rows are written for security/admin changes.
 
 ### Web tests
@@ -572,6 +581,8 @@ empty DB
  -> Dad admin write succeeds
 ```
 
+All unsafe requests in this flow send the configured Origin.
+
 CI remains:
 
 ```text
@@ -586,7 +597,7 @@ On failure, compact diagnostic artifacts remain first-line evidence; full raw lo
 
 ## 15. Security/privacy invariants
 
-- never log raw passwords, setup token, session token, cookie header, or authorization secrets;
+- never log raw passwords, setup token, session token, cookie header, authorization secrets, or client IP addresses;
 - session DB rows contain token hashes only;
 - setup token exists only in environment + transient request memory;
 - no legal names are required;
@@ -620,7 +631,7 @@ M1 is complete only when:
 - schema/migrations are committed and verified on empty PostgreSQL;
 - one-time setup works and is permanently closed afterward;
 - Dad/Mom/Nanny use separate credentials;
-- server-side session lifecycle and revocation rules pass tests;
+- server-side session lifecycle and revocation/rotation rules pass tests;
 - policy matrix is enforced by API, not only hidden in UI;
 - Nanny cannot perform family-admin writes;
 - security/admin actions produce attributable audit events;
