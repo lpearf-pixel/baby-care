@@ -44,8 +44,11 @@ export function createDiagnosticEvent(input: DiagnosticEventInput): DiagnosticEv
     message: input.message,
   };
   if (input.traceId) event.trace_id = input.traceId;
-  if (input.expected) event.expected = redact(input.expected);
-  if (input.actual) event.actual = redact(input.actual);
-  if (input.evidencePointer) event.evidence_pointer = redact(input.evidencePointer);
+  const expected = redact(input.expected);
+  const actual = redact(input.actual);
+  const evidencePointer = redact(input.evidencePointer);
+  if (expected !== undefined) event.expected = expected;
+  if (actual !== undefined) event.actual = actual;
+  if (evidencePointer !== undefined) event.evidence_pointer = evidencePointer;
   return event;
 }
