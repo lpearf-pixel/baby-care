@@ -16,17 +16,17 @@ export const CareEventTypeSchema = z.enum([
 ]);
 
 export const CareWarningCodeSchema = z.enum([
-  'duplicate_candidate',
+  'possible_duplicate',
   'unusual_value',
-  'old_backfill',
   'sleep_overlap',
+  'old_backfill',
 ]);
 
 export const CareWarningSchema = z
   .object({
     code: CareWarningCodeSchema,
-    message: z.string().min(1).max(240),
-    relatedEventId: z.string().uuid().optional(),
+    summary: z.string().min(1).max(240),
+    recentEventId: z.string().uuid().optional(),
   })
   .strict();
 
