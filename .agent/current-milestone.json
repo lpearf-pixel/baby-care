@@ -10,6 +10,8 @@
   "m1_authoritative_branch": "codex/m1-family-baby-foundation",
   "m1_authoritative_head": "f0f3bbc2035ea6c6af6c89e47b17bd1b0ca5419c",
   "m1_pending_prerequisite_branch": "codex/m1-h-production-flow",
+  "m1_blocker_issue": 3,
+  "m1_blocker_issue_title": "M1-H: close production startup and Compose authorization gate",
   "m1_prerequisite": "complete and reverify migrate-before-listen production startup and full Compose family authorization flow before M2 production implementation",
   "design_spec": "docs/superpowers/specs/2026-08-13-m2-care-recording-mvp-design.md",
   "baby_display_name": "xiangxiang",
