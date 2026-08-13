@@ -1,20 +1,25 @@
 {
   "schema_version": 1,
-  "milestone": "M0 Repository and delivery foundation",
-  "status": "release_gate",
+  "milestone": "M1 Family and baby foundation",
+  "status": "ready_for_design",
   "branch": "codex/m0-delivery-foundation",
-  "completed_segments": [
-    "spec-and-plan",
-    "workspace-contracts-observability",
-    "api-health-tracing",
-    "web-pwa-shell",
-    "postgres-integration",
-    "compact-diagnostics",
-    "docker-compose",
-    "segmented-ci"
+  "completed_milestones": ["M0 Repository and delivery foundation"],
+  "m0_verified_ci_run": 31674964075,
+  "next_scope": [
+    "family model",
+    "baby profile",
+    "Dad/Mom/Nanny roles",
+    "family-test session flow",
+    "authorization boundaries",
+    "actor/source audit metadata"
   ],
-  "current_gate": "final frozen-lockfile release verification",
-  "next_milestone": "M1 Family and baby foundation",
   "baby_display_name": "xiangxiang",
-  "m2_real_care_habits_gate": "required_before_care_interaction_defaults"
+  "m2_real_care_habits_gate": "required_before_care_interaction_defaults",
+  "do_not_start_in_m1": [
+    "feeding interaction defaults",
+    "diaper interaction defaults",
+    "sleep interaction defaults",
+    "Guardian integration",
+    "JoyAI/Qwen runtime"
+  ]
 }
