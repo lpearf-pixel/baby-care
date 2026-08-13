@@ -1,10 +1,11 @@
 {
   "schema_version": 1,
   "milestone": "M1 Family and baby foundation",
-  "status": "ready_for_design",
-  "branch": "codex/m0-delivery-foundation",
+  "status": "spec_written_pending_user_review",
+  "branch": "codex/m1-family-baby-foundation",
   "completed_milestones": ["M0 Repository and delivery foundation"],
   "m0_verified_ci_run": 31674964075,
+  "design_spec": "docs/superpowers/specs/2026-08-13-m1-family-baby-foundation-design.md",
   "next_scope": [
     "family model",
     "baby profile",
