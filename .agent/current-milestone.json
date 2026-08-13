@@ -1,13 +1,9 @@
 {
   "schema_version": 1,
   "milestone": "M2 Care Recording MVP",
-  "status": "implementation_plan_written_pending_user_review",
+  "status": "implementation_in_progress",
   "branch": "codex/m2-care-recording-implementation",
-  "completed_milestones": [
-    "M0 Repository and delivery foundation",
-    "M1 Family and baby foundation"
-  ],
-  "m0_verified_ci_run": 31674964075,
+  "completed_milestones": ["M0 Repository and delivery foundation", "M1 Family and baby foundation"],
   "m1_state": "verified_complete",
   "m1_authoritative_branch": "codex/m1-family-baby-foundation",
   "m1_authoritative_head": "76d578a464ec2ab1f8eb1f8f33d8e429caff10ba",
@@ -18,18 +14,17 @@
   "m2_design_status": "approved",
   "m2_design_spec": "docs/superpowers/specs/2026-08-13-m2-care-recording-mvp-design.md",
   "m2_implementation_plan": "docs/superpowers/plans/2026-08-13-m2-care-recording-mvp-reviewed.md",
-  "baby_display_name": "xiangxiang",
   "m2_real_care_habits_gate": "satisfied",
   "m2_production_baseline_blocker": "cleared",
-  "next_scope": [
-    "user reviews reviewed M2 implementation plan",
-    "after approval execute the reviewed M2 plan in segmented RED-GREEN-CI tasks"
+  "completed_tasks": [
+    "Task 1 Care Foundation Schema, Common Contracts, and Authorization",
+    "Task 2 Deterministic Care Rules"
   ],
-  "do_not_start_before_m2_implementation_plan_approval": [
-    "M2 care schema migration",
-    "M2 care API implementation",
-    "M2 care Web interaction implementation",
-    "Guardian integration",
-    "JoyAI/Qwen runtime"
-  ]
+  "task1_final_head": "7c44d480e588b42bced8da0ee9be4ac3a2bccabd",
+  "task1_final_ci_run": 31713732247,
+  "task2_final_head": "c44a793d601df303a62e07fed5ff551e97a87721",
+  "task2_final_ci_run": 31715074111,
+  "current_task": "Task 3 Authenticated Ownership, Idempotency, and Revision Primitives",
+  "known_tooling_note": "M2 runtime SQL migration and journal are verified; Drizzle 0001 snapshot metadata was not generated in the current harness and must be reconciled before later schema changes or final release.",
+  "out_of_scope": ["Guardian integration", "JoyAI/Qwen runtime", "M3 handoff UX", "main branch changes"]
 }
