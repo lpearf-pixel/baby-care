@@ -1,10 +1,12 @@
 import type { SessionDto } from '@baby-care/contracts';
-import type { Relationship, PermissionLevel } from '@baby-care/domain';
 import type { DatabaseContext } from '../db.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { createSessionToken, hashSessionToken } from './session-token.js';
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
+
+type Relationship = SessionDto['relationship'];
+type PermissionLevel = SessionDto['permissionLevel'];
 
 export interface AuthContext {
   userId: string;
@@ -88,6 +90,38 @@ async function insertSession(
 }
 
 export function createAuthService(database: DatabaseContext, now: () => Date = () => new Date()) {
+  async function authenticate(rawToken: string): Promise<{ context: AuthContext; session: SessionDto } | null> {
+    const current = now();
+    const tokenHash = hashSessionToken(rawToken);
+    const result = await database.pool.query<AuthRow>(
+      authSelect(`
+        join sessions s on s.user_id = u.id and s.family_id = fm.family_id
+        where s.token_hash = $1
+          and s.revoked_at is null
+          and s.expires_at > $2
+      `),
+      [tokenHash, current],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+
+    await database.pool.query(
+      `update sessions set last_seen_at = $2 where token_hash = $1 and revoked_at is null`,
+      [tokenHash, current],
+    );
+
+    return {
+      context: {
+        userId: row.user_id,
+        membershipId: row.membership_id,
+        familyId: row.family_id,
+        relationship: row.relationship,
+        permissionLevel: row.permission_level,
+      },
+      session: toSessionDto(row),
+    };
+  }
+
   return {
     async login(loginName: string, password: string): Promise<LoginResult | null> {
       const result = await database.pool.query<AuthRow>(
@@ -102,36 +136,7 @@ export function createAuthService(database: DatabaseContext, now: () => Date = (
       return { rawToken: token.raw, session: toSessionDto(row) };
     },
 
-    async authenticate(rawToken: string): Promise<{ context: AuthContext; session: SessionDto } | null> {
-      const current = now();
-      const result = await database.pool.query<AuthRow>(
-        `${authSelect(`
-          join sessions s on s.user_id = u.id and s.family_id = fm.family_id
-          where s.token_hash = $1
-            and s.revoked_at is null
-            and s.expires_at > $2
-        `)}`,
-        [hashSessionToken(rawToken), current],
-      );
-      const row = result.rows[0];
-      if (!row) return null;
-
-      await database.pool.query(
-        `update sessions set last_seen_at = $2 where token_hash = $1 and revoked_at is null`,
-        [hashSessionToken(rawToken), current],
-      );
-
-      return {
-        context: {
-          userId: row.user_id,
-          membershipId: row.membership_id,
-          familyId: row.family_id,
-          relationship: row.relationship,
-          permissionLevel: row.permission_level,
-        },
-        session: toSessionDto(row),
-      };
-    },
+    authenticate,
 
     async logout(rawToken: string): Promise<void> {
       await database.pool.query(
@@ -145,7 +150,7 @@ export function createAuthService(database: DatabaseContext, now: () => Date = (
       currentPassword: string,
       nextPassword: string,
     ): Promise<LoginResult | null> {
-      const authenticated = await this.authenticate(rawToken);
+      const authenticated = await authenticate(rawToken);
       if (!authenticated) return null;
 
       const passwordResult = await database.pool.query<{ password_hash: string }>(
