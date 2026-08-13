@@ -16,6 +16,9 @@ afterEach(async () => {
 async function migrateDatabase(): Promise<DatabaseContext> {
   const context = createDatabase(testDatabaseUrl!);
   await context.migrate();
+  await context.pool.query(
+    'truncate table audit_events, sessions, babies, family_memberships, users, families restart identity cascade',
+  );
   return context;
 }
 

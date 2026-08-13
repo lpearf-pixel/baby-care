@@ -1,7 +1,10 @@
+import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate as runDrizzleMigrations } from 'drizzle-orm/node-postgres/migrator';
 import * as schema from './schema.js';
+
+const migrationsFolder = fileURLToPath(new URL('../../../migrations', import.meta.url));
 
 export interface DatabaseContext {
   pool: pg.Pool;
@@ -19,7 +22,7 @@ export function createDatabase(databaseUrl: string): DatabaseContext {
     pool,
     orm,
     async migrate(): Promise<void> {
-      await runDrizzleMigrations(orm, { migrationsFolder: './migrations' });
+      await runDrizzleMigrations(orm, { migrationsFolder });
     },
     async checkDatabase(): Promise<boolean> {
       try {
