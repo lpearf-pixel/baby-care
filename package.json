@@ -1,0 +1,21 @@
+{
+  "name": "baby-care",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.12.0" },
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "typecheck": "npm run typecheck -w @baby-care/shared && npm run typecheck -w @baby-care/api && npm run typecheck -w @baby-care/web",
+    "test": "npm run test -w @baby-care/shared && npm run test -w @baby-care/api && npm run test -w @baby-care/web && node --test tools/collect-diagnostics.test.mjs",
+    "test:integration": "npm run test:integration -w @baby-care/api",
+    "build": "npm run build -w @baby-care/shared && npm run build -w @baby-care/api && npm run build -w @baby-care/web",
+    "verify:focused": "npm run typecheck && npm run test && npm run build",
+    "diagnostics:collect": "node tools/collect-diagnostics.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "typescript": "5.8.3",
+    "vitest": "3.2.4"
+  }
+}
