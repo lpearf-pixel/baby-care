@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "milestone": "M2 Care Recording MVP",
-  "status": "ready_for_implementation_planning",
-  "branch": "codex/m2-care-recording-mvp",
+  "status": "implementation_plan_written_pending_user_review",
+  "branch": "codex/m2-care-recording-implementation",
   "completed_milestones": [
     "M0 Repository and delivery foundation",
     "M1 Family and baby foundation"
@@ -10,20 +10,22 @@
   "m0_verified_ci_run": 31674964075,
   "m1_state": "verified_complete",
   "m1_authoritative_branch": "codex/m1-family-baby-foundation",
+  "m1_authoritative_head": "76d578a464ec2ab1f8eb1f8f33d8e429caff10ba",
+  "m1_authoritative_ci_run": 31707486985,
   "m1_h_state": "closed",
-  "m1_h_branch": "codex/m1-h-production-flow",
-  "m1_h_validation_ci_run": 31707034192,
   "m2_design_branch": "codex/m2-care-recording-mvp",
+  "m2_design_head": "eadb8f1d41770b5ef940f16993e57a4cb8ee6bc5",
   "m2_design_status": "approved",
+  "m2_design_spec": "docs/superpowers/specs/2026-08-13-m2-care-recording-mvp-design.md",
+  "m2_implementation_plan": "docs/superpowers/plans/2026-08-13-m2-care-recording-mvp-final.md",
   "baby_display_name": "xiangxiang",
   "m2_real_care_habits_gate": "satisfied",
   "m2_production_baseline_blocker": "cleared",
   "next_scope": [
-    "review approved M2 written specification",
-    "create M2 implementation plan",
-    "execute M2 only after implementation plan approval"
+    "user reviews M2 implementation plan",
+    "after approval execute the final M2 plan in segmented RED-GREEN-CI tasks"
   ],
-  "do_not_start_before_m2_implementation_plan": [
+  "do_not_start_before_m2_implementation_plan_approval": [
     "M2 care schema migration",
     "M2 care API implementation",
     "M2 care Web interaction implementation",
