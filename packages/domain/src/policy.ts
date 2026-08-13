@@ -4,6 +4,8 @@ const caregiverCapabilities = new Set<Capability>([
   'family.read',
   'baby.read',
   'members.read',
+  'care.read',
+  'care.write',
 ]);
 
 export function can(permission: PermissionLevel, capability: Capability): boolean {
