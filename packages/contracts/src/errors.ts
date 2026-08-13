@@ -11,6 +11,9 @@ export const ApiErrorCodeSchema = z.enum([
   'member_already_exists',
   'member_disabled',
   'validation_failed',
+  'care_confirmation_required',
+  'care_event_not_found',
+  'care_state_conflict',
 ]);
 
 export const ApiErrorSchema = z
