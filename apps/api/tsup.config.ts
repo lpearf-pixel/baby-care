@@ -6,5 +6,5 @@ export default defineConfig({
   outDir: 'dist',
   clean: true,
   target: 'es2022',
-  noExternal: ['@baby-care/contracts', '@baby-care/observability'],
+  noExternal: ['@baby-care/contracts', '@baby-care/domain', '@baby-care/observability'],
 });

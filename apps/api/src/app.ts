@@ -3,8 +3,10 @@ import { resolveTraceId } from '@baby-care/observability';
 import { createAuthService } from './auth/auth-service.js';
 import type { DatabaseContext } from './db.js';
 import { createFamilyRepository } from './family/family-repository.js';
+import { createFamilyService } from './family/family-service.js';
 import { createSetupService } from './family/setup-service.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerFamilyRoutes } from './routes/family.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerSetupRoutes } from './routes/setup.js';
 
@@ -38,10 +40,16 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
   });
 
   if (dependencies.database && dependencies.appOrigin) {
+    const authService = createAuthService(dependencies.database, now);
     registerAuthRoutes(app, {
-      authService: createAuthService(dependencies.database, now),
+      authService,
       appOrigin: dependencies.appOrigin,
       sessionSecure: dependencies.sessionSecure ?? false,
+    });
+    registerFamilyRoutes(app, {
+      authService,
+      familyService: createFamilyService(dependencies.database),
+      appOrigin: dependencies.appOrigin,
     });
   }
 

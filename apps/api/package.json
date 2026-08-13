@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@baby-care/contracts": "workspace:*",
+    "@baby-care/domain": "workspace:*",
     "@baby-care/observability": "workspace:*",
     "drizzle-orm": "latest",
     "fastify": "latest",
