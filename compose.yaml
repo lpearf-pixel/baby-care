@@ -21,6 +21,9 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 8787
       DATABASE_URL: postgres://babycare:babycare@postgres:5432/babycare
+      BABY_CARE_APP_ORIGIN: http://127.0.0.1:8080
+      BABY_CARE_SETUP_TOKEN: local-development-setup-token-change-me
+      SESSION_SECURE: "false"
       DIAGNOSTIC_LEVEL: info
     depends_on:
       postgres:
