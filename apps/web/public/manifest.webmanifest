@@ -1,0 +1,10 @@
+{
+  "name": "Baby Care · xiangxiang",
+  "short_name": "Baby Care",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f4ef",
+  "theme_color": "#f5f4ef",
+  "lang": "zh-CN",
+  "description": "xiangxiang 新生儿家庭护理工作台"
+}

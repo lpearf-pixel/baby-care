@@ -1,0 +1,83 @@
+name: M0 Verify
+
+on:
+  push:
+    branches: ["codex/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Focused verification
+        shell: bash
+        run: |
+          mkdir -p diagnostics/raw
+          set -o pipefail
+          npm run verify:focused 2>&1 | tee diagnostics/raw/focused.log
+      - name: Collect compact diagnostics
+        if: failure()
+        run: npm run diagnostics:collect -- --status failed --component focused
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m0-diagnostics-focused-${{ github.run_id }}
+          path: diagnostics/
+          retention-days: 7
+
+  postgres-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: babycare_test
+          POSTGRES_USER: babycare
+          POSTGRES_PASSWORD: babycare
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U babycare -d babycare_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgresql://babycare:babycare@127.0.0.1:5432/babycare_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: PostgreSQL integration
+        shell: bash
+        run: |
+          mkdir -p diagnostics/raw
+          set -o pipefail
+          npm run test:integration 2>&1 | tee diagnostics/raw/postgres-integration.log
+      - name: Validate Compose model
+        shell: bash
+        run: |
+          set -o pipefail
+          docker compose config 2>&1 | tee diagnostics/raw/compose-config.log
+      - name: Collect compact diagnostics
+        if: failure()
+        run: npm run diagnostics:collect -- --status failed --component postgres-integration
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m0-diagnostics-postgres-${{ github.run_id }}
+          path: diagnostics/
+          retention-days: 7
