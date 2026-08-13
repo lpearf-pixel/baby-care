@@ -1,26 +1,56 @@
 {
   "schema_version": 1,
-  "milestone": "M1 Family and baby foundation",
-  "status": "spec_written_pending_user_review",
-  "branch": "codex/m1-family-baby-foundation",
-  "completed_milestones": ["M0 Repository and delivery foundation"],
-  "m0_verified_ci_run": 31674964075,
-  "design_spec": "docs/superpowers/specs/2026-08-13-m1-family-baby-foundation-design.md",
-  "next_scope": [
-    "family model",
-    "baby profile",
-    "Dad/Mom/Nanny roles",
-    "family-test session flow",
-    "authorization boundaries",
-    "actor/source audit metadata"
+  "milestone": "M2 Care Recording MVP",
+  "status": "written_spec_pending_user_review",
+  "branch": "codex/m2-care-recording-mvp",
+  "completed_milestones": [
+    "M0 Repository and delivery foundation"
   ],
+  "m1_state": "core_implemented_production_gate_correction_required",
+  "m1_authoritative_branch": "codex/m1-family-baby-foundation",
+  "m1_authoritative_head": "f0f3bbc2035ea6c6af6c89e47b17bd1b0ca5419c",
+  "m1_pending_prerequisite_branch": "codex/m1-h-production-flow",
+  "m1_prerequisite": "complete and reverify migrate-before-listen production startup and full Compose family authorization flow before M2 production implementation",
+  "design_spec": "docs/superpowers/specs/2026-08-13-m2-care-recording-mvp-design.md",
   "baby_display_name": "xiangxiang",
-  "m2_real_care_habits_gate": "required_before_care_interaction_defaults",
-  "do_not_start_in_m1": [
-    "feeding interaction defaults",
-    "diaper interaction defaults",
-    "sleep interaction defaults",
+  "m2_real_care_habits_gate": "satisfied",
+  "confirmed_care_habits": {
+    "bottle_capacities_ml": [90, 150, 200],
+    "bottle_capacity_is_intake_shortcut": false,
+    "bottle_liquid_types": ["expressed_breast_milk", "formula"],
+    "breastfeeding_timer": "total_session_duration",
+    "diaper_detail": "detailed_when_stool_present",
+    "sleep_backfill_minutes": [0, 10, 20, 30],
+    "nanny_handoff_schedule": "unknown_do_not_hardcode",
+    "frequent_care_events": [
+      "burping",
+      "spit_up",
+      "crying",
+      "bathing",
+      "temperature",
+      "weight",
+      "medication_administration"
+    ],
+    "home_priorities": [
+      "last_feed_elapsed_and_amount_or_duration",
+      "last_diaper_elapsed",
+      "rolling_24h_measurable_bottle_intake"
+    ],
+    "bottle_quick_values": "top_3_from_recent_20_actual_values_per_liquid_type_by_frequency_then_recency"
+  },
+  "do_not_start_before_written_spec_review": [
+    "M2 implementation plan",
+    "care schema migration",
+    "care API implementation",
+    "care Web interaction implementation"
+  ],
+  "m2_non_goals": [
     "Guardian integration",
-    "JoyAI/Qwen runtime"
+    "JoyAI/Qwen runtime",
+    "automated feeding recognition",
+    "medical diagnosis",
+    "medication dose recommendation",
+    "fixed Nanny shift schedule",
+    "full offline sync"
   ]
 }
