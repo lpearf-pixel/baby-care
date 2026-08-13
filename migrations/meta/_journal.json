@@ -8,6 +8,13 @@
       "when": 1786605204004,
       "tag": "0000_m1_family_identity",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786633200000,
+      "tag": "0001_m2_care_recording",
+      "breakpoints": true
     }
   ]
 }
