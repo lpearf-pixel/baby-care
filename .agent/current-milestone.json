@@ -17,13 +17,13 @@
   "m2_design_head": "eadb8f1d41770b5ef940f16993e57a4cb8ee6bc5",
   "m2_design_status": "approved",
   "m2_design_spec": "docs/superpowers/specs/2026-08-13-m2-care-recording-mvp-design.md",
-  "m2_implementation_plan": "docs/superpowers/plans/2026-08-13-m2-care-recording-mvp-final.md",
+  "m2_implementation_plan": "docs/superpowers/plans/2026-08-13-m2-care-recording-mvp-reviewed.md",
   "baby_display_name": "xiangxiang",
   "m2_real_care_habits_gate": "satisfied",
   "m2_production_baseline_blocker": "cleared",
   "next_scope": [
-    "user reviews M2 implementation plan",
-    "after approval execute the final M2 plan in segmented RED-GREEN-CI tasks"
+    "user reviews reviewed M2 implementation plan",
+    "after approval execute the reviewed M2 plan in segmented RED-GREEN-CI tasks"
   ],
   "do_not_start_before_m2_implementation_plan_approval": [
     "M2 care schema migration",
