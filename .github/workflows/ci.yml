@@ -3,7 +3,8 @@ name: Baby Care CI
 on:
   push:
     branches:
-      - codex/m0-delivery-foundation
+      - main
+      - "codex/**"
   pull_request:
     branches:
       - main
