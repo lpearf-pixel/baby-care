@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.js';
 
 const dadSession = {
@@ -41,6 +41,8 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
 function renderWithApi(api: ReturnType<typeof fakeApi>) {
   render(<App {...({ api } as unknown as Record<string, never>)} />);
 }
+
+afterEach(() => cleanup());
 
 describe('M1 Baby Care family workspace', () => {
   it('shows first-run setup with xiangxiang default and a non-persistent secret field', async () => {
