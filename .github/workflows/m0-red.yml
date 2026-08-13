@@ -1,0 +1,29 @@
+name: M0 RED Baseline
+
+on:
+  push:
+    branches:
+      - codex/m0-delivery-foundation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  red-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.17.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install workspace dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Run RED contract tests
+        run: pnpm test
