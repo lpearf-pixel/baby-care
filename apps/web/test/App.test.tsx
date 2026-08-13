@@ -80,8 +80,8 @@ describe('M1 Baby Care family workspace', () => {
     renderWithApi(api);
 
     expect((await screen.findAllByText('Dad')).length).toBeGreaterThan(0);
-    expect(screen.getByText('xiangxiang')).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: '家庭管理' })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('xiangxiang')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '添加月嫂' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '保存宝宝资料' })).toBeInTheDocument();
     expect(screen.queryByText(/上次喂奶|正在睡眠|尿布|奶量/)).not.toBeInTheDocument();
