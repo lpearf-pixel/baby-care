@@ -57,6 +57,8 @@ Every record exposed in the Baby Timeline has these stable concepts:
 
 The timeline envelope is not a license for arbitrary care JSON. Type-specific fields remain validated by dedicated contracts.
 
+For normal manual writes, `family_id`, `baby_id`, `actor_user_id`, and `source=manual` are assigned by the authenticated server context rather than trusted from the client.
+
 ## 5. Feeding model
 
 ### 5.1 Feeding Session
@@ -75,6 +77,8 @@ A session can include:
 Example:
 
 `02:10 direct breastfeeding 18 min -> formula 45 ml -> burped -> small spit-up`
+
+When a session contains multiple feeding components, “last feeding” may display the compact combined summary rather than dropping one component.
 
 ### 5.2 Direct breastfeeding
 
@@ -106,16 +110,17 @@ Only actual consumed amount contributes to bottle-volume aggregates.
 
 M2 must not seed 90/150/200 ml as feeding amount buttons.
 
-The quick-value system learns from recent actual consumed amounts. Requirements:
+Quick values are deterministic and maintained separately for expressed breast milk and formula:
 
-- expressed breast milk and formula maintain separate recent-value histories
-- prefer recent and repeated actual values
-- de-duplicate nearby identical values
-- keep the list small enough for one-handed use
-- always provide `Other` / numeric entry
-- when history is insufficient, use numeric entry rather than invented feeding defaults
+1. take the most recent 20 active bottle-feeding components for that liquid type;
+2. group by exact actual consumed ml;
+3. rank by frequency descending;
+4. break frequency ties by most recent use descending;
+5. display at most the top 3 unique amounts;
+6. always provide `Other` / numeric entry;
+7. with no history, show numeric entry only rather than invented feeding defaults.
 
-The exact ranking algorithm is an implementation detail, but its behavior must be deterministic and testable. A simple weighted frequency/recency algorithm is preferred over ML.
+This simple recency/frequency rule is preferred over ML and must be covered by unit tests.
 
 ## 6. Diaper and stool model
 
@@ -159,7 +164,9 @@ Both support fast time choices:
 
 Requirements:
 
-- manual backfill is supported
+- manual backfill is supported without an arbitrary historical cutoff
+- an `occurred_at` more than 5 minutes in the future relative to server time is rejected as structurally invalid; the 5-minute tolerance exists only for device clock skew
+- older backfills may receive a soft “confirm this time” prompt but remain recordable
 - manual correction/edit is supported
 - overlapping or inconsistent intervals generate a soft correction flow, not silent data loss
 - future Guardian suggestions may propose corrections but never silently overwrite manual sleep facts
@@ -205,7 +212,7 @@ M2 records the event; it does not diagnose cry cause.
 ### Weight
 
 - numeric weight
-- canonical storage unit
+- stored canonically in kilograms
 - occurred time
 - note
 
@@ -227,6 +234,7 @@ M2 must expose enough query support for the following first-screen facts, even i
    - elapsed time since feed
    - bottle: liquid type + actual consumed ml
    - direct breastfeeding: total duration
+   - combined feeding session: compactly show both when applicable
 2. Last diaper
    - elapsed time
    - urine/stool classification
@@ -250,7 +258,7 @@ Bottle total:
 
 Direct breastfeeding summary:
 
-- session/component count
+- component/session count
 - total recorded minutes
 
 Calendar-day summaries remain secondary and can be expanded later.
@@ -292,7 +300,7 @@ M2 uses soft validation for plausible input mistakes.
 
 Example: recent feeding amounts cluster near 60 ml and a user enters 600 ml. The UI/API may flag the value as unusual and ask for confirmation, but must not silently rewrite it to 60 ml.
 
-Hard validation remains for structurally invalid data such as negative volumes or impossible timestamps outside allowed correction bounds.
+Hard validation remains for structurally invalid data such as negative amounts/durations or an `occurred_at` beyond the allowed 5-minute future clock-skew tolerance.
 
 ## 14. Nanny handoff boundary
 
@@ -357,9 +365,9 @@ Audit/diagnostic data must not include:
 - session tokens/cookies
 - setup token
 - unnecessary IP/network details
-- medication secrets do not exist; medication facts are care data and stay in the private care database, not diagnostic summaries
+- full care payloads when a compact event identifier/reason is sufficient
 
-Compact diagnostics identify failing care component/event IDs without dumping the user's entire Baby Timeline.
+Medication facts, temperatures, weights, and notes stay in the private care database and must not be dumped wholesale into compact diagnostics.
 
 ## 19. Offline/weak-network behavior
 
@@ -382,10 +390,12 @@ Required focused/domain tests:
 
 - bottle capacity never affects intake total
 - breast milk bottle and formula histories learn quick values independently
+- recent-20 frequency/recency quick-value ranking is deterministic
 - direct breastfeeding contributes minutes/count, never inferred ml
 - rolling 24-hour boundary behavior
 - diaper progressive detail validation
 - sleep now/10/20/30/custom backfill
+- future timestamp tolerance/rejection
 - sleep correction/overlap handling
 - undo/edit audit semantics
 - duplicate warning without silent merge
