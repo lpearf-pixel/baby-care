@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "milestone": "M0 Repository and delivery foundation",
+  "status": "release_gate",
+  "branch": "codex/m0-delivery-foundation",
+  "completed_segments": [
+    "spec-and-plan",
+    "workspace-contracts-observability",
+    "api-health-tracing",
+    "web-pwa-shell",
+    "postgres-integration",
+    "compact-diagnostics",
+    "docker-compose",
+    "segmented-ci"
+  ],
+  "current_gate": "final frozen-lockfile release verification",
+  "next_milestone": "M1 Family and baby foundation",
+  "baby_display_name": "xiangxiang",
+  "m2_real_care_habits_gate": "required_before_care_interaction_defaults"
+}
