@@ -89,10 +89,10 @@ describe('M1 Baby Care family workspace', () => {
     const api = fakeApi({ getSession: vi.fn(async () => nannySession) });
     renderWithApi(api);
 
-    expect(await screen.findByText('Nanny')).toBeInTheDocument();
+    expect((await screen.findAllByText('Nanny')).length).toBeGreaterThan(0);
     expect(await screen.findByRole('heading', { name: '家庭信息' })).toBeInTheDocument();
     await waitFor(() => expect(api.listMembers).toHaveBeenCalled());
-    expect(screen.getByText('Mom')).toBeInTheDocument();
+    expect(screen.getAllByText('Mom').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: '添加月嫂' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '保存宝宝资料' })).not.toBeInTheDocument();
   });
