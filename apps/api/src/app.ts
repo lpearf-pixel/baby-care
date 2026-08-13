@@ -1,8 +1,10 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { resolveTraceId } from '@baby-care/observability';
+import { createAuthService } from './auth/auth-service.js';
 import type { DatabaseContext } from './db.js';
 import { createFamilyRepository } from './family/family-repository.js';
 import { createSetupService } from './family/setup-service.js';
+import { registerAuthRoutes } from './routes/auth.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerSetupRoutes } from './routes/setup.js';
 
@@ -12,6 +14,7 @@ export interface AppDependencies {
   database?: DatabaseContext;
   appOrigin?: string;
   setupToken?: string;
+  sessionSecure?: boolean;
 }
 
 export function buildApp(dependencies: AppDependencies): FastifyInstance {
@@ -33,6 +36,14 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
     checkDatabase: dependencies.checkDatabase,
     now,
   });
+
+  if (dependencies.database && dependencies.appOrigin) {
+    registerAuthRoutes(app, {
+      authService: createAuthService(dependencies.database, now),
+      appOrigin: dependencies.appOrigin,
+      sessionSecure: dependencies.sessionSecure ?? false,
+    });
+  }
 
   if (dependencies.database && dependencies.appOrigin && dependencies.setupToken) {
     registerSetupRoutes(app, {
