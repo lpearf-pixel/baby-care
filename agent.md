@@ -23,6 +23,8 @@ Birth Ready v0.1 targets one family and one baby with three roles:
 - Mom
 - Nanny / 月嫂
 
+Current baby development/display nickname: **xiangxiang**.
+
 Requirements:
 
 - Dad and Mom can manage family settings, export data, and review Guardian information.
@@ -84,6 +86,21 @@ Birth Ready prioritizes:
 - Backup and restore
 
 Defer non-critical features such as advanced AI analytics, vaccination management, native apps, complex content generation, or broad health knowledge chat until core family use is stable.
+
+### M2 real-care-habits gate
+
+Before implementing or finalizing M2 Care Recording MVP interaction defaults, **ask the user for the family's real care habits**. Do not silently lock UX around placeholder assumptions.
+
+At minimum collect:
+
+- common bottle volumes / preferred quick-entry buttons
+- mixed-feeding workflow and whether bottle milk should distinguish expressed breast milk vs formula
+- breastfeeding tracking preference: left/right timing vs simpler total-session timing
+- diaper/stool detail level the family actually wants to record
+- nanny handoff/shift timing and what free-text notes matter
+- any other repeated care action that should be reachable in about 2-3 taps
+
+The user explicitly asked to be reminded at the care-recording stage. Treat this as a required product-input gate, not optional polish.
 
 ### Mixed feeding rule
 
