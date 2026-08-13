@@ -9,8 +9,16 @@ Read `/agent.md` first. This file is the compact execution index; detailed miles
 
 ## Current state
 
-Current milestone: **M1 — Family and baby foundation**  
-Previous milestone: **M0 — Repository and delivery foundation — complete**
+Current milestone: **M2 — Care Recording MVP — ready for implementation planning**
+Previous milestone: **M1 — Family and baby foundation — verified complete**
+
+M1-H production closure is complete. The API now migrates before listening, fails closed
+with database resources released when startup fails, and wires the full M1 family runtime
+in production. The empty-database Docker Compose family authorization flow is verified.
+
+M2 design and the real-family care-habits input gate were completed in the independent
+`codex/m2-care-recording-mvp` work. M1-H no longer blocks M2 implementation planning;
+the M2 care design remains authoritative on that branch and is not duplicated here.
 
 M0 established:
 
@@ -96,7 +104,7 @@ Gate evidence required and achieved before moving on:
 - frozen-lockfile reproducibility
 - compact diagnostic artifact path for failures
 
-### M1 — Family and baby foundation — CURRENT
+### M1 — Family and baby foundation — COMPLETE
 
 Deliverables:
 
@@ -109,24 +117,19 @@ Deliverables:
 
 Gate:
 
-- all three roles can access only allowed functionality
-- Nanny cannot access restricted admin/private functions
-- concurrent writes preserve correct actor/source attribution
+- all three roles can access only allowed functionality — verified
+- Nanny cannot access restricted admin/private functions — verified
+- concurrent writes preserve correct actor/source attribution — verified
+- production startup migrates before listen and fails closed — verified
+- empty-database production Compose family authorization flow — verified
 
-### M2 — Care recording MVP — INPUT GATE REQUIRED
+### M2 — Care recording MVP — DESIGN APPROVED / READY FOR IMPLEMENTATION PLANNING
 
-**Before designing/finalizing care interaction defaults, ask the user for real family care habits. Do not proceed from placeholder assumptions.**
+The real-family care-habits gate is satisfied and the approved design lives on
+`codex/m2-care-recording-mvp`. Create and approve its implementation plan before writing
+M2 production code. Do not modify the approved care-habit design as part of M1 closure.
 
-Collect at minimum:
-
-- common bottle volumes / quick buttons
-- expressed breast milk vs formula workflow
-- breastfeeding left/right timing vs total-session preference
-- desired diaper/stool detail level
-- nanny handoff/shift timing and note needs
-- other repeated actions that should fit in 2-3 taps
-
-Then implement:
+Approved implementation scope includes:
 
 - mixed-feeding session
 - diaper/stool
@@ -227,4 +230,5 @@ Agents read the minimum evidence required for the current decision:
 
 ## Next action
 
-Start the M1 design/spec for family, baby, role/session, and audit boundaries. M1 must not introduce M2 care-recording interaction assumptions.
+From `codex/m2-care-recording-mvp`, review the approved M2 specification and create the
+M2 implementation plan using the verified authoritative M1 production baseline.
