@@ -1,0 +1,52 @@
+name: Bootstrap pnpm lockfile
+
+on:
+  push:
+    branches:
+      - codex/m0-delivery-foundation
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: baby-care-lockfile-bootstrap
+  cancel-in-progress: true
+
+jobs:
+  lockfile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stop when lockfile already exists
+        id: lock
+        shell: bash
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: pnpm/action-setup@v4
+        if: steps.lock.outputs.needed == 'true'
+        with:
+          version: 10.17.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        if: steps.lock.outputs.needed == 'true'
+        with:
+          node-version: 24
+      - name: Generate lockfile
+        if: steps.lock.outputs.needed == 'true'
+        run: pnpm install --lockfile-only --no-frozen-lockfile
+      - name: Commit lockfile to feature branch
+        if: steps.lock.outputs.needed == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pnpm-lock.yaml
+          git commit -m "chore: lock M0 dependencies"
+          git push origin HEAD:codex/m0-delivery-foundation
