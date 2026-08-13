@@ -13,14 +13,15 @@ afterEach(async () => {
   }
 });
 
+async function migrateDatabase(): Promise<DatabaseContext> {
+  const context = createDatabase(testDatabaseUrl!);
+  await context.migrate();
+  return context;
+}
+
 describeDatabase('M1 database migrations', () => {
   it('migrates an empty database and creates the six M1 tables', async () => {
-    database = createDatabase(testDatabaseUrl!);
-    const migrate = (database as DatabaseContext & { migrate?: () => Promise<void> }).migrate;
-
-    expect(migrate).toBeTypeOf('function');
-    await migrate!.call(database);
-
+    database = await migrateDatabase();
     const result = await database.pool.query<{ table_name: string }>(
       `select table_name from information_schema.tables where table_schema = 'public'`,
     );
@@ -38,14 +39,10 @@ describeDatabase('M1 database migrations', () => {
     }
   });
 
-  it('enforces the active-family singleton and one baby per family', async () => {
-    database = createDatabase(testDatabaseUrl!);
-    const migrate = (database as DatabaseContext & { migrate?: () => Promise<void> }).migrate;
-
-    expect(migrate).toBeTypeOf('function');
-    await migrate!.call(database);
-
+  it('enforces one active family and one baby per family', async () => {
+    database = await migrateDatabase();
     const familyId = '11111111-1111-4111-8111-111111111111';
+
     await database.pool.query(
       `insert into families (id, name, timezone, status) values ($1, 'Xiangxiang Family', 'Asia/Shanghai', 'active')`,
       [familyId],
@@ -66,6 +63,45 @@ describeDatabase('M1 database migrations', () => {
       database.pool.query(
         `insert into babies (id, family_id, display_name, status) values ('44444444-4444-4444-8444-444444444444', $1, 'another baby', 'active')`,
         [familyId],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+  });
+
+  it('enforces one active relationship and unique session token hashes', async () => {
+    database = await migrateDatabase();
+    const familyId = '55555555-5555-4555-8555-555555555555';
+    const dadId = '66666666-6666-4666-8666-666666666666';
+    const otherDadId = '77777777-7777-4777-8777-777777777777';
+
+    await database.pool.query(
+      `insert into families (id, name, timezone, status) values ($1, 'Xiangxiang Family', 'Asia/Shanghai', 'active')`,
+      [familyId],
+    );
+    await database.pool.query(
+      `insert into users (id, login_name, display_name, password_hash, status) values ($1, 'dad', 'Dad', 'hash-1', 'active'), ($2, 'dad2', 'Dad 2', 'hash-2', 'active')`,
+      [dadId, otherDadId],
+    );
+    await database.pool.query(
+      `insert into family_memberships (id, family_id, user_id, relationship, permission_level, status) values ('88888888-8888-4888-8888-888888888888', $1, $2, 'dad', 'family_admin', 'active')`,
+      [familyId, dadId],
+    );
+
+    await expect(
+      database.pool.query(
+        `insert into family_memberships (id, family_id, user_id, relationship, permission_level, status) values ('99999999-9999-4999-8999-999999999999', $1, $2, 'dad', 'family_admin', 'active')`,
+        [familyId, otherDadId],
+      ),
+    ).rejects.toMatchObject({ code: '23505' });
+
+    await database.pool.query(
+      `insert into sessions (id, family_id, user_id, token_hash, expires_at) values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', $1, $2, 'same-token-hash', now() + interval '1 day')`,
+      [familyId, dadId],
+    );
+
+    await expect(
+      database.pool.query(
+        `insert into sessions (id, family_id, user_id, token_hash, expires_at) values ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', $1, $2, 'same-token-hash', now() + interval '1 day')`,
+        [familyId, dadId],
       ),
     ).rejects.toMatchObject({ code: '23505' });
   });

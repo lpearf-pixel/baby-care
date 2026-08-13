@@ -1,20 +1,26 @@
 import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate as runDrizzleMigrations } from 'drizzle-orm/node-postgres/migrator';
+import * as schema from './schema.js';
 
 export interface DatabaseContext {
   pool: pg.Pool;
   orm: ReturnType<typeof drizzle>;
+  migrate: () => Promise<void>;
   checkDatabase: () => Promise<boolean>;
   close: () => Promise<void>;
 }
 
 export function createDatabase(databaseUrl: string): DatabaseContext {
   const pool = new pg.Pool({ connectionString: databaseUrl });
-  const orm = drizzle(pool);
+  const orm = drizzle(pool, { schema });
 
   return {
     pool,
     orm,
+    async migrate(): Promise<void> {
+      await runDrizzleMigrations(orm, { migrationsFolder: './migrations' });
+    },
     async checkDatabase(): Promise<boolean> {
       try {
         await pool.query('select 1 as ok');
