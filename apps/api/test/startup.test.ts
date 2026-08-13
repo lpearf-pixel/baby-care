@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { startServer as startProductionServer } from '../src/startup.js';
 
 interface StartupModule {
   startServer?: (options: {
@@ -15,13 +16,7 @@ interface StartupModule {
   }) => Promise<void>;
 }
 
-async function loadStartup(): Promise<Partial<StartupModule>> {
-  try {
-    return await vi.importActual<StartupModule>('../src/startup.js');
-  } catch {
-    return {};
-  }
-}
+const startServer = startProductionServer as unknown as NonNullable<StartupModule['startServer']>;
 
 const environment = {
   DATABASE_URL: 'postgres://example/test',
@@ -34,14 +29,11 @@ const environment = {
 
 describe('production API startup', () => {
   it('migrates before building/listening and injects M1 runtime configuration', async () => {
-    const startup = await loadStartup();
-    expect(startup.startServer).toBeTypeOf('function');
-
     const events: string[] = [];
     let capturedDependencies: Record<string, unknown> | undefined;
     let closeHook: (() => Promise<void>) | undefined;
 
-    await startup.startServer!({
+    await startServer({
       environment,
       createDatabase: () => ({
         migrate: async () => { events.push('migrate'); },
@@ -70,12 +62,9 @@ describe('production API startup', () => {
   });
 
   it('does not build or listen when migration fails and closes the database', async () => {
-    const startup = await loadStartup();
-    expect(startup.startServer).toBeTypeOf('function');
-
     const events: string[] = [];
     await expect(
-      startup.startServer!({
+      startServer({
         environment,
         createDatabase: () => ({
           migrate: async () => {

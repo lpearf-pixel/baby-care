@@ -23,9 +23,15 @@ async function waitFor(path, expectedStatus = 200) {
   throw new Error(`SMOKE_FAILED path=${path} expected=${expectedStatus} actual=${last}`);
 }
 
-function cookieFrom(response) {
+function cookieFrom(response, { secure }) {
   const setCookie = response.headers.get('set-cookie');
   if (!setCookie) throw new Error('SMOKE_FAILED expected session cookie');
+  if (!/;\s*HttpOnly(?:;|$)/i.test(setCookie) || !/;\s*SameSite=Lax(?:;|$)/i.test(setCookie)) {
+    throw new Error('SMOKE_FAILED session cookie policy mismatch');
+  }
+  if (/;\s*Secure(?:;|$)/i.test(setCookie) !== secure) {
+    throw new Error('SMOKE_FAILED session cookie secure mismatch');
+  }
   const cookie = setCookie.split(';', 1)[0];
   if (!cookie?.startsWith('baby_care_session=')) {
     throw new Error('SMOKE_FAILED unexpected session cookie');
@@ -87,7 +93,7 @@ const dadLogin = await request('/api/auth/login', {
   method: 'POST',
   body: { loginName: 'dad', password: 'dad-smoke-password' },
 });
-const dadCookie = cookieFrom(dadLogin.response);
+const dadCookie = cookieFrom(dadLogin.response, { secure: false });
 
 const dadSession = await request('/api/auth/session', { cookie: dadCookie });
 if (dadSession.payload?.relationship !== 'dad' || dadSession.payload?.permissionLevel !== 'family_admin') {
@@ -106,11 +112,27 @@ const nannyLogin = await request('/api/auth/login', {
   method: 'POST',
   body: { loginName: 'nanny', password: 'nanny-smoke-password' },
 });
-const nannyCookie = cookieFrom(nannyLogin.response);
+const nannyCookie = cookieFrom(nannyLogin.response, { secure: false });
+
+const nannyFamily = await request('/api/family', { cookie: nannyCookie });
+if (nannyFamily.payload?.name !== 'Xiangxiang Family') {
+  throw new Error('SMOKE_FAILED Nanny family read mismatch');
+}
 
 const nannyBaby = await request('/api/baby', { cookie: nannyCookie });
 if (nannyBaby.payload?.displayName !== 'xiangxiang') {
   throw new Error('SMOKE_FAILED Nanny baby read mismatch');
+}
+
+const nannyMembers = await request('/api/family/members', { cookie: nannyCookie });
+if (!Array.isArray(nannyMembers.payload) || nannyMembers.payload.length !== 3) {
+  throw new Error('SMOKE_FAILED Nanny members read mismatch');
+}
+for (const member of nannyMembers.payload) {
+  const fields = Object.keys(member).sort().join(',');
+  if (fields !== 'displayName,membershipId,permissionLevel,relationship,status') {
+    throw new Error('SMOKE_FAILED Nanny member projection mismatch');
+  }
 }
 
 const nannyForbidden = await request('/api/family', {
