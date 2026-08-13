@@ -57,7 +57,11 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthRoute
       return sendError(reply, 401, 'invalid_credentials', 'The login name or password is incorrect.', request.id);
     }
 
-    const result = await dependencies.authService.login(parsed.data.loginName, parsed.data.password);
+    const result = await dependencies.authService.login(
+      parsed.data.loginName,
+      parsed.data.password,
+      request.id,
+    );
     if (!result) {
       return sendError(reply, 401, 'invalid_credentials', 'The login name or password is incorrect.', request.id);
     }
@@ -84,7 +88,7 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthRoute
     if (!requireOrigin(request, reply, dependencies.appOrigin)) return;
 
     const rawToken = readSessionCookie(request.headers.cookie);
-    if (rawToken) await dependencies.authService.logout(rawToken);
+    if (rawToken) await dependencies.authService.logout(rawToken, request.id);
     reply.header('set-cookie', serializeClearedSessionCookie(dependencies.sessionSecure));
     return reply.code(204).send();
   });
@@ -106,6 +110,7 @@ export function registerAuthRoutes(app: FastifyInstance, dependencies: AuthRoute
       rawToken,
       parsed.data.currentPassword,
       parsed.data.newPassword,
+      request.id,
     );
     if (!result) {
       return sendError(reply, 401, 'invalid_credentials', 'The current password is incorrect.', request.id);

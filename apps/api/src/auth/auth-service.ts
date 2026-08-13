@@ -1,5 +1,7 @@
+import type pg from 'pg';
 import type { SessionDto } from '@baby-care/contracts';
 import type { DatabaseContext } from '../db.js';
+import { writeAudit } from '../audit/audit-repository.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { createSessionToken, hashSessionToken } from './session-token.js';
 
@@ -74,14 +76,14 @@ function authSelect(whereClause: string): string {
 }
 
 async function insertSession(
-  database: DatabaseContext,
+  client: pg.Pool | pg.PoolClient,
   familyId: string,
   userId: string,
   now: Date,
 ): Promise<{ raw: string; hash: string }> {
   const token = createSessionToken();
   const expiresAt = new Date(now.getTime() + SESSION_LIFETIME_MS);
-  await database.pool.query(
+  await client.query(
     `insert into sessions (family_id, user_id, token_hash, created_at, expires_at, last_seen_at)
      values ($1, $2, $3, $4, $5, $4)`,
     [familyId, userId, token.hash, now, expiresAt],
@@ -90,6 +92,40 @@ async function insertSession(
 }
 
 export function createAuthService(database: DatabaseContext, now: () => Date = () => new Date()) {
+  async function activeFamilyId(): Promise<string | null> {
+    const result = await database.pool.query<{ id: string }>(
+      `select id from families where status = 'active' limit 1`,
+    );
+    return result.rows[0]?.id ?? null;
+  }
+
+  async function auditFailedLogin(traceId: string): Promise<void> {
+    const familyId = await activeFamilyId();
+    if (!familyId) return;
+    const client = await database.pool.connect();
+    try {
+      await client.query('begin');
+      await writeAudit(client, {
+        familyId,
+        actorUserId: null,
+        actorMembershipId: null,
+        action: 'auth.login_failed',
+        targetType: 'auth',
+        targetId: null,
+        source: 'api',
+        traceId,
+        metadata: null,
+        occurredAt: now(),
+      });
+      await client.query('commit');
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async function authenticate(rawToken: string): Promise<{ context: AuthContext; session: SessionDto } | null> {
     const current = now();
     const tokenHash = hashSessionToken(rawToken);
@@ -123,32 +159,83 @@ export function createAuthService(database: DatabaseContext, now: () => Date = (
   }
 
   return {
-    async login(loginName: string, password: string): Promise<LoginResult | null> {
+    async login(loginName: string, password: string, traceId: string): Promise<LoginResult | null> {
       const result = await database.pool.query<AuthRow>(
         authSelect('where u.login_name = $1'),
         [normalizeLoginName(loginName)],
       );
       const row = result.rows[0];
-      if (!row?.password_hash) return null;
-      if (!(await verifyPassword(row.password_hash, password))) return null;
+      if (!row?.password_hash || !(await verifyPassword(row.password_hash, password))) {
+        await auditFailedLogin(traceId);
+        return null;
+      }
 
-      const token = await insertSession(database, row.family_id, row.user_id, now());
-      return { rawToken: token.raw, session: toSessionDto(row) };
+      const current = now();
+      const client = await database.pool.connect();
+      try {
+        await client.query('begin');
+        const token = await insertSession(client, row.family_id, row.user_id, current);
+        await writeAudit(client, {
+          familyId: row.family_id,
+          actorUserId: row.user_id,
+          actorMembershipId: row.membership_id,
+          action: 'auth.login_succeeded',
+          targetType: 'user',
+          targetId: row.user_id,
+          source: 'api',
+          traceId,
+          metadata: null,
+          occurredAt: current,
+        });
+        await client.query('commit');
+        return { rawToken: token.raw, session: toSessionDto(row) };
+      } catch (error) {
+        await client.query('rollback');
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
     authenticate,
 
-    async logout(rawToken: string): Promise<void> {
-      await database.pool.query(
-        `update sessions set revoked_at = coalesce(revoked_at, $2) where token_hash = $1`,
-        [hashSessionToken(rawToken), now()],
-      );
+    async logout(rawToken: string, traceId: string): Promise<void> {
+      const authenticated = await authenticate(rawToken);
+      if (!authenticated) return;
+      const current = now();
+      const client = await database.pool.connect();
+      try {
+        await client.query('begin');
+        await client.query(
+          `update sessions set revoked_at = coalesce(revoked_at, $2) where token_hash = $1`,
+          [hashSessionToken(rawToken), current],
+        );
+        await writeAudit(client, {
+          familyId: authenticated.context.familyId,
+          actorUserId: authenticated.context.userId,
+          actorMembershipId: authenticated.context.membershipId,
+          action: 'auth.logout',
+          targetType: 'user',
+          targetId: authenticated.context.userId,
+          source: 'api',
+          traceId,
+          metadata: null,
+          occurredAt: current,
+        });
+        await client.query('commit');
+      } catch (error) {
+        await client.query('rollback');
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
     async changePassword(
       rawToken: string,
       currentPassword: string,
       nextPassword: string,
+      traceId: string,
     ): Promise<LoginResult | null> {
       const authenticated = await authenticate(rawToken);
       if (!authenticated) return null;
@@ -187,6 +274,18 @@ export function createAuthService(database: DatabaseContext, now: () => Date = (
             expiresAt,
           ],
         );
+        await writeAudit(client, {
+          familyId: authenticated.context.familyId,
+          actorUserId: authenticated.context.userId,
+          actorMembershipId: authenticated.context.membershipId,
+          action: 'auth.password_changed',
+          targetType: 'user',
+          targetId: authenticated.context.userId,
+          source: 'api',
+          traceId,
+          metadata: null,
+          occurredAt: current,
+        });
         await client.query('commit');
       } catch (error) {
         await client.query('rollback');

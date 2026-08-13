@@ -10,6 +10,7 @@ import { can, type Capability } from '@baby-care/domain';
 import type { DatabaseContext } from '../db.js';
 import type { AuthContext } from '../auth/auth-service.js';
 import { hashPassword } from '../auth/password.js';
+import { writeAudit } from '../audit/audit-repository.js';
 
 export class FamilyForbiddenError extends Error {
   readonly code = 'forbidden' as const;
@@ -96,17 +97,39 @@ export function createFamilyService(database: DatabaseContext) {
       return result.rows[0];
     },
 
-    async updateFamily(context: AuthContext, input: UpdateFamilyInput): Promise<FamilyDto> {
+    async updateFamily(context: AuthContext, input: UpdateFamilyInput, traceId: string): Promise<FamilyDto> {
       requireCapability(context, 'family.update');
-      const result = await database.pool.query<FamilyDto>(
-        `update families
-         set name = coalesce($2, name), timezone = coalesce($3, timezone), updated_at = now()
-         where id = $1 and status = 'active'
-         returning id, name, timezone, status`,
-        [context.familyId, input.name ?? null, input.timezone ?? null],
-      );
-      if (!result.rows[0]) throw new Error('active family missing');
-      return result.rows[0];
+      const client = await database.pool.connect();
+      try {
+        await client.query('begin');
+        const result = await client.query<FamilyDto>(
+          `update families
+           set name = coalesce($2, name), timezone = coalesce($3, timezone), updated_at = now()
+           where id = $1 and status = 'active'
+           returning id, name, timezone, status`,
+          [context.familyId, input.name ?? null, input.timezone ?? null],
+        );
+        const family = result.rows[0];
+        if (!family) throw new Error('active family missing');
+        await writeAudit(client, {
+          familyId: context.familyId,
+          actorUserId: context.userId,
+          actorMembershipId: context.membershipId,
+          action: 'family.updated',
+          targetType: 'family',
+          targetId: context.familyId,
+          source: 'api',
+          traceId,
+          metadata: null,
+        });
+        await client.query('commit');
+        return family;
+      } catch (error) {
+        await client.query('rollback');
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
     async getBaby(context: AuthContext): Promise<BabyDto> {
@@ -130,36 +153,57 @@ export function createFamilyService(database: DatabaseContext) {
       };
     },
 
-    async updateBaby(context: AuthContext, input: UpdateBabyInput): Promise<BabyDto> {
+    async updateBaby(context: AuthContext, input: UpdateBabyInput, traceId: string): Promise<BabyDto> {
       requireCapability(context, 'baby.update');
       const hasBirthDate = Object.prototype.hasOwnProperty.call(input, 'birthDate');
-      const result = await database.pool.query<{
-        id: string;
-        display_name: string;
-        birth_date: string | Date | null;
-        status: 'active';
-      }>(
-        `update babies
-         set display_name = coalesce($2, display_name),
-             birth_date = case when $3::boolean then $4::date else birth_date end,
-             updated_at = now()
-         where family_id = $1 and status = 'active'
-         returning id, display_name, birth_date, status`,
-        [context.familyId, input.displayName ?? null, hasBirthDate, input.birthDate ?? null],
-      );
-      const row = result.rows[0];
-      if (!row) throw new Error('active baby missing');
-      return {
-        id: row.id,
-        displayName: row.display_name,
-        birthDate: toDateOnly(row.birth_date),
-        status: row.status,
-      };
+      const client = await database.pool.connect();
+      try {
+        await client.query('begin');
+        const result = await client.query<{
+          id: string;
+          display_name: string;
+          birth_date: string | Date | null;
+          status: 'active';
+        }>(
+          `update babies
+           set display_name = coalesce($2, display_name),
+               birth_date = case when $3::boolean then $4::date else birth_date end,
+               updated_at = now()
+           where family_id = $1 and status = 'active'
+           returning id, display_name, birth_date, status`,
+          [context.familyId, input.displayName ?? null, hasBirthDate, input.birthDate ?? null],
+        );
+        const row = result.rows[0];
+        if (!row) throw new Error('active baby missing');
+        await writeAudit(client, {
+          familyId: context.familyId,
+          actorUserId: context.userId,
+          actorMembershipId: context.membershipId,
+          action: 'baby.updated',
+          targetType: 'baby',
+          targetId: row.id,
+          source: 'api',
+          traceId,
+          metadata: null,
+        });
+        await client.query('commit');
+        return {
+          id: row.id,
+          displayName: row.display_name,
+          birthDate: toDateOnly(row.birth_date),
+          status: row.status,
+        };
+      } catch (error) {
+        await client.query('rollback');
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
     listMembers,
 
-    async createNanny(context: AuthContext, input: CreateNannyInput): Promise<MemberDto> {
+    async createNanny(context: AuthContext, input: CreateNannyInput, traceId: string): Promise<MemberDto> {
       requireCapability(context, 'members.manage');
       const active = await database.pool.query(
         `select 1 from family_memberships where family_id = $1 and relationship = 'nanny' and status = 'active' limit 1`,
@@ -181,9 +225,21 @@ export function createFamilyService(database: DatabaseContext) {
            values ($1, $2, 'nanny', 'caregiver', 'active') returning id`,
           [context.familyId, user.rows[0]!.id],
         );
+        const membershipId = membership.rows[0]!.id;
+        await writeAudit(client, {
+          familyId: context.familyId,
+          actorUserId: context.userId,
+          actorMembershipId: context.membershipId,
+          action: 'member.nanny_created',
+          targetType: 'membership',
+          targetId: membershipId,
+          source: 'api',
+          traceId,
+          metadata: null,
+        });
         await client.query('commit');
         return {
-          membershipId: membership.rows[0]!.id,
+          membershipId,
           displayName: input.displayName,
           relationship: 'nanny',
           permissionLevel: 'caregiver',
@@ -198,17 +254,39 @@ export function createFamilyService(database: DatabaseContext) {
       }
     },
 
-    async setNannyStatus(context: AuthContext, membershipId: string, status: 'active' | 'disabled'): Promise<MemberDto> {
+    async setNannyStatus(
+      context: AuthContext,
+      membershipId: string,
+      status: 'active' | 'disabled',
+      traceId: string,
+    ): Promise<MemberDto> {
       requireCapability(context, 'members.manage');
       await nannyTarget(context, membershipId);
+      const client = await database.pool.connect();
       try {
-        await database.pool.query(
+        await client.query('begin');
+        await client.query(
           `update family_memberships set status = $3, updated_at = now() where id = $1 and family_id = $2`,
           [membershipId, context.familyId, status],
         );
+        await writeAudit(client, {
+          familyId: context.familyId,
+          actorUserId: context.userId,
+          actorMembershipId: context.membershipId,
+          action: status === 'active' ? 'member.nanny_enabled' : 'member.nanny_disabled',
+          targetType: 'membership',
+          targetId: membershipId,
+          source: 'api',
+          traceId,
+          metadata: null,
+        });
+        await client.query('commit');
       } catch (error) {
+        await client.query('rollback');
         if ((error as { code?: string }).code === '23505') throw new MemberAlreadyExistsError();
         throw error;
+      } finally {
+        client.release();
       }
       const members = await listMembers(context);
       const member = members.find((item) => item.membershipId === membershipId);
@@ -216,7 +294,12 @@ export function createFamilyService(database: DatabaseContext) {
       return member;
     },
 
-    async resetNannyPassword(context: AuthContext, membershipId: string, newPassword: string): Promise<void> {
+    async resetNannyPassword(
+      context: AuthContext,
+      membershipId: string,
+      newPassword: string,
+      traceId: string,
+    ): Promise<void> {
       requireCapability(context, 'credentials.reset_nanny');
       const target = await nannyTarget(context, membershipId);
       const passwordHash = await hashPassword(newPassword);
@@ -225,6 +308,17 @@ export function createFamilyService(database: DatabaseContext) {
         await client.query('begin');
         await client.query(`update users set password_hash = $2, updated_at = now() where id = $1`, [target.user_id, passwordHash]);
         await client.query(`update sessions set revoked_at = coalesce(revoked_at, now()) where user_id = $1`, [target.user_id]);
+        await writeAudit(client, {
+          familyId: context.familyId,
+          actorUserId: context.userId,
+          actorMembershipId: context.membershipId,
+          action: 'member.nanny_password_reset',
+          targetType: 'membership',
+          targetId: membershipId,
+          source: 'api',
+          traceId,
+          metadata: null,
+        });
         await client.query('commit');
       } catch (error) {
         await client.query('rollback');

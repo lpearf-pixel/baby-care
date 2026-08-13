@@ -85,7 +85,7 @@ export function registerFamilyRoutes(app: FastifyInstance, dependencies: FamilyR
     const parsed = UpdateFamilyInputSchema.safeParse(request.body);
     if (!parsed.success) return sendError(reply, 400, 'validation_failed', 'The family update is invalid.', request.id);
     try {
-      return reply.send(await dependencies.familyService.updateFamily(context, parsed.data));
+      return reply.send(await dependencies.familyService.updateFamily(context, parsed.data, request.id));
     } catch (error) {
       return handleFamilyError(reply, request, error);
     }
@@ -108,7 +108,7 @@ export function registerFamilyRoutes(app: FastifyInstance, dependencies: FamilyR
     const parsed = UpdateBabyInputSchema.safeParse(request.body);
     if (!parsed.success) return sendError(reply, 400, 'validation_failed', 'The baby update is invalid.', request.id);
     try {
-      return reply.send(await dependencies.familyService.updateBaby(context, parsed.data));
+      return reply.send(await dependencies.familyService.updateBaby(context, parsed.data, request.id));
     } catch (error) {
       return handleFamilyError(reply, request, error);
     }
@@ -131,7 +131,7 @@ export function registerFamilyRoutes(app: FastifyInstance, dependencies: FamilyR
     const parsed = CreateNannyInputSchema.safeParse(request.body);
     if (!parsed.success) return sendError(reply, 400, 'validation_failed', 'The member request is invalid.', request.id);
     try {
-      return reply.code(201).send(await dependencies.familyService.createNanny(context, parsed.data));
+      return reply.code(201).send(await dependencies.familyService.createNanny(context, parsed.data, request.id));
     } catch (error) {
       return handleFamilyError(reply, request, error);
     }
@@ -145,7 +145,7 @@ export function registerFamilyRoutes(app: FastifyInstance, dependencies: FamilyR
     if (!parsed.success) return sendError(reply, 400, 'validation_failed', 'The member status request is invalid.', request.id);
     const membershipId = (request.params as { membershipId: string }).membershipId;
     try {
-      return reply.send(await dependencies.familyService.setNannyStatus(context, membershipId, parsed.data.status));
+      return reply.send(await dependencies.familyService.setNannyStatus(context, membershipId, parsed.data.status, request.id));
     } catch (error) {
       return handleFamilyError(reply, request, error);
     }
@@ -159,7 +159,7 @@ export function registerFamilyRoutes(app: FastifyInstance, dependencies: FamilyR
     if (!parsed.success) return sendError(reply, 400, 'validation_failed', 'The password reset request is invalid.', request.id);
     const membershipId = (request.params as { membershipId: string }).membershipId;
     try {
-      await dependencies.familyService.resetNannyPassword(context, membershipId, parsed.data.newPassword);
+      await dependencies.familyService.resetNannyPassword(context, membershipId, parsed.data.newPassword, request.id);
       return reply.code(204).send();
     } catch (error) {
       return handleFamilyError(reply, request, error);
