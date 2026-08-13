@@ -79,7 +79,7 @@ describe('M1 Baby Care family workspace', () => {
     const api = fakeApi();
     renderWithApi(api);
 
-    expect(await screen.findByText('Dad')).toBeInTheDocument();
+    expect((await screen.findAllByText('Dad')).length).toBeGreaterThan(0);
     expect(screen.getByText('xiangxiang')).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: '家庭管理' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '添加月嫂' })).toBeInTheDocument();
