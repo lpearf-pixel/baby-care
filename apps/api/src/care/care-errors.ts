@@ -21,6 +21,13 @@ export class CareForbiddenError extends Error {
   }
 }
 
+export class CareValidationError extends Error {
+  constructor(message = 'Care input failed validation.') {
+    super(message);
+    this.name = 'CareValidationError';
+  }
+}
+
 export class CareConfirmationRequiredError extends Error {
   readonly warnings: readonly CareWarning[];
 
