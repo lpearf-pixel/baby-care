@@ -337,6 +337,18 @@ spec
 -> user final acceptance
 ```
 
+### Long-task segmentation rule
+
+Do not package a long-running milestone into one oversized execution that risks timeout or context exhaustion.
+
+- Split long work into independently testable segments with explicit input, output, and acceptance evidence.
+- Prefer several bounded commits/CI cycles over one large opaque run.
+- A segment should be restartable from repository state without requiring chat-history reconstruction.
+- After each segment, persist progress in git and/or the current milestone file before continuing.
+- Continue automatically into the next reversible segment when the previous segment passes; do not ask the user to manually drive ordinary progress.
+- If a segment fails, diagnose from compact structured evidence, repair, and retry that segment rather than restarting the whole milestone.
+- Only surface to the user when a defined user gate is reached or when automation cannot safely proceed.
+
 User involvement should normally be limited to:
 
 1. major product-direction changes
