@@ -43,6 +43,12 @@ function normalizeLoginName(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function toDateOnly(value: string | Date | null): string | null {
+  if (value === null) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return value.slice(0, 10);
+}
+
 export function createFamilyService(database: DatabaseContext) {
   async function listMembers(context: AuthContext): Promise<MemberDto[]> {
     requireCapability(context, 'members.read');
@@ -108,7 +114,7 @@ export function createFamilyService(database: DatabaseContext) {
       const result = await database.pool.query<{
         id: string;
         display_name: string;
-        birth_date: string | null;
+        birth_date: string | Date | null;
         status: 'active';
       }>(
         `select id, display_name, birth_date, status from babies where family_id = $1 and status = 'active' limit 1`,
@@ -116,7 +122,12 @@ export function createFamilyService(database: DatabaseContext) {
       );
       const row = result.rows[0];
       if (!row) throw new Error('active baby missing');
-      return { id: row.id, displayName: row.display_name, birthDate: row.birth_date, status: row.status };
+      return {
+        id: row.id,
+        displayName: row.display_name,
+        birthDate: toDateOnly(row.birth_date),
+        status: row.status,
+      };
     },
 
     async updateBaby(context: AuthContext, input: UpdateBabyInput): Promise<BabyDto> {
@@ -125,7 +136,7 @@ export function createFamilyService(database: DatabaseContext) {
       const result = await database.pool.query<{
         id: string;
         display_name: string;
-        birth_date: string | null;
+        birth_date: string | Date | null;
         status: 'active';
       }>(
         `update babies
@@ -138,7 +149,12 @@ export function createFamilyService(database: DatabaseContext) {
       );
       const row = result.rows[0];
       if (!row) throw new Error('active baby missing');
-      return { id: row.id, displayName: row.display_name, birthDate: row.birth_date, status: row.status };
+      return {
+        id: row.id,
+        displayName: row.display_name,
+        birthDate: toDateOnly(row.birth_date),
+        status: row.status,
+      };
     },
 
     listMembers,
