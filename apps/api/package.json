@@ -1,0 +1,26 @@
+{
+  "name": "@baby-care/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "build": "tsup",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@baby-care/contracts": "workspace:*",
+    "@baby-care/observability": "workspace:*",
+    "drizzle-orm": "latest",
+    "fastify": "latest",
+    "pg": "latest",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/pg": "latest",
+    "drizzle-kit": "latest",
+    "tsup": "latest",
+    "tsx": "latest"
+  }
+}

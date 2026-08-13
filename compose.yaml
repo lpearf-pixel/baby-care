@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: babycare
+      POSTGRES_USER: babycare
+      POSTGRES_PASSWORD: babycare
+    volumes:
+      - babycare_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U babycare -d babycare"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 8787
+      DATABASE_URL: postgres://babycare:babycare@postgres:5432/babycare
+      DIAGNOSTIC_LEVEL: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8787:8787"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))"
+        ]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  babycare_postgres:
