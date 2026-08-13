@@ -6,18 +6,32 @@ export interface DiagnosticSummaryInput {
   evidence: string;
 }
 
-export function truncateEvidence(_value: string, _maximum = 2048): string {
-  return '';
+export interface DiagnosticSummary extends DiagnosticSummaryInput {
+  schema_version: 1;
+  generated_at: string;
 }
 
-export function buildDiagnosticSummary(_input: DiagnosticSummaryInput) {
+export function truncateEvidence(value: string, maximum = 2048): string {
+  if (maximum < 16) {
+    throw new RangeError('maximum must be at least 16');
+  }
+  if (value.length <= maximum) {
+    return value;
+  }
+  const marker = '\n[truncated]';
+  return `${value.slice(0, maximum - marker.length)}${marker}`;
+}
+
+export function buildDiagnosticSummary(
+  input: DiagnosticSummaryInput,
+): DiagnosticSummary {
   return {
-    schema_version: 1 as const,
-    status: 'failure' as const,
-    stage: '',
-    component: '',
-    event_code: '',
-    evidence: '',
-    generated_at: '',
+    schema_version: 1,
+    status: input.status,
+    stage: input.stage,
+    component: input.component,
+    event_code: input.event_code,
+    evidence: truncateEvidence(input.evidence),
+    generated_at: new Date().toISOString(),
   };
 }
