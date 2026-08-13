@@ -1,4 +1,4 @@
-import { mkdir, open, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, open, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 const OUTPUT_DIR = resolve('diagnostics/latest');
