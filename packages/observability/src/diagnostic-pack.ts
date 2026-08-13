@@ -18,8 +18,8 @@ export function truncateEvidence(value: string, maximum = 2048): string {
   if (value.length <= maximum) {
     return value;
   }
-  const marker = '\n[truncated]';
-  return `${value.slice(0, maximum - marker.length)}${marker}`;
+  const marker = '[truncated]\n';
+  return `${marker}${value.slice(-(maximum - marker.length))}`;
 }
 
 export function buildDiagnosticSummary(

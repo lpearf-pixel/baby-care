@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { buildDiagnosticSummary, truncateEvidence } from '../src/diagnostic-pack.js';
 
 describe('compact diagnostic packs', () => {
-  it('keeps summary evidence bounded', () => {
-    const long = 'x'.repeat(10_000);
+  it('keeps summary evidence bounded while preserving the final error', () => {
+    const long = `START-${'x'.repeat(10_000)}-FINAL_ERROR`;
     const summary = buildDiagnosticSummary({
       status: 'failure',
       stage: 'unit',
@@ -14,6 +14,8 @@ describe('compact diagnostic packs', () => {
 
     expect(summary.evidence.length).toBeLessThanOrEqual(2048);
     expect(summary.evidence).toContain('[truncated]');
+    expect(summary.evidence).toContain('FINAL_ERROR');
+    expect(summary.evidence).not.toContain('START-');
   });
 
   it('preserves short useful evidence verbatim', () => {

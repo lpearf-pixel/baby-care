@@ -5,10 +5,10 @@ const OUTPUT_DIR = resolve('diagnostics/latest');
 const MAX_SOURCE_BYTES = 8192;
 const MAX_EVIDENCE_CHARS = 2048;
 
-function truncate(value, maximum = MAX_EVIDENCE_CHARS) {
+function truncateTail(value, maximum = MAX_EVIDENCE_CHARS) {
   if (value.length <= maximum) return value;
-  const marker = '\n[truncated]';
-  return `${value.slice(0, maximum - marker.length)}${marker}`;
+  const marker = '[truncated]\n';
+  return `${marker}${value.slice(-(maximum - marker.length))}`;
 }
 
 async function readTailBounded(path) {
@@ -31,7 +31,7 @@ async function writeJson(path, value) {
 }
 
 const evidenceFromFile = await readTailBounded(process.env.DIAG_EVIDENCE_FILE);
-const evidence = truncate(
+const evidence = truncateTail(
   evidenceFromFile || process.env.DIAG_EVIDENCE || 'No bounded evidence was supplied; inspect the failed step annotation.',
 );
 

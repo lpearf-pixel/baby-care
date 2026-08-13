@@ -204,7 +204,9 @@ jobs:
       - name: Capture bounded service state
         if: failure()
         shell: bash
-        run: docker compose ps 2>&1 | tee -a /tmp/compose.log
+        run: |
+          docker compose ps 2>&1 | tee -a /tmp/compose.log
+          docker compose logs --no-color --tail=80 api 2>&1 | tee -a /tmp/compose.log
       - name: Collect compact diagnostics
         if: failure()
         env:
