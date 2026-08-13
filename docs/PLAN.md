@@ -9,222 +9,132 @@ Read `/agent.md` first. This file is the compact execution index; detailed miles
 
 ## Current state
 
-Current milestone: **M1 — Family and baby foundation**  
-Previous milestone: **M0 — Repository and delivery foundation — complete**
+Current design milestone: **M2 — Care Recording MVP**  
+M2 design status: **approved and written; pending written-spec review before implementation plan**  
+Implementation blocker: **M1-H production startup/Compose closure must be completed and integrated first**
 
-M0 established:
+Verified repository facts on 2026-08-13:
 
-- pnpm/TypeScript monorepo with frozen lockfile
-- shared health/event contracts
-- structured trace IDs and bounded diagnostics
-- Fastify API with PostgreSQL-aware `/health`
-- responsive React/Vite Web/PWA shell
-- real PostgreSQL CI integration test
-- production API/Web container builds
-- Docker Compose stack and smoke probe
-- segmented GitHub public-runner CI: static, unit, integration, build, compose-smoke
-- compact CI failure artifacts that preserve bounded error-tail evidence
-- minimal local startup/verification documentation
+- M0 delivery foundation: complete.
+- M1 core family/baby/session/authorization/audit/Web work: implemented on `codex/m1-family-baby-foundation` at `f0f3bbc2035ea6c6af6c89e47b17bd1b0ca5419c`.
+- M1-H branch `codex/m1-h-production-flow` is three commits ahead of the M1 branch and contains unfinished RED production startup/Compose work; it must not be described as a completed GREEN release gate until reconciled and reverified.
+- M2 real-family care-habits input gate: satisfied.
+- M2 design: `docs/superpowers/specs/2026-08-13-m2-care-recording-mvp-design.md`.
 
-M0 implementation detail:
+## Confirmed M2 family inputs
 
-- Design: `docs/superpowers/specs/2026-08-13-m0-delivery-foundation-design.md`
-- Plan: `docs/superpowers/plans/2026-08-13-m0-delivery-foundation.md`
+- Baby nickname: `xiangxiang`.
+- Bottle capacities: 90 / 150 / 200 ml; capacities are **not** intake shortcuts.
+- Bottle feeds distinguish expressed breast milk vs formula.
+- Direct breastfeeding records total session duration only.
+- Bottle quick values come from recent actual consumed ml, separately per milk type.
+- Diaper/stool uses detailed mode when stool is present.
+- Sleep requires now / 10 / 20 / 30 minutes ago / custom backfill.
+- Frequent care events: burping, spit-up, crying, bathing, temperature, weight, medication administration.
+- Home priority: last feed + amount/duration, last diaper elapsed time, rolling 24-hour measurable bottle intake.
+- Nanny handoff schedule remains unknown and must not be hard-coded.
 
-## Product goal
-
-Deliver a practical Web/PWA newborn-care workspace that Dad, Mom, and Nanny can use on iPhone, Android, and Mac before Birth Ready.
-
-The product should make four things easy:
-
-1. See the baby's current care state immediately.
-2. Record common care actions in about 2-3 taps.
-3. Share one synchronized source of truth across caregivers.
-4. Understand the previous rolling 24 hours and caregiver handoff without reading the entire timeline.
-
-Baby Care must remain usable when Baby Guardian is offline.
-
-## Architecture boundary
-
-```text
-iPhone / Android / Mac
-        |
-        v
-   Baby Care Web/PWA
-        |
-        v
-     Baby Care API
-        |
-   +----+-----------+
-   |                |
-PostgreSQL      backup/export
-   |
-   v
-Unified Baby Timeline
-   ^
-   |
-Guardian Adapter <-- versioned API/events --> baby-monitor-local
-```
-
-Guardian never writes directly to the Baby Care database.
-
-The separate AI validation track remains:
-
-```text
-Xiaomi camera/sensors
-  -> i9 OpenVINO / deterministic perception
-  -> M2 Baby Agent Orchestrator
-  -> JoyAI semantic action
-  -> Qwen3-VL ambiguity escalation
-  -> semantic candidate
-  -> Baby Care / human confirmation
-```
-
-M6 must not slow Birth Ready P0 delivery.
-
-## Milestones
+## Milestone sequence
 
 ### M0 — Repository and delivery foundation — COMPLETE
 
-Gate evidence required and achieved before moving on:
+Delivered monorepo, Web/PWA shell, API/PostgreSQL foundation, Docker Compose, segmented public-runner CI, and compact diagnostics.
 
-- static lint/typecheck
-- unit/contract tests
-- real PostgreSQL integration
-- production builds
-- production Docker Compose smoke
-- frozen-lockfile reproducibility
-- compact diagnostic artifact path for failures
+### M1 — Family and baby foundation — CORE IMPLEMENTED / PRODUCTION GATE CORRECTION REQUIRED
 
-### M1 — Family and baby foundation — CURRENT
+Implemented core scope:
 
-Deliverables:
+- Family + `xiangxiang`
+- Dad/Mom/Nanny identities and permissions
+- Setup/login/server-side session flow
+- server-side authorization
+- actor/source audit trail
+- family identity Web/PWA states
 
-- family model
-- baby profile (`xiangxiang` as development/display nickname)
-- Dad / Mom / Nanny roles
-- family-test login/session flow
-- authorization boundaries
-- actor/source audit metadata
+Remaining prerequisite before M2 implementation:
 
-Gate:
+- close M1-H migrate-before-listen production startup and full Compose family authorization flow
+- verify exact-head static/unit/integration/build/compose gates
+- advance the authoritative M1 baseline and correct PR/status evidence
 
-- all three roles can access only allowed functionality
-- Nanny cannot access restricted admin/private functions
-- concurrent writes preserve correct actor/source attribution
+### M2 — Care recording MVP — DESIGN APPROVED
 
-### M2 — Care recording MVP — INPUT GATE REQUIRED
+Approved design includes:
 
-**Before designing/finalizing care interaction defaults, ask the user for real family care habits. Do not proceed from placeholder assumptions.**
+- mixed Feeding Session
+- actual bottle intake ml; bottle capacity kept separate
+- dynamic recent bottle-amount shortcuts
+- direct breastfeeding total-duration recording
+- diaper/stool detailed mode
+- sleep interval/backfill/correction
+- burping, spit-up, crying, bathing, temperature, weight, medication administration
+- rolling 24-hour bottle ml and breastfeeding count/minutes
+- fast edit/undo
+- conservative duplicate warning
+- soft sanity warning without silent correction
 
-Collect at minimum:
-
-- common bottle volumes / quick buttons
-- expressed breast milk vs formula workflow
-- breastfeeding left/right timing vs total-session preference
-- desired diaper/stool detail level
-- nanny handoff/shift timing and note needs
-- other repeated actions that should fit in 2-3 taps
-
-Then implement:
-
-- mixed-feeding session
-- diaper/stool
-- sleep start/end/backfill
-- cry/notable event
-- spit-up
-- weight
-- fast undo/edit
-- duplicate warning
+Implementation may start only after the written spec review gate and M1-H prerequisite are satisfied.
 
 ### M3 — Care workspace
 
-- current-state Home
-- unified timeline
-- rolling 24-hour summary
-- filters
-- caregiver handoff
-- night/one-handed interaction
+- richer current-state Home
+- unified timeline presentation and filters
+- caregiver handoff/shift UX after the real Nanny schedule is known
+- night/one-handed refinement
 
 ### M4 — Reliability
 
-- backup automation
-- restore verification
-- idempotency/duplicate protection
-- migration verification
-- retry/weak-network behavior as applicable
+- backup automation and restore verification
+- migration/retry/idempotency hardening
 - release-level diagnostics
 
 ### M5 — Guardian integration
 
 - versioned Guardian event contract
-- Guardian Adapter
-- candidate ingestion
+- adapter and candidate ingestion
 - confirm/ignore flow
-- confidence/source display
-- replayable CI fixtures
-
-AI never silently overwrites human care facts.
+- AI never silently overwrites human care facts
 
 ### M6 — Baby Agent Orchestrator PoC — PARALLEL / NON-BLOCKING
 
 - model registry
-- Baby World State
-- Care Session state machine
-- L0/L1/L2 escalation
-- JoyAI Mac feasibility benchmark
-- Qwen3-VL fallback
-- replayable action fixtures
-- latency/confidence/cost evidence
+- Baby World State / Care Session state machine
+- OpenVINO -> JoyAI -> Qwen escalation
+- replayable fixtures and latency/confidence evidence
 
 ### M7 — Birth Ready freeze
 
-Once M0-M4 are stable and family simulation is usable:
-
-- stop large feature additions
-- fix only usability/data/login/sync/backup/critical defects
-- run full release gate
-- produce `v0.1-rc`, then `v0.1 Birth Ready`
+Freeze large feature additions, fix usability/data/login/sync/backup/critical defects, and produce release candidates.
 
 ## Autonomous delivery workflow
 
 ```text
-approved spec
+approved design
+ -> written spec review
  -> implementation plan
- -> segmented implementation
+ -> close prerequisite gates
+ -> segmented RED/GREEN implementation
  -> focused tests
- -> module/integration tests
+ -> PostgreSQL/Web/module integration
  -> GitHub CI
- -> compact diagnostic evidence on failure
+ -> compact diagnostics on failure
  -> automatic repair/rerun
- -> review
- -> milestone release gate
- -> user final acceptance only where needed
+ -> milestone review and release gate
 ```
 
-Ordinary software verification belongs on GitHub public runners, not on the user's local terminal.
-
-## Test escalation
-
-```text
-affected/focused tests
- -> module/integration
- -> milestone full release gate
-```
-
-Do not run every expensive gate for every trivial edit.
+Ordinary software verification belongs on GitHub public runners, not the user's local terminal.
 
 ## Context/token rule
 
-Agents read the minimum evidence required for the current decision:
+Agents read the minimum evidence required:
 
 1. `agent.md`
-2. this current-plan index
+2. this execution index
 3. the relevant feature spec/plan
 4. affected contracts/symbols/diff
-5. structured failure evidence
-6. targeted raw-log ranges only if the structured evidence is insufficient
+5. compact structured failure evidence
+6. targeted raw-log ranges only when compact evidence is insufficient
 
 ## Next action
 
-Start the M1 design/spec for family, baby, role/session, and audit boundaries. M1 must not introduce M2 care-recording interaction assumptions.
+User reviews the written M2 spec. After approval of the written spec, create the M2 implementation plan; its first executable prerequisite is to repair and reverify M1-H before writing M2 care-domain production code.
