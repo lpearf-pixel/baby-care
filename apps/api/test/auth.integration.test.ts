@@ -11,8 +11,9 @@ let database: DatabaseContext | undefined;
 
 function cookieValue(setCookie: string | string[] | undefined): string {
   const header = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-  expect(header).toBeTruthy();
-  const pair = header!.split(';', 1)[0];
+  if (!header) throw new Error('expected set-cookie header');
+  const pair = header.split(';', 1)[0];
+  if (!pair) throw new Error('expected session cookie pair');
   expect(pair).toMatch(/^baby_care_session=/);
   return pair;
 }
