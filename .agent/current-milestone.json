@@ -1,25 +1,32 @@
 {
   "schema_version": 1,
-  "milestone": "M1 Family and baby foundation",
-  "status": "spec_written_pending_user_review",
-  "branch": "codex/m1-family-baby-foundation",
-  "completed_milestones": ["M0 Repository and delivery foundation"],
-  "m0_verified_ci_run": 31674964075,
-  "design_spec": "docs/superpowers/specs/2026-08-13-m1-family-baby-foundation-design.md",
-  "next_scope": [
-    "family model",
-    "baby profile",
-    "Dad/Mom/Nanny roles",
-    "family-test session flow",
-    "authorization boundaries",
-    "actor/source audit metadata"
+  "milestone": "M2 Care Recording MVP",
+  "status": "ready_for_implementation_planning",
+  "branch": "codex/m2-care-recording-mvp",
+  "completed_milestones": [
+    "M0 Repository and delivery foundation",
+    "M1 Family and baby foundation"
   ],
+  "m0_verified_ci_run": 31674964075,
+  "m1_state": "verified_complete",
+  "m1_authoritative_branch": "codex/m1-family-baby-foundation",
+  "m1_h_state": "closed",
+  "m1_h_branch": "codex/m1-h-production-flow",
+  "m1_h_validation_ci_run": 31707034192,
+  "m2_design_branch": "codex/m2-care-recording-mvp",
+  "m2_design_status": "approved",
   "baby_display_name": "xiangxiang",
-  "m2_real_care_habits_gate": "required_before_care_interaction_defaults",
-  "do_not_start_in_m1": [
-    "feeding interaction defaults",
-    "diaper interaction defaults",
-    "sleep interaction defaults",
+  "m2_real_care_habits_gate": "satisfied",
+  "m2_production_baseline_blocker": "cleared",
+  "next_scope": [
+    "review approved M2 written specification",
+    "create M2 implementation plan",
+    "execute M2 only after implementation plan approval"
+  ],
+  "do_not_start_before_m2_implementation_plan": [
+    "M2 care schema migration",
+    "M2 care API implementation",
+    "M2 care Web interaction implementation",
     "Guardian integration",
     "JoyAI/Qwen runtime"
   ]
