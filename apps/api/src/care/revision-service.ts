@@ -26,10 +26,6 @@ function rejectFuture(value: string, now: Date): void {
   if (!result.ok) throw new CareValidationError('The care time is too far in the future.');
 }
 
-function eventOccurredAt(input: EditCareEventInput): Date {
-  return new Date(input.eventType === 'sleep' ? input.startedAt : input.occurredAt);
-}
-
 function inputSnapshot(input: EditCareEventInput): Record<string, unknown> {
   return JSON.parse(JSON.stringify(input)) as Record<string, unknown>;
 }
