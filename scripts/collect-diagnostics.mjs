@@ -4,6 +4,47 @@ import { dirname, resolve } from 'node:path';
 const OUTPUT_DIR = resolve('diagnostics/latest');
 const MAX_SOURCE_BYTES = 8192;
 const MAX_EVIDENCE_CHARS = 2048;
+const REDACTED = '[REDACTED]';
+const SENSITIVE_KEY = [
+  'password',
+  'passphrase',
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'setupToken',
+  'setup_token',
+  'sessionToken',
+  'session_token',
+  'token',
+  'medicationName',
+  'medication_name',
+  'medicationDose',
+  'medication_dose',
+  'dose',
+  'doseUnit',
+  'dose_unit',
+  'valueCelsius',
+  'value_celsius',
+  'temperature',
+  'valueKg',
+  'value_kg',
+  'weight',
+  'note',
+].join('|');
+
+function redactSensitiveEvidence(value) {
+  let redacted = value;
+  redacted = redacted.replace(/baby_care_session=[^;\s"']+/gi, `baby_care_session=${REDACTED}`);
+  redacted = redacted.replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, `Bearer ${REDACTED}`);
+
+  const keyedValue = new RegExp(
+    `((?:"|')?(?:${SENSITIVE_KEY})(?:"|')?\\s*[:=]\\s*)("(?:\\\\.|[^"])*"|'(?:\\\\.|[^'])*'|[^\\s,}\\]]+)`,
+    'gi',
+  );
+  redacted = redacted.replace(keyedValue, (_match, prefix) => `${prefix}${REDACTED}`);
+
+  return redacted;
+}
 
 function truncateTail(value, maximum = MAX_EVIDENCE_CHARS) {
   if (value.length <= maximum) return value;
@@ -31,9 +72,10 @@ async function writeJson(path, value) {
 }
 
 const evidenceFromFile = await readTailBounded(process.env.DIAG_EVIDENCE_FILE);
-const evidence = truncateTail(
-  evidenceFromFile || process.env.DIAG_EVIDENCE || 'No bounded evidence was supplied; inspect the failed step annotation.',
-);
+const rawEvidence = evidenceFromFile
+  || process.env.DIAG_EVIDENCE
+  || 'No bounded evidence was supplied; inspect the failed step annotation.';
+const evidence = truncateTail(redactSensitiveEvidence(rawEvidence));
 
 const summary = {
   schema_version: 1,
