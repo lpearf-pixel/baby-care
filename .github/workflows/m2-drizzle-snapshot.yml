@@ -42,7 +42,9 @@ jobs:
         shell: bash
         env:
           DRIZZLE_OUT: ${{ github.workspace }}/diagnostics/drizzle-m2
-        run: pnpm --filter @baby-care/api exec drizzle-kit generate --config ../../drizzle.config.ts --name m2_care_recording
+        run: |
+          set -o pipefail
+          pnpm --filter @baby-care/api exec drizzle-kit generate --config "$GITHUB_WORKSPACE/drizzle.config.ts" --name m2_care_recording 2>&1 | tee /tmp/drizzle-snapshot.log
       - name: Verify generated files
         shell: bash
         run: |
@@ -50,7 +52,15 @@ jobs:
           test -f diagnostics/drizzle-m2/meta/0001_snapshot.json
           test -f diagnostics/drizzle-m2/0001_m2_care_recording.sql
           ls -la diagnostics/drizzle-m2 diagnostics/drizzle-m2/meta
+      - name: Upload generator log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m2-drizzle-snapshot-log-${{ github.run_id }}
+          path: /tmp/drizzle-snapshot.log
+          retention-days: 3
       - uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: m2-drizzle-snapshot-${{ github.run_id }}
           path: diagnostics/drizzle-m2/
