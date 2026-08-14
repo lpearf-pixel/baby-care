@@ -23,15 +23,13 @@ interface RecentState extends RecentCareRecord {
   editInput: EditCareEventInput;
 }
 
-function mergeConfirmed<T extends { confirmedWarnings?: CareWarningCode[] }>(
-  input: T,
-  confirmedWarnings?: CareWarningCode[],
-): T {
+function mergeConfirmed<T>(input: T, confirmedWarnings?: CareWarningCode[]): T {
   if (!confirmedWarnings?.length) return input;
+  const current = (input as { confirmedWarnings?: CareWarningCode[] }).confirmedWarnings ?? [];
   return {
-    ...input,
-    confirmedWarnings: [...new Set([...(input.confirmedWarnings ?? []), ...confirmedWarnings])],
-  };
+    ...(input as object),
+    confirmedWarnings: [...new Set([...current, ...confirmedWarnings])],
+  } as T;
 }
 
 function feedingLabel(input: CreateFeedingSessionInput): string {
