@@ -2,13 +2,17 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { resolveTraceId } from '@baby-care/observability';
 import { createAuthService } from './auth/auth-service.js';
 import { createCareAuth } from './care/care-auth.js';
+import { createDiaperService } from './care/diaper-service.js';
 import { createFeedingService } from './care/feeding-service.js';
+import { createSleepService } from './care/sleep-service.js';
 import type { DatabaseContext } from './db.js';
 import { createFamilyRepository } from './family/family-repository.js';
 import { createFamilyService } from './family/family-service.js';
 import { createSetupService } from './family/setup-service.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerDiaperRoutes } from './routes/care-diaper.js';
 import { registerFeedingRoutes } from './routes/care-feeding.js';
+import { registerSleepRoutes } from './routes/care-sleep.js';
 import { registerFamilyRoutes } from './routes/family.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerSetupRoutes } from './routes/setup.js';
@@ -44,6 +48,7 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
 
   if (dependencies.database && dependencies.appOrigin) {
     const authService = createAuthService(dependencies.database, now);
+    const careAuth = createCareAuth({ authService, appOrigin: dependencies.appOrigin });
     registerAuthRoutes(app, {
       authService,
       appOrigin: dependencies.appOrigin,
@@ -55,8 +60,16 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
       appOrigin: dependencies.appOrigin,
     });
     registerFeedingRoutes(app, {
-      careAuth: createCareAuth({ authService, appOrigin: dependencies.appOrigin }),
+      careAuth,
       feedingService: createFeedingService(dependencies.database, now),
+    });
+    registerDiaperRoutes(app, {
+      careAuth,
+      diaperService: createDiaperService(dependencies.database, now),
+    });
+    registerSleepRoutes(app, {
+      careAuth,
+      sleepService: createSleepService(dependencies.database, now),
     });
   }
 
