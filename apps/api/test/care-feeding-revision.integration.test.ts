@@ -50,8 +50,8 @@ describeDatabase('M2 feeding correction and undo', () => {
         [eventId],
       );
       expect(components.rows).toEqual([
-        { component_type: 'bottle', liquid_type: 'formula', amount_ml: 75, duration_minutes: null },
         { component_type: 'direct_breastfeeding', liquid_type: null, amount_ml: null, duration_minutes: 10 },
+        { component_type: 'bottle', liquid_type: 'formula', amount_ml: 75, duration_minutes: null },
       ]);
       const oldLinkedStatus = await context.database.pool.query(`select status from care_events where id = $1`, [originalLinked.rows[0]!.id]);
       expect(oldLinkedStatus.rows[0].status).toBe('voided');

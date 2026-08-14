@@ -161,7 +161,7 @@ async function applyEditPayload(
     return;
   }
 
-  if (input.eventType === 'temperature' || input.eventType === 'weight') {
+  if ('measurement' in input) {
     await updateEventEnvelope(client, event, new Date(input.occurredAt), input.note, updatedAt);
     const value = input.measurement.kind === 'temperature'
       ? input.measurement.valueCelsius
@@ -174,6 +174,9 @@ async function applyEditPayload(
     return;
   }
 
+  if (!('action' in input)) {
+    throw new CareStateConflictError('The edit payload does not match the stored event type.');
+  }
   await updateEventEnvelope(client, event, new Date(input.occurredAt), input.note, updatedAt);
   const action = input.action;
   await client.query(
