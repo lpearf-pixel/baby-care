@@ -1,4 +1,4 @@
-export type CareQuickAction = 'feeding' | 'diaper' | 'sleep';
+export type CareQuickAction = 'feeding' | 'diaper' | 'sleep' | 'more';
 
 export function QuickRecordBar({
   active,
@@ -11,6 +11,7 @@ export function QuickRecordBar({
     { id: 'feeding', label: '喂奶' },
     { id: 'diaper', label: '尿布' },
     { id: 'sleep', label: '睡觉/醒来' },
+    { id: 'more', label: '更多' },
   ];
   return (
     <section className="quick-record" aria-label="快速记录">
