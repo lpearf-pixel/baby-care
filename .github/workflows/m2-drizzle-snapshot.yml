@@ -15,7 +15,6 @@ concurrency:
 
 jobs:
   generate:
-    if: ${{ hashFiles('migrations/meta/0001_snapshot.json') == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
