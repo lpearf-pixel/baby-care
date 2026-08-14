@@ -1,32 +1,53 @@
 {
   "schema_version": 1,
-  "milestone": "M2 Care Recording MVP",
-  "status": "implementation_in_progress",
+  "milestone": "M3 Care Workspace",
+  "status": "ready_for_design",
   "branch": "codex/m2-care-recording-implementation",
-  "completed_milestones": ["M0 Repository and delivery foundation", "M1 Family and baby foundation"],
+  "completed_milestones": [
+    "M0 Repository and delivery foundation",
+    "M1 Family and baby foundation",
+    "M2 Care Recording MVP"
+  ],
   "m1_state": "verified_complete",
   "m1_authoritative_branch": "codex/m1-family-baby-foundation",
   "m1_authoritative_head": "76d578a464ec2ab1f8eb1f8f33d8e429caff10ba",
   "m1_authoritative_ci_run": 31707486985,
   "m1_h_state": "closed",
+  "m2_state": "implementation_complete_release_candidate",
   "m2_design_branch": "codex/m2-care-recording-mvp",
   "m2_design_head": "eadb8f1d41770b5ef940f16993e57a4cb8ee6bc5",
   "m2_design_status": "approved",
+  "m2_implementation_branch": "codex/m2-care-recording-implementation",
+  "m2_release_branch": "codex/m2-task11-release-gate",
   "m2_implementation_plan": "docs/superpowers/plans/2026-08-13-m2-care-recording-mvp-reviewed.md",
   "m2_real_care_habits_gate": "satisfied",
   "m2_production_baseline_blocker": "cleared",
+  "m2_drizzle_snapshot": "reconciled",
+  "m2_final_verification_contract": "fresh static/unit/postgresql-integration/build/production-compose-smoke 5/5 on one exact final head",
   "completed_tasks": [
     "Task 1 Care Foundation Schema, Common Contracts, and Authorization",
     "Task 2 Deterministic Care Rules",
-    "Task 3 Authenticated Ownership, Idempotency, and Revision Primitives"
+    "Task 3 Authenticated Ownership, Idempotency, and Revision Primitives",
+    "Task 4 Mixed Feeding Sessions and Dynamic Quick Values",
+    "Task 5 Diaper and Sleep Recording",
+    "Task 6 Frequent Care Actions and Measurements",
+    "Task 7 Summary Timeline Revision and Undo",
+    "Task 8 Fast Care Web Workspace",
+    "Task 9 Care Warnings Corrections and Frequent Events",
+    "Task 10 Concurrent Caregiver and Privacy Gate",
+    "Task 11 Production Compose Release Flow"
   ],
-  "task1_final_head": "7c44d480e588b42bced8da0ee9be4ac3a2bccabd",
-  "task1_final_ci_run": 31713732247,
-  "task2_final_head": "c44a793d601df303a62e07fed5ff551e97a87721",
-  "task2_final_ci_run": 31715074111,
-  "task3_final_head": "d1f1680d247042a7125eb175a7dc5114b9729357",
-  "task3_final_ci_run": 31716114837,
-  "current_task": "Task 4 Mixed Feeding Sessions and Dynamic Quick Values",
-  "known_tooling_note": "M2 runtime SQL migration and journal are verified; Drizzle 0001 snapshot metadata was not generated in the current harness and must be reconciled before later schema changes or final release.",
-  "out_of_scope": ["Guardian integration", "JoyAI/Qwen runtime", "M3 handoff UX", "main branch changes"]
+  "next_scope": [
+    "care timeline comprehension",
+    "family handoff workflow",
+    "day/night operational UX",
+    "correction and history usability"
+  ],
+  "do_not_start_in_m3_without_separate_design": [
+    "Guardian integration",
+    "JoyAI/Qwen runtime",
+    "automated feeding recognition",
+    "medical diagnosis or dose recommendation",
+    "cloud deployment"
+  ]
 }
