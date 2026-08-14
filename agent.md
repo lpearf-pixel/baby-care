@@ -143,6 +143,52 @@ sleep_started
 sleep_ended
 ```
 
+### Voice-initiated feeding sessions
+
+The user has approved a future cross-project capability with the assistant wake name **小小**. The target interaction begins with a phrase such as:
+
+```text
+嘿，小小，我要喂奶了
+```
+
+This capability does not change the deployment boundary:
+
+- `baby-monitor-local` owns Xiaomi audio acquisition, short in-memory buffering, VAD/wake-word/ASR, local spoken acknowledgement, camera-side feeding-process observation, and the candidate-event lifecycle.
+- `baby-care` remains the source of truth for family care records. It receives only versioned semantic candidates through the Guardian Adapter/API and owns caregiver confirmation, correction, revision history, undo, Dashboard display, and analytics.
+- Guardian must never write directly to the Baby Care database.
+- Raw continuous audio/video remains local by default. Prefer short in-memory audio windows that are discarded after intent extraction; do not upload continuous household audio to Baby Care.
+- The assistant wake name `小小` is independent of the baby's current display nickname `xiangxiang`.
+
+A voice command starts a **feeding-session candidate**, not an automatically confirmed intake record. The candidate should preserve at least:
+
+```text
+event_id
+session_id
+intent
+started_at
+ended_at
+feeding_mode
+suggested_amount_ml
+amount_origin
+source_device
+source_actor_hint
+confidence
+confirmation_state
+evidence_pointer
+contract_version
+```
+
+The M2 feeding semantics remain authoritative:
+
+- bottle volume means actual consumed ml;
+- expressed breast milk and formula remain distinct;
+- direct breastfeeding records total session minutes and never inferred ml;
+- a configured/default bottle amount is a suggested value only until a caregiver confirms or edits it;
+- analytics must distinguish defaulted, machine-inferred, and human-confirmed values;
+- AI/Guardian candidates never silently overwrite human records.
+
+Before implementation, the hardware track must prove whether the live Xiaomi `MJSXJ17CM` `cs2+udp` source exposes a usable audio track. Local playback through the camera speaker is also unproven; reply output must use a pluggable sink and the product owner must choose the first sink (i9/external speaker, Xiaomi speaker, or Baby Care PWA). This integration requires its own approved specification and must not silently expand M3 Care Workspace.
+
 ## 7. Baby Agent Orchestrator
 
 A dedicated Agent Orchestrator is part of the target architecture. The M2 Mac is the preferred AI orchestration node; the i9/Guardian machine remains the fast perception node.
