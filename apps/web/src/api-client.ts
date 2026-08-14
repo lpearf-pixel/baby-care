@@ -1,19 +1,26 @@
 import type {
   BabyDto,
   BottleLiquidType,
+  CareActionReceipt,
   CareHomeSummaryDto,
+  CareRevisionReceipt,
+  CreateCareActionInput,
   CreateDiaperInput,
   CreateFeedingSessionInput,
+  CreateMeasurementInput,
   CreateNannyInput,
   DiaperEventDto,
+  EditCareEventInput,
   FamilyDto,
   FeedingQuickValuesDto,
   FeedingSessionDto,
+  MeasurementReceipt,
   MemberDto,
   SessionDto,
   SetupInput,
   SleepIntervalDto,
   StartSleepInput,
+  UndoCareEventResponse,
   UpdateBabyInput,
   UpdateFamilyInput,
   WakeSleepInput,
@@ -78,6 +85,10 @@ export interface BabyCareApi {
   createDiaper(input: CreateDiaperInput): Promise<DiaperEventDto>;
   startSleep(input: StartSleepInput): Promise<SleepIntervalDto>;
   wakeSleep(input: WakeSleepInput): Promise<SleepIntervalDto>;
+  createCareAction(input: CreateCareActionInput): Promise<CareActionReceipt>;
+  createMeasurement(input: CreateMeasurementInput): Promise<MeasurementReceipt>;
+  editCareEvent(eventId: string, input: EditCareEventInput): Promise<CareRevisionReceipt>;
+  undoCareEvent(eventId: string): Promise<UndoCareEventResponse>;
 }
 
 export const babyCareApi: BabyCareApi = {
@@ -123,4 +134,12 @@ export const babyCareApi: BabyCareApi = {
     request('/api/care/sleep/start', { method: 'POST', body: JSON.stringify(input) }),
   wakeSleep: (input) =>
     request('/api/care/sleep/wake', { method: 'POST', body: JSON.stringify(input) }),
+  createCareAction: (input) =>
+    request('/api/care/actions', { method: 'POST', body: JSON.stringify(input) }),
+  createMeasurement: (input) =>
+    request('/api/care/measurements', { method: 'POST', body: JSON.stringify(input) }),
+  editCareEvent: (eventId, input) =>
+    request(`/api/care/events/${eventId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  undoCareEvent: (eventId) =>
+    request(`/api/care/events/${eventId}/undo`, { method: 'POST' }),
 };
