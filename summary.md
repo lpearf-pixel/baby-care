@@ -101,34 +101,54 @@ Next hardware investigation, when Guardian integration work is explicitly starte
 
 This is a **future Guardian/multimodal integration candidate**, not permission to expand M3 Care Workspace automatically.
 
-## 7. Approved direction — voice-initiated feeding capture
+## 7. Approved direction — voice-first care interaction
 
-The user has requested a separate Guardian/Voice Feeding integration track.
+The user has expanded the earlier feeding-only request into a long-term **voice-first Baby Care interaction** direction. Routine create/query/correct/undo operations should normally be possible through the local assistant **小小**, while the PWA remains the fallback, confirmation, history, and correction surface.
 
-Target interaction:
+Representative interaction:
 
 ```text
 Caregiver: 嘿，小小，我要喂奶了
 Assistant: 好的
 ```
 
-Expected behavior:
+Target coverage includes feeding, diaper/stool, sleep/wake, burping, spit-up, crying, bathing, temperature, weight, and medication actually administered, plus queries such as the last feeding time and rolling 24-hour totals.
 
-1. `baby-monitor-local` reads the Xiaomi camera audio locally, detects the wake phrase and feeding intent, and gives an audible acknowledgement through a pluggable output sink.
-2. Guardian starts a feeding-session candidate and observes the camera stream in the background to estimate session boundaries and process events such as feeding/burping/ending.
-3. Guardian emits a versioned semantic candidate through an API/event contract; it never writes the Baby Care database directly.
-4. Baby Care displays the candidate for confirmation/correction, preserves source/confidence/revision history, and makes confirmed data available to the future Dashboard and analysis.
-5. A configured/default bottle amount is stored as a suggested value with explicit provenance. It is not treated as confirmed actual intake until a caregiver confirms or edits it.
-6. Raw continuous household audio/video stays local. Prefer short in-memory audio buffering -> VAD/wake/ASR -> intent -> discard.
+System direction:
 
-Known unresolved hardware/product inputs:
+1. `baby-monitor-local` builds a local Voice Care Gateway: Xiaomi audio -> VAD/wake -> local ASR -> deterministic care intent/dialogue -> acknowledgement -> semantic candidate/outbox.
+2. A wake opens a short configurable conversation window so follow-up values/corrections do not require repeating the wake phrase.
+3. A voice event may start a care-session state machine. Camera analysis can help estimate process boundaries, but must not infer bottle intake from images or silently confirm a record.
+4. Guardian emits versioned semantic candidates through an API/event contract and never writes the Baby Care database directly.
+5. Baby Care owns authenticated actor attribution, confirmation, revision/undo, the final care record, Dashboard display, and analytics.
+6. A default bottle amount is a suggested value with explicit provenance, not confirmed actual consumed ml.
+7. Raw continuous household audio/video remains local; short in-memory audio windows are discarded after intent extraction.
 
-- Live-device probe is still required to prove that the current Xiaomi `MJSXJ17CM` `cs2+udp` / go2rtc source exposes a usable audio track and codec.
-- Xiaomi camera-speaker playback/two-way talk is not yet available outside Mi Home and must not be assumed.
-- The first spoken-response sink still needs the user's choice: i9/external speaker, Xiaomi camera speaker, or Baby Care PWA.
-- Session-end rules and the family default bottle amount must be fixed in the dedicated design, not guessed during implementation.
+Safety policy:
 
-This is an explicitly requested future integration track, but it does not merge Guardian code into Baby Care and does not silently change the current M3 Care Workspace scope. The first implementation work belongs in `baby-monitor-local`; the Baby Care adapter/confirmation side follows under a separate approved integration contract.
+- Low-risk reversible actions use brief acknowledgement and immediate undo.
+- Quantities/times are repeated when confidence is low or validation warns.
+- Medication requires explicit confirmation of name, dose, unit, and administered time. The system records facts only and never recommends or calculates a dose.
+- The camera microphone must not guess Dad/Mom/Nanny from voice. Use a revocable Baby Care active-caregiver session/lease; otherwise keep the event system-sourced and pending confirmation.
+- Offline Guardian uses an idempotent local outbox and synchronizes later without duplicating records.
+
+Night policy:
+
+- Quiet hours and volume cap are configurable household settings.
+- Successful low-risk commands receive only a short, low-volume response.
+- Do not automatically increase volume in response to crying/noise; use a soft chime, PWA visual/haptic result, or pending state when speech would be disruptive.
+- TTS must be prevented from re-triggering wake/ASR through capture ducking/echo control.
+- Phase 1 should use a proven configurable macOS/i9 or external-speaker sink. Xiaomi camera-speaker/two-way talk remains optional until local control is proven.
+
+Required phased delivery in `baby-monitor-local`:
+
+- G0: live Xiaomi audio-track/codec/latency probe with privacy-safe diagnostics and rollback;
+- G1: local wake/ASR/TTS loop, quiet-hours policy, output-sink abstraction, replay fixtures;
+- G2: deterministic care-command grammar, dialogue/session state machine, safety tiers, corrections/undo, actor-lease boundary, idempotent outbox;
+- G3: feeding/care camera fusion and a versioned Baby Care contract simulator using synthetic/replay inputs;
+- G4: separate Baby Care Adapter/confirmation integration after its contract is approved.
+
+This remains separate from the current M3 Care Workspace implementation. The first code work belongs on a new `baby-monitor-local` feature branch based on its verified Guardian branch; Baby Care integration follows separately.
 
 ## 8. Autonomous development rules to preserve
 
