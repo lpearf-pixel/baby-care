@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: m2-drizzle-snapshot-${{ github.ref }}
@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   generate:
+    if: ${{ hashFiles('migrations/meta/0001_snapshot.json') == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -43,26 +44,20 @@ jobs:
         shell: bash
         env:
           DRIZZLE_OUT: ../../diagnostics/drizzle-m2
-        run: |
-          set -o pipefail
-          pnpm --filter @baby-care/api exec drizzle-kit generate --config "$GITHUB_WORKSPACE/drizzle.config.ts" --name m2_care_recording 2>&1 | tee /tmp/drizzle-snapshot.log
-      - name: Verify generated files
+        run: pnpm --filter @baby-care/api exec drizzle-kit generate --config "$GITHUB_WORKSPACE/drizzle.config.ts" --name m2_care_recording
+      - name: Verify generated snapshot
         shell: bash
         run: |
           set -euo pipefail
           test -f diagnostics/drizzle-m2/meta/0001_snapshot.json
-          test "$(find diagnostics/drizzle-m2 -maxdepth 1 -type f -name '0001_*.sql' | wc -l | tr -d ' ')" = "1"
-          ls -la diagnostics/drizzle-m2 diagnostics/drizzle-m2/meta
-      - name: Upload generator log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: m2-drizzle-snapshot-log-${{ github.run_id }}
-          path: /tmp/drizzle-snapshot.log
-          retention-days: 3
-      - uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: m2-drizzle-snapshot-${{ github.run_id }}
-          path: diagnostics/drizzle-m2/
-          retention-days: 3
+          node -e "const fs=require('fs'); const a=JSON.parse(fs.readFileSync('migrations/meta/0000_snapshot.json')); const b=JSON.parse(fs.readFileSync('diagnostics/drizzle-m2/meta/0001_snapshot.json')); if (b.prevId!==a.id) process.exit(1); if (Object.keys(b.tables).length!==14) process.exit(1);"
+      - name: Commit generated snapshot only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp diagnostics/drizzle-m2/meta/0001_snapshot.json migrations/meta/0001_snapshot.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add migrations/meta/0001_snapshot.json
+          git commit -m "chore: add M2 drizzle snapshot"
+          git push origin HEAD:codex/m2-task11-release-gate
