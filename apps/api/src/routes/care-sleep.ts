@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { StartSleepInputSchema, WakeSleepInputSchema } from '@baby-care/contracts';
 import type { CareAuth } from '../care/care-auth.js';
 import {
@@ -8,7 +8,7 @@ import {
 } from '../care/care-errors.js';
 import type { SleepService } from '../care/sleep-service.js';
 
-function handleSleepError(reply: Parameters<Parameters<FastifyInstance['post']>[1]>[1], requestId: string, error: unknown) {
+function handleSleepError(reply: FastifyReply, requestId: string, error: unknown) {
   if (error instanceof CareConfirmationRequiredError) {
     return reply.code(409).send({
       code: 'care_confirmation_required',
