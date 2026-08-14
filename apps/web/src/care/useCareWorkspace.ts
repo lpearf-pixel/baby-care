@@ -5,7 +5,7 @@ import { BabyCareApiError, type BabyCareApi } from '../api-client.js';
 interface PendingCareWarning {
   warnings: readonly CareWarning[];
   retry: (confirmedWarnings: CareWarningCode[]) => Promise<unknown>;
-  onSuccess?: (result: unknown) => void;
+  onSuccess: ((result: unknown) => void) | undefined;
 }
 
 function warningsFromError(error: unknown): CareWarning[] | null {
