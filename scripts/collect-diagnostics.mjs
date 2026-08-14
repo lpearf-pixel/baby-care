@@ -35,7 +35,7 @@ const SENSITIVE_KEY = [
 function redactSensitiveEvidence(value) {
   let redacted = value;
   redacted = redacted.replace(/baby_care_session=[^;\s"']+/gi, `baby_care_session=${REDACTED}`);
-  redacted = redacted.replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, `Bearer ${REDACTED}`);
+  redacted = redacted.replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, `Bearer ${REDACTED}`);
 
   const keyedValue = new RegExp(
     `((?:"|')?(?:${SENSITIVE_KEY})(?:"|')?\\s*[:=]\\s*)("(?:\\\\.|[^"])*"|'(?:\\\\.|[^'])*'|[^\\s,}\\]]+)`,
