@@ -41,7 +41,7 @@ jobs:
       - name: Generate snapshot with Drizzle Kit
         shell: bash
         env:
-          DRIZZLE_OUT: ${{ github.workspace }}/diagnostics/drizzle-m2
+          DRIZZLE_OUT: ./diagnostics/drizzle-m2
         run: |
           set -o pipefail
           pnpm --filter @baby-care/api exec drizzle-kit generate --config "$GITHUB_WORKSPACE/drizzle.config.ts" --name m2_care_recording 2>&1 | tee /tmp/drizzle-snapshot.log
@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           test -f diagnostics/drizzle-m2/meta/0001_snapshot.json
-          test -f diagnostics/drizzle-m2/0001_m2_care_recording.sql
+          test "$(find diagnostics/drizzle-m2 -maxdepth 1 -type f -name '0001_*.sql' | wc -l | tr -d ' ')" = "1"
           ls -la diagnostics/drizzle-m2 diagnostics/drizzle-m2/meta
       - name: Upload generator log on failure
         if: failure()
