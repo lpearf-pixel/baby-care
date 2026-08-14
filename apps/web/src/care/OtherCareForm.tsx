@@ -59,7 +59,7 @@ export function OtherCareForm({
   async function submit() {
     if (!kind) return;
     const base = { occurredAt: new Date().toISOString(), clientRequestId: requestId.current };
-    let saved = false;
+    let saved: boolean;
     if (kind === 'temperature') {
       const valueCelsius = Number(temperature);
       if (!Number.isFinite(valueCelsius) || valueCelsius <= 0) return;
