@@ -101,7 +101,36 @@ Next hardware investigation, when Guardian integration work is explicitly starte
 
 This is a **future Guardian/multimodal integration candidate**, not permission to expand M3 Care Workspace automatically.
 
-## 7. Autonomous development rules to preserve
+## 7. Approved direction — voice-initiated feeding capture
+
+The user has requested a separate Guardian/Voice Feeding integration track.
+
+Target interaction:
+
+```text
+Caregiver: 嘿，小小，我要喂奶了
+Assistant: 好的
+```
+
+Expected behavior:
+
+1. `baby-monitor-local` reads the Xiaomi camera audio locally, detects the wake phrase and feeding intent, and gives an audible acknowledgement through a pluggable output sink.
+2. Guardian starts a feeding-session candidate and observes the camera stream in the background to estimate session boundaries and process events such as feeding/burping/ending.
+3. Guardian emits a versioned semantic candidate through an API/event contract; it never writes the Baby Care database directly.
+4. Baby Care displays the candidate for confirmation/correction, preserves source/confidence/revision history, and makes confirmed data available to the future Dashboard and analysis.
+5. A configured/default bottle amount is stored as a suggested value with explicit provenance. It is not treated as confirmed actual intake until a caregiver confirms or edits it.
+6. Raw continuous household audio/video stays local. Prefer short in-memory audio buffering -> VAD/wake/ASR -> intent -> discard.
+
+Known unresolved hardware/product inputs:
+
+- Live-device probe is still required to prove that the current Xiaomi `MJSXJ17CM` `cs2+udp` / go2rtc source exposes a usable audio track and codec.
+- Xiaomi camera-speaker playback/two-way talk is not yet available outside Mi Home and must not be assumed.
+- The first spoken-response sink still needs the user's choice: i9/external speaker, Xiaomi camera speaker, or Baby Care PWA.
+- Session-end rules and the family default bottle amount must be fixed in the dedicated design, not guessed during implementation.
+
+This is an explicitly requested future integration track, but it does not merge Guardian code into Baby Care and does not silently change the current M3 Care Workspace scope. The first implementation work belongs in `baby-monitor-local`; the Baby Care adapter/confirmation side follows under a separate approved integration contract.
+
+## 8. Autonomous development rules to preserve
 
 - Read `agent.md` first, then this file, `docs/PLAN.md`, `.agent/current-milestone.json`, and only the relevant approved spec/plan.
 - Use RED -> GREEN -> focused tests -> integration -> exact-head CI.
@@ -113,7 +142,7 @@ This is a **future Guardian/multimodal integration candidate**, not permission t
 - Preserve user work; do not reset/overwrite unrelated changes.
 - Only stop for major product direction, credentials/payment, destructive/irreversible actions, or real hardware/family acceptance that automation cannot reproduce.
 
-## 8. Fresh Work entry point
+## 9. Fresh Work entry point
 
 The next Work should begin with **M3 design**, not M2 implementation and not Guardian coding.
 
@@ -127,7 +156,7 @@ Recommended first sequence:
 6. Explicitly keep Guardian/audio/AI outside M3 unless the user separately approves a scope change.
 7. Present the M3 design for approval before implementation.
 
-## 9. Copy/paste prompt for the next Work
+## 10. Copy/paste prompt for the next Work
 
 ```text
 你现在接管长期项目 `lpearf-pixel/baby-care`。
