@@ -36,6 +36,7 @@ jobs:
           set -euo pipefail
           rm -rf diagnostics/drizzle-m2
           mkdir -p diagnostics/drizzle-m2/meta
+          cp migrations/0000_m1_family_identity.sql diagnostics/drizzle-m2/0000_m1_family_identity.sql
           cp migrations/meta/0000_snapshot.json diagnostics/drizzle-m2/meta/0000_snapshot.json
           node -e "const fs=require('fs'); const j=JSON.parse(fs.readFileSync('migrations/meta/_journal.json','utf8')); j.entries=j.entries.filter((e)=>e.idx===0); fs.writeFileSync('diagnostics/drizzle-m2/meta/_journal.json', JSON.stringify(j,null,2)+'\n');"
       - name: Generate snapshot with Drizzle Kit
