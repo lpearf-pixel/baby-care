@@ -1,11 +1,14 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { resolveTraceId } from '@baby-care/observability';
 import { createAuthService } from './auth/auth-service.js';
+import { createCareAuth } from './care/care-auth.js';
+import { createFeedingService } from './care/feeding-service.js';
 import type { DatabaseContext } from './db.js';
 import { createFamilyRepository } from './family/family-repository.js';
 import { createFamilyService } from './family/family-service.js';
 import { createSetupService } from './family/setup-service.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerFeedingRoutes } from './routes/care-feeding.js';
 import { registerFamilyRoutes } from './routes/family.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerSetupRoutes } from './routes/setup.js';
@@ -50,6 +53,10 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
       authService,
       familyService: createFamilyService(dependencies.database),
       appOrigin: dependencies.appOrigin,
+    });
+    registerFeedingRoutes(app, {
+      careAuth: createCareAuth({ authService, appOrigin: dependencies.appOrigin }),
+      feedingService: createFeedingService(dependencies.database, now),
     });
   }
 
