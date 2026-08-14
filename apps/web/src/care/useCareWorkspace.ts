@@ -1,12 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CareHomeSummaryDto } from '@baby-care/contracts';
-import type { BabyCareApi } from '../api-client.js';
+import type { CareHomeSummaryDto, CareWarning, CareWarningCode } from '@baby-care/contracts';
+import { BabyCareApiError, type BabyCareApi } from '../api-client.js';
+
+interface PendingCareWarning {
+  warnings: readonly CareWarning[];
+  retry: (confirmedWarnings: CareWarningCode[]) => Promise<unknown>;
+  onSuccess?: (result: unknown) => void;
+}
+
+function warningsFromError(error: unknown): CareWarning[] | null {
+  if (!(error instanceof BabyCareApiError) || error.code !== 'care_confirmation_required') return null;
+  if (!error.details || typeof error.details !== 'object' || !('warnings' in error.details)) return null;
+  const warnings = (error.details as { warnings?: unknown }).warnings;
+  if (!Array.isArray(warnings)) return null;
+  const valid = warnings.filter((value): value is CareWarning => (
+    typeof value === 'object'
+    && value !== null
+    && 'code' in value
+    && 'summary' in value
+    && typeof (value as { code?: unknown }).code === 'string'
+    && typeof (value as { summary?: unknown }).summary === 'string'
+  ));
+  return valid.length > 0 ? valid : null;
+}
 
 export function useCareWorkspace(api: BabyCareApi) {
   const [summary, setSummary] = useState<CareHomeSummaryDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [pendingWarning, setPendingWarning] = useState<PendingCareWarning | null>(null);
 
   const reload = useCallback(async () => {
     const next = await api.getCareSummary(new Date().toISOString());
@@ -27,15 +50,28 @@ export function useCareWorkspace(api: BabyCareApi) {
     };
   }, [reload]);
 
-  const save = useCallback(async (action: () => Promise<unknown>): Promise<boolean> => {
+  const save = useCallback(async <T,>(
+    action: (confirmedWarnings?: CareWarningCode[]) => Promise<T>,
+    onSuccess?: (result: T) => void,
+  ): Promise<boolean> => {
     setBusy(true);
     setMessage(null);
     try {
-      await action();
+      const result = await action();
       await reload();
+      onSuccess?.(result);
       setMessage('记录已保存');
       return true;
-    } catch {
+    } catch (error) {
+      const warnings = warningsFromError(error);
+      if (warnings) {
+        setPendingWarning({
+          warnings,
+          retry: (confirmedWarnings) => action(confirmedWarnings),
+          onSuccess: onSuccess as ((result: unknown) => void) | undefined,
+        });
+        return false;
+      }
       setMessage('保存失败，已保留当前填写内容，可重试');
       return false;
     } finally {
@@ -43,5 +79,43 @@ export function useCareWorkspace(api: BabyCareApi) {
     }
   }, [reload]);
 
-  return { summary, loading, busy, message, reload, save };
+  const confirmWarning = useCallback(async () => {
+    const pending = pendingWarning;
+    if (!pending) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const codes = pending.warnings.map((warning) => warning.code);
+      const result = await pending.retry(codes);
+      await reload();
+      pending.onSuccess?.(result);
+      setPendingWarning(null);
+      setMessage('记录已保存');
+    } catch (error) {
+      const warnings = warningsFromError(error);
+      if (warnings) {
+        setPendingWarning({ ...pending, warnings });
+      } else {
+        setMessage('保存失败，已保留当前填写内容，可重试');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [pendingWarning, reload]);
+
+  const cancelWarning = useCallback(() => {
+    setPendingWarning(null);
+  }, []);
+
+  return {
+    summary,
+    loading,
+    busy,
+    message,
+    pendingWarning,
+    reload,
+    save,
+    confirmWarning,
+    cancelWarning,
+  };
 }
