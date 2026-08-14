@@ -16,6 +16,20 @@ const dadSession = {
 
 const nannySession = { ...dadSession, displayName: 'Nanny', relationship: 'nanny', permissionLevel: 'caregiver' } as const;
 
+const emptyCareSummary = {
+  asOf: '2026-08-13T08:00:00.000Z',
+  lastFeeding: null,
+  lastDiaper: null,
+  rolling24h: {
+    bottleTotalMl: 0,
+    expressedBreastMilkMl: 0,
+    formulaMl: 0,
+    directBreastfeedingSessions: 0,
+    directBreastfeedingMinutes: 0,
+  },
+  currentSleep: null,
+} as const;
+
 function fakeApi(overrides: Record<string, unknown> = {}) {
   return {
     getSetupStatus: vi.fn(async () => ({ required: false })),
@@ -34,6 +48,7 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
     createNanny: vi.fn(),
     setNannyStatus: vi.fn(),
     resetNannyPassword: vi.fn(),
+    getCareSummary: vi.fn(async () => emptyCareSummary),
     ...overrides,
   };
 }
@@ -44,7 +59,7 @@ function renderWithApi(api: ReturnType<typeof fakeApi>) {
 
 afterEach(() => cleanup());
 
-describe('M1 Baby Care family workspace', () => {
+describe('Baby Care family workspace', () => {
   it('shows first-run setup with xiangxiang default and a non-persistent secret field', async () => {
     const api = fakeApi({
       getSetupStatus: vi.fn(async () => ({ required: true })),
@@ -75,23 +90,26 @@ describe('M1 Baby Care family workspace', () => {
     expect(screen.queryByText(/dad.*不存在|用户不存在|密码错误/i)).not.toBeInTheDocument();
   });
 
-  it('shows family-admin controls for Dad without inventing care state', async () => {
+  it('shows Dad both M2 care recording and family-admin controls', async () => {
     const api = fakeApi();
     renderWithApi(api);
 
     expect((await screen.findAllByText('Dad')).length).toBeGreaterThan(0);
+    expect(await screen.findByRole('heading', { name: '护理状态' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '喂奶' })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: '家庭管理' })).toBeInTheDocument();
     expect(screen.getByDisplayValue('xiangxiang')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '添加月嫂' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '保存宝宝资料' })).toBeInTheDocument();
-    expect(screen.queryByText(/上次喂奶|正在睡眠|尿布|奶量/)).not.toBeInTheDocument();
   });
 
-  it('shows Nanny a read-only family view and never renders admin actions', async () => {
+  it('shows Nanny the shared care workspace and a read-only family view without admin actions', async () => {
     const api = fakeApi({ getSession: vi.fn(async () => nannySession) });
     renderWithApi(api);
 
     expect((await screen.findAllByText('Nanny')).length).toBeGreaterThan(0);
+    expect(await screen.findByRole('heading', { name: '护理状态' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '尿布' })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: '家庭信息' })).toBeInTheDocument();
     await waitFor(() => expect(api.listMembers).toHaveBeenCalled());
     expect(screen.getAllByText('Mom').length).toBeGreaterThan(0);
