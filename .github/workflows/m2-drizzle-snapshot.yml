@@ -42,7 +42,7 @@ jobs:
       - name: Generate snapshot with Drizzle Kit
         shell: bash
         env:
-          DRIZZLE_OUT: ./diagnostics/drizzle-m2
+          DRIZZLE_OUT: ../../diagnostics/drizzle-m2
         run: |
           set -o pipefail
           pnpm --filter @baby-care/api exec drizzle-kit generate --config "$GITHUB_WORKSPACE/drizzle.config.ts" --name m2_care_recording 2>&1 | tee /tmp/drizzle-snapshot.log
