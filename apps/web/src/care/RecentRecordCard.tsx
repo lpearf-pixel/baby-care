@@ -1,7 +1,6 @@
 export interface RecentCareRecord {
   id: string;
   label: string;
-  edit: () => Promise<void>;
 }
 
 export function RecentRecordCard({
