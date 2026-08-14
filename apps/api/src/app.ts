@@ -1,17 +1,21 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import { resolveTraceId } from '@baby-care/observability';
 import { createAuthService } from './auth/auth-service.js';
+import { createActionService } from './care/action-service.js';
 import { createCareAuth } from './care/care-auth.js';
 import { createDiaperService } from './care/diaper-service.js';
 import { createFeedingService } from './care/feeding-service.js';
+import { createMeasurementService } from './care/measurement-service.js';
 import { createSleepService } from './care/sleep-service.js';
 import type { DatabaseContext } from './db.js';
 import { createFamilyRepository } from './family/family-repository.js';
 import { createFamilyService } from './family/family-service.js';
 import { createSetupService } from './family/setup-service.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerCareActionRoutes } from './routes/care-actions.js';
 import { registerDiaperRoutes } from './routes/care-diaper.js';
 import { registerFeedingRoutes } from './routes/care-feeding.js';
+import { registerMeasurementRoutes } from './routes/care-measurements.js';
 import { registerSleepRoutes } from './routes/care-sleep.js';
 import { registerFamilyRoutes } from './routes/family.js';
 import { registerHealthRoute } from './routes/health.js';
@@ -70,6 +74,14 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
     registerSleepRoutes(app, {
       careAuth,
       sleepService: createSleepService(dependencies.database, now),
+    });
+    registerCareActionRoutes(app, {
+      careAuth,
+      actionService: createActionService(dependencies.database, now),
+    });
+    registerMeasurementRoutes(app, {
+      careAuth,
+      measurementService: createMeasurementService(dependencies.database, now),
     });
   }
 
