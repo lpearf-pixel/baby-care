@@ -21,11 +21,11 @@ describeDatabase('M2 diaper recording', () => {
       });
       expect(response.statusCode).toBe(201);
       const stored = await database.pool.query(
-        `select diaper_kind, stool_color, stool_consistency, stool_amount from diaper_events where event_id = $1`,
+        `select kind, stool_color, stool_consistency, stool_amount from diaper_events where event_id = $1`,
         [response.json().id],
       );
       expect(stored.rows).toEqual([{
-        diaper_kind: 'urine',
+        kind: 'urine',
         stool_color: null,
         stool_consistency: null,
         stool_amount: null,
@@ -54,11 +54,11 @@ describeDatabase('M2 diaper recording', () => {
       });
       expect(response.statusCode).toBe(201);
       const stored = await database.pool.query(
-        `select diaper_kind, stool_color, stool_consistency, stool_amount from diaper_events where event_id = $1`,
+        `select kind, stool_color, stool_consistency, stool_amount from diaper_events where event_id = $1`,
         [response.json().id],
       );
       expect(stored.rows).toEqual([{
-        diaper_kind: 'stool',
+        kind: 'stool',
         stool_color: 'yellow',
         stool_consistency: 'seedy',
         stool_amount: 'medium',
