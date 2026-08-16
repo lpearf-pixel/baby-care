@@ -9,9 +9,9 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 ## Current state
 
-Current milestone: **M3 — Care Workspace — ready for design**  
-Completed milestone: **M2 — Care Recording MVP — implementation complete**  
-Previous milestone: **M1 — Family and baby foundation — verified complete**
+Current milestone: **M3 — Care Workspace — verified complete**
+Completed milestone: **M3 — Care Workspace — verified complete**
+Previous milestone: **M2 — Care Recording MVP — verified complete**
 
 Verified M1 production baseline:
 
@@ -25,6 +25,12 @@ M2 sources:
 - reviewed plan: `docs/superpowers/plans/2026-08-13-m2-care-recording-mvp-reviewed.md`
 - implementation branch: `codex/m2-care-recording-implementation`
 - release-gate branch: `codex/m2-task11-release-gate`
+
+M3 sources:
+
+- approved design: `docs/superpowers/specs/2026-08-15-m3-care-workspace-design.md`
+- implementation plan: `docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md`
+- implementation branch: `codex/m3-care-workspace-implementation`
 
 ## M2 delivered
 
@@ -56,13 +62,28 @@ M2 sources:
 
 A fresh five-job CI on the exact final M2 head remains the authoritative release evidence and must include this file, `.agent/current-milestone.json`, README, migration metadata, and production smoke.
 
-## Next milestone — M3 Care Workspace
+## M3 verified release scope
 
-M3 should improve timeline comprehension, handoff, correction workflows, and day/night operational UX using the M2 care facts already implemented. It must not silently expand into Guardian/JoyAI/Qwen integration; Guardian integration remains a later milestone.
+The M3 branch implements explicit caregiver takeover, recent-24-hour fallback and fixed checkpoint briefings, typed/filterable cursor timeline and event detail, version-aware historical correction with append-only history, caregiver-scoped non-authoritative reminders, and per-device low-disturbance day/night Web behavior.
+
+Authoritative M3 release evidence:
+
+- exact code candidate: `e551cecd6146dbb41cb146fae84bc4a5049b9392`;
+- CI run `31954327509`: static, unit/contracts, PostgreSQL integration, production build, and production Compose smoke — 5/5 PASS;
+- production Compose job `95182508610` preserved the M1/M2 assertions and emitted exactly these four M3 markers:
+
+- `SMOKE_OK component=m3-handoff`
+- `SMOKE_OK component=m3-typed-timeline`
+- `SMOKE_OK component=m3-revision-conflict`
+- `SMOKE_OK component=m3-care-workspace-release-flow`
+
+M3 is verified complete on that matched code-head/run pair. This durable-state documentation commit necessarily creates a later head; after it is pushed, require one final CI run on the documentation-closure head and record that run in the Draft PR. Do not edit these files again merely to embed the closure run, which would create an infinite self-reference loop.
+
+Next work is family acceptance and Birth Ready operational simulation, followed by explicit selection and approval of a post-M3 milestone. M3 implementation scope must not be reopened implicitly.
 
 ## Hard scope boundaries
 
-No Guardian ingestion, JoyAI/Qwen runtime, automated feeding recognition, diagnosis/dose recommendation, cloud deployment, or `main` modification/merge in M2.
+Verified M3 contains no Guardian ingestion, JoyAI/Qwen runtime, automated feeding recognition, diagnosis/dose recommendation, cloud deployment, or `main` modification/merge. Any such post-M3 work requires its own approved design.
 
 ## Working rule
 

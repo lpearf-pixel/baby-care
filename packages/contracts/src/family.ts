@@ -1,10 +1,18 @@
 import { z } from 'zod';
 
+export function isSafeTimeZoneIdentifier(value: string): boolean {
+  return /^(?:UTC|[A-Za-z][A-Za-z0-9._+-]*(?:\/[A-Za-z0-9][A-Za-z0-9._+-]*)+)$/.test(value);
+}
+
+const IanaTimeZoneSchema = z.string().trim().min(1).max(80).refine(isSafeTimeZoneIdentifier, {
+  message: 'Timezone must use safe IANA identifier syntax.',
+});
+
 export const FamilyDtoSchema = z
   .object({
     id: z.string().uuid(),
     name: z.string(),
-    timezone: z.string(),
+    timezone: IanaTimeZoneSchema,
     status: z.literal('active'),
   })
   .strict();
@@ -31,7 +39,7 @@ export const MemberDtoSchema = z
 export const UpdateFamilyInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
-    timezone: z.string().trim().min(1).max(80).optional(),
+    timezone: IanaTimeZoneSchema.optional(),
   })
   .strict()
   .refine((value) => value.name !== undefined || value.timezone !== undefined, {

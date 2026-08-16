@@ -53,8 +53,8 @@ function fakeApi() {
     getFeedingQuickValues: vi.fn(async (liquidType: 'expressed_breast_milk' | 'formula') => ({ liquidType, values: [45, 60, 75] })),
     createFeedingSession: vi.fn(async () => ({ id: '55555555-5555-4555-8555-555555555555', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const })),
     createDiaper: vi.fn(async () => ({ id: '66666666-6666-4666-8666-666666666666', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const, kind: 'urine' as const, stoolColor: null, stoolConsistency: null, stoolAmount: null, note: null })),
-    startSleep: vi.fn(async () => ({ id: '77777777-7777-4777-8777-777777777777', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const, startedAt: '2026-08-13T08:00:00.000Z', endedAt: null, note: null })),
-    wakeSleep: vi.fn(async () => ({ id: '77777777-7777-4777-8777-777777777777', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const, startedAt: '2026-08-13T07:30:00.000Z', endedAt: '2026-08-13T08:00:00.000Z', note: null })),
+    startSleep: vi.fn(async () => ({ id: '77777777-7777-4777-8777-777777777777', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const, startedAt: '2026-08-13T08:00:00.000Z', endedAt: null, note: null, version: 1 })),
+    wakeSleep: vi.fn(async () => ({ id: '77777777-7777-4777-8777-777777777777', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const, startedAt: '2026-08-13T07:30:00.000Z', endedAt: '2026-08-13T08:00:00.000Z', note: null, version: 2 })),
   };
 }
 

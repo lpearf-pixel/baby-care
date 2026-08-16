@@ -1,6 +1,7 @@
 export interface RecentCareRecord {
   id: string;
   label: string;
+  version: number;
 }
 
 export function RecentRecordCard({

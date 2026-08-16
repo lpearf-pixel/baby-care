@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const collector = resolve(repoRoot, 'scripts/collect-diagnostics.mjs');
 
-function runCollector(cwd: string, evidenceFile: string): Promise<void> {
+function runCollector(cwd: string, evidenceFile: string, trustedMetadata?: string): Promise<void> {
   return new Promise((resolveRun, reject) => {
     const child = spawn(process.execPath, [collector], {
       cwd,
@@ -18,6 +18,7 @@ function runCollector(cwd: string, evidenceFile: string): Promise<void> {
         DIAG_COMPONENT: 'api-postgres',
         DIAG_EVENT_CODE: 'INTEGRATION_GATE_FAILED',
         DIAG_EVIDENCE_FILE: evidenceFile,
+        ...(trustedMetadata ? { DIAG_TRUSTED_METADATA: trustedMetadata } : {}),
       },
       stdio: 'ignore',
     });
@@ -39,6 +40,10 @@ describe('compact diagnostic privacy', () => {
       '37.2',
       '3.4',
       'private care note body',
+      'private-formula-type',
+      'private-bottle-kind',
+      '61',
+      '151',
       'raw-session-token-private',
       'setup-token-private',
     ];
@@ -47,6 +52,13 @@ describe('compact diagnostic privacy', () => {
       [
         'request failed medicationName="Private Medication Name" dose=0.5 doseUnit=mL',
         'measurement valueCelsius=37.2 valueKg=3.4 note="private care note body"',
+        'feeding components=[',
+        '  {"kind":"private-bottle-kind",',
+        '   "liquidType":"private-formula-type",',
+        '   "amountMl":61,',
+        '   "bottleCapacityMl":151}',
+        ']',
+        'feeding amountMl=61 bottleCapacityMl=151 liquidType="private-formula-type"',
         'cookie="baby_care_session=raw-session-token-private" setupToken="setup-token-private"',
         'constraint care_event_owner_membership_fk failed',
       ].join('\n'),
@@ -54,10 +66,132 @@ describe('compact diagnostic privacy', () => {
     );
 
     await runCollector(cwd, evidenceFile);
-    const summary = await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8');
+    const summary = JSON.parse(
+      await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8'),
+    ) as unknown;
 
-    for (const secret of forbidden) expect(summary).not.toContain(secret);
-    expect(summary).toContain('care_event_owner_membership_fk');
-    expect(summary).toContain('[REDACTED]');
+    expect(summary).toEqual(expect.objectContaining({ evidence: expect.any(String) }));
+    const evidence = (summary as { evidence: string }).evidence;
+
+    for (const secret of forbidden) expect(evidence).not.toContain(secret);
+    expect(evidence).not.toContain('care_event_owner_membership_fk');
+    expect(evidence).toContain('[REDACTED]');
+  });
+
+  it('redacts the extended care-field matrix and whole revision snapshots', async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), 'baby-care-diag-matrix-'));
+    const evidenceFile = resolve(cwd, 'integration.log');
+    const forbidden = [
+      '73-private-duration',
+      '74-private-duration-snake',
+      'private-stool-color',
+      'private-stool-consistency',
+      'private-stool-amount',
+      'private-measurement-method',
+      'private-related-action',
+      'private-before-note',
+      'private-before-milk',
+      'private-after-medication',
+      'private-after-dose',
+      'private-future-care-field',
+    ];
+    await writeFile(
+      evidenceFile,
+      [
+        'durationMinutes="73-private-duration" duration_minutes="74-private-duration-snake"',
+        'stoolColor="private-stool-color" stool_consistency="private-stool-consistency" stoolAmount="private-stool-amount"',
+        'method="private-measurement-method"',
+        'relatedActions=[{"kind":"spit_up","amount":"private-related-action"}]',
+        'before_json={"note":"private-before-note","components":[{"amountMl":"private-before-milk"}]}',
+        'after_json={',
+        '  "action":{"kind":"medication","medicationName":"private-after-medication",',
+        '  "dose":"private-after-dose"}',
+        '}',
+        'futureCareField="private-future-care-field"',
+        'constraint care_event_owner_membership_fk failed code=care_state_conflict',
+      ].join('\n'),
+      'utf8',
+    );
+
+    await runCollector(cwd, evidenceFile);
+    const summary = JSON.parse(
+      await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8'),
+    ) as { evidence: string };
+
+    for (const secret of forbidden) expect(summary.evidence).not.toContain(secret);
+    expect(summary.evidence).not.toContain('care_event_owner_membership_fk');
+    expect(summary.evidence).not.toContain('care_state_conflict');
+    expect(summary.evidence).toContain('[REDACTED]');
+  });
+
+  it('does not extract spoofed allowlist keys from arbitrary assertion output', async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), 'baby-care-diag-diff-'));
+    const evidenceFile = resolve(cwd, 'integration.log');
+    await writeFile(
+      evidenceFile,
+      [
+        'FAIL care-event.test.ts > edit conflict',
+        '- Expected',
+        '- "private care note body"',
+        '+ Received',
+        '+ "another private body"',
+        'event_id=11111111-1111-4111-8111-111111111111 event_type=feeding status=failed',
+        '- "trace_id=private-care-note code=care_state_conflict duration_ms=47"',
+        'constraint care_event_owner_membership_fk failed',
+      ].join('\n'),
+      'utf8',
+    );
+
+    await runCollector(cwd, evidenceFile);
+    const summary = JSON.parse(
+      await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8'),
+    ) as { evidence: string };
+
+    expect(summary.evidence).not.toContain('private care note body');
+    expect(summary.evidence).not.toContain('another private body');
+    expect(summary.evidence).not.toContain('- Expected');
+    expect(summary.evidence).not.toContain('+ Received');
+    expect(summary.evidence).toBe('[REDACTED]');
+  });
+
+  it('preserves strictly validated metadata supplied through the trusted producer channel', async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), 'baby-care-diag-trusted-'));
+    const evidenceFile = resolve(cwd, 'integration.log');
+    await writeFile(evidenceFile, '- "trace_id=spoofed-private-note"', 'utf8');
+    await runCollector(cwd, evidenceFile, JSON.stringify({
+      schema_version: 1,
+      event_id: '11111111-1111-4111-8111-111111111111',
+      event_type: 'feeding',
+      status: 'failed',
+      trace_id: 'trace-safe-123',
+      duration_ms: 47,
+      code: 'care_state_conflict',
+      constraint: 'care_event_owner_membership_fk',
+    }));
+    const summary = JSON.parse(
+      await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8'),
+    ) as { evidence: string };
+
+    expect(summary.evidence).not.toContain('spoofed-private-note');
+    expect(summary.evidence).toContain('"trace_id":"trace-safe-123"');
+    expect(summary.evidence).toContain('"duration_ms":47');
+    expect(summary.evidence).toContain('"code":"care_state_conflict"');
+    expect(summary.evidence).toContain('"constraint":"care_event_owner_membership_fk"');
+  });
+
+  it.each([
+    ['malformed', '{not-json'],
+    ['unknown key', JSON.stringify({ schema_version: 1, trace_id: 'safe', note: 'private' })],
+    ['invalid value', JSON.stringify({ schema_version: 1, duration_ms: 'private' })],
+  ])('rejects %s trusted metadata as a whole', async (_label, trustedMetadata) => {
+    const cwd = await mkdtemp(resolve(tmpdir(), 'baby-care-diag-invalid-trusted-'));
+    const evidenceFile = resolve(cwd, 'integration.log');
+    await writeFile(evidenceFile, 'ordinary failure output', 'utf8');
+    await runCollector(cwd, evidenceFile, trustedMetadata);
+    const summary = JSON.parse(
+      await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8'),
+    ) as { evidence: string };
+
+    expect(summary.evidence).toBe('[REDACTED]');
   });
 });

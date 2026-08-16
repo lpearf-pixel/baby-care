@@ -12,7 +12,9 @@ import type { CareActorContext } from './care-auth.js';
 import { insertCareActionRow } from './care-action-repository.js';
 import {
   appendCareRevision,
+  assertExpectedCareEventVersion,
   createCareEvent,
+  loadCareEventForUpdate,
   loadActiveCareEventForUpdate,
   type CareEventRow,
   voidCareEvent,
@@ -92,6 +94,8 @@ async function voidLinkedActions(
       eventId: event.id,
       actor,
       action: 'void',
+      fromVersion: event.version,
+      toVersion: event.version + 1,
       before,
       after: { status: 'voided' },
       traceId,
@@ -205,6 +209,7 @@ export function createRevisionService(database: DatabaseContext, now: () => Date
     async edit(
       actor: CareActorContext,
       eventId: string,
+      expectedVersion: number,
       input: EditCareEventInput,
       traceId: string,
     ): Promise<CareRevisionReceipt> {
@@ -219,8 +224,12 @@ export function createRevisionService(database: DatabaseContext, now: () => Date
       const client = await database.pool.connect();
       try {
         await client.query('begin');
-        const event = await loadActiveCareEventForUpdate(client, actor, eventId);
+        const event = await loadCareEventForUpdate(client, actor, eventId);
         if (!event) throw new CareEventNotFoundError();
+        assertExpectedCareEventVersion(event, expectedVersion);
+        if (event.status !== 'active') {
+          throw new CareStateConflictError('The care event is no longer active.');
+        }
         if (event.eventType !== input.eventType) {
           throw new CareStateConflictError('The edit type does not match the stored event type.');
         }
@@ -230,6 +239,8 @@ export function createRevisionService(database: DatabaseContext, now: () => Date
           eventId,
           actor,
           action: 'edit',
+          fromVersion: event.version,
+          toVersion: event.version + 1,
           before,
           after: inputSnapshot(input),
           traceId,
@@ -245,13 +256,22 @@ export function createRevisionService(database: DatabaseContext, now: () => Date
       }
     },
 
-    async undo(actor: CareActorContext, eventId: string, traceId: string): Promise<UndoCareEventResponse> {
+    async undo(
+      actor: CareActorContext,
+      eventId: string,
+      expectedVersion: number,
+      traceId: string,
+    ): Promise<UndoCareEventResponse> {
       const currentTime = now();
       const client = await database.pool.connect();
       try {
         await client.query('begin');
-        const event = await loadActiveCareEventForUpdate(client, actor, eventId);
+        const event = await loadCareEventForUpdate(client, actor, eventId);
         if (!event) throw new CareEventNotFoundError();
+        assertExpectedCareEventVersion(event, expectedVersion);
+        if (event.status !== 'active') {
+          throw new CareStateConflictError('The care event is no longer active.');
+        }
         const before = await loadCareSnapshot(client, event);
         if (event.eventType === 'feeding') {
           await voidLinkedActions(client, actor, event.id, currentTime, traceId);
@@ -262,6 +282,8 @@ export function createRevisionService(database: DatabaseContext, now: () => Date
           eventId,
           actor,
           action: 'void',
+          fromVersion: event.version,
+          toVersion: event.version + 1,
           before,
           after: { status: 'voided' },
           traceId,

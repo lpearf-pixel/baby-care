@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../src/app.js';
 import { createDatabase, type DatabaseContext } from '../src/db.js';
@@ -200,5 +201,158 @@ describeDatabase('M1 identity audit trail', () => {
     }
 
     await app.close();
+  });
+
+  it('keeps care audit metadata allowlisted without payloads or credentials', async () => {
+    const app = await createInitializedApp();
+    try {
+      const dadLogin = await login(app, 'dad', 'dad-test-password', 'care-audit-login');
+      expect(dadLogin.statusCode).toBe(200);
+      const dadCookie = cookieFrom(dadLogin as unknown as { headers: Record<string, unknown> });
+      const headers = (traceId: string) => ({
+        origin: APP_ORIGIN,
+        cookie: dadCookie,
+        'x-trace-id': traceId,
+      });
+
+      const feeding = await app.inject({
+        method: 'POST',
+        url: '/api/care/feeding-sessions',
+        headers: headers('care-audit-feeding'),
+        payload: {
+          occurredAt: '2026-08-13T07:10:00.000Z',
+          clientRequestId: randomUUID(),
+          note: 'private-care-note-audit-sentinel',
+          components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 60, bottleCapacityMl: 150 }],
+        },
+      });
+      expect(feeding.statusCode).toBe(201);
+      const feedingId = feeding.json().id as string;
+
+      const medication = await app.inject({
+        method: 'POST',
+        url: '/api/care/actions',
+        headers: headers('care-audit-medication'),
+        payload: {
+          occurredAt: '2026-08-13T07:20:00.000Z',
+          clientRequestId: randomUUID(),
+          note: 'private-medication-note-audit-sentinel',
+          action: {
+            kind: 'medication',
+            medicationName: 'Private Medication Audit Sentinel',
+            dose: 0.375,
+            doseUnit: 'mL-private-audit-sentinel',
+          },
+        },
+      });
+      expect(medication.statusCode).toBe(201);
+      const medicationId = medication.json().id as string;
+
+      const temperature = await app.inject({
+        method: 'POST',
+        url: '/api/care/measurements',
+        headers: headers('care-audit-temperature'),
+        payload: {
+          occurredAt: '2026-08-13T07:30:00.000Z',
+          clientRequestId: randomUUID(),
+          note: 'private-temperature-note-audit-sentinel',
+          measurement: { kind: 'temperature', valueCelsius: 37.2, method: 'private-method-audit-sentinel' },
+        },
+      });
+      expect(temperature.statusCode).toBe(201);
+
+      const edited = await app.inject({
+        method: 'PATCH',
+        url: `/api/care/events/${feedingId}`,
+        headers: headers('care-audit-edit'),
+        payload: {
+          expectedVersion: 1,
+          event: {
+            eventType: 'feeding',
+            occurredAt: '2026-08-13T07:10:00.000Z',
+            note: 'private-edited-note-audit-sentinel',
+            components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 65, bottleCapacityMl: 150 }],
+          },
+        },
+      });
+      expect(edited.statusCode).toBe(200);
+
+      const undone = await app.inject({
+        method: 'POST',
+        url: `/api/care/events/${medicationId}/undo`,
+        headers: headers('care-audit-undo'),
+        payload: { expectedVersion: 1 },
+      });
+      expect(undone.statusCode).toBe(200);
+
+      const handoff = await app.inject({
+        method: 'POST',
+        url: '/api/care/handoffs',
+        headers: headers('care-audit-handoff'),
+        payload: { occurredAt: '2026-08-13T08:00:00.000Z', clientRequestId: randomUUID() },
+      });
+      expect(handoff.statusCode).toBe(201);
+
+      const result = await database!.pool.query<{
+        action: string;
+        target_id: string | null;
+        trace_id: string;
+        metadata_json: Record<string, unknown> | null;
+      }>(
+        `select action, target_id, trace_id, metadata_json
+           from audit_events
+          where action like 'care.%'
+          order by occurred_at, id`,
+      );
+      expect(result.rows.map((row) => row.action).sort()).toEqual([
+        'care.event_created',
+        'care.event_created',
+        'care.event_created',
+        'care.event_edited',
+        'care.handoff_created',
+        'care.event_voided',
+      ].sort());
+
+      for (const row of result.rows) {
+        if (row.action === 'care.handoff_created') {
+          expect(row.metadata_json).toEqual({
+            checkpointId: row.target_id,
+            source: 'manual',
+            traceId: row.trace_id,
+          });
+        } else {
+          expect(row.metadata_json).toEqual({
+            eventType: expect.any(String),
+            careSource: 'manual',
+          });
+        }
+      }
+
+      const serializedMetadata = JSON.stringify(result.rows.map((row) => row.metadata_json));
+      for (const forbidden of [
+        'private-care-note-audit-sentinel',
+        'private-medication-note-audit-sentinel',
+        'Private Medication Audit Sentinel',
+        'mL-private-audit-sentinel',
+        'private-temperature-note-audit-sentinel',
+        'private-method-audit-sentinel',
+        'private-edited-note-audit-sentinel',
+        dadCookie,
+        'dad-test-password',
+        SETUP_TOKEN,
+        'components',
+        'amountMl',
+        'bottleCapacityMl',
+        'medicationName',
+        'doseUnit',
+        'valueCelsius',
+        'before',
+        'after',
+      ]) {
+        expect(serializedMetadata).not.toContain(forbidden);
+      }
+    } finally {
+      await app.close();
+    }
   });
 });

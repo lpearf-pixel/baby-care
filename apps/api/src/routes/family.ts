@@ -67,6 +67,15 @@ function handleFamilyError(reply: FastifyReply, request: FastifyRequest, error: 
   throw error;
 }
 
+function isSupportedIanaTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function registerFamilyRoutes(app: FastifyInstance, dependencies: FamilyRouteDependencies): void {
   app.get('/api/family', async (request, reply) => {
     const context = await requireAuth(request, reply, dependencies.authService);
@@ -84,6 +93,9 @@ export function registerFamilyRoutes(app: FastifyInstance, dependencies: FamilyR
     if (!context) return;
     const parsed = UpdateFamilyInputSchema.safeParse(request.body);
     if (!parsed.success) return sendError(reply, 400, 'validation_failed', 'The family update is invalid.', request.id);
+    if (parsed.data.timezone && !isSupportedIanaTimeZone(parsed.data.timezone)) {
+      return sendError(reply, 400, 'validation_failed', 'The family timezone is not supported.', request.id);
+    }
     try {
       return reply.send(await dependencies.familyService.updateFamily(context, parsed.data, request.id));
     } catch (error) {
