@@ -10,6 +10,7 @@ import type {
 import type { BabyCareApi } from '../api-client.js';
 import { BabyCareApiError } from '../api-client.js';
 import { CareSummary } from './CareSummary.js';
+import { CareEventDetail } from './CareEventDetail.js';
 import { CareTimeline } from './CareTimeline.js';
 import { CareWarningDialog } from './CareWarningDialog.js';
 import { DiaperForm } from './DiaperForm.js';
@@ -110,6 +111,9 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
   const [recent, setRecent] = useState<RecentState | null>(null);
   const [editing, setEditing] = useState(false);
   const [revisionConflict, setRevisionConflict] = useState(false);
+  const [recentEditingVersion, setRecentEditingVersion] = useState<number | null>(null);
+  const [recentLatestVersion, setRecentLatestVersion] = useState<number | null>(null);
+  const [detailEventId, setDetailEventId] = useState<string | null>(null);
   const {
     summary,
     loading,
@@ -189,25 +193,31 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
   async function editRecent(input: EditCareEventInput) {
     if (!recent) return;
     setRevisionConflict(false);
-    await save(
-      () => api.editCareEvent(recent.id, { expectedVersion: recent.version, event: input })
-        .catch((error: unknown) => {
+    setRecentLatestVersion(null);
+    const saved = await save(
+      () => api.editCareEvent(recent.id, { expectedVersion: recentEditingVersion ?? recent.version, event: input })
+        .catch(async (error: unknown) => {
           if (error instanceof BabyCareApiError && error.code === 'care_state_conflict') {
             setRevisionConflict(true);
+            const latest = await api.getCareEventDetail(recent.id).catch(() => null);
+            if (latest) setRecentLatestVersion(latest.version);
           }
           throw error;
         }),
       (receipt) => {
         setRecent({ ...recent, version: receipt.version, editInput: input });
         setEditing(false);
+        setRecentEditingVersion(null);
+        setRecentLatestVersion(null);
       },
     );
+    if (saved) await Promise.all([reloadTimeline(), reloadHandoff()]);
   }
 
   async function undoRecent() {
     if (!recent) return;
     setRevisionConflict(false);
-    await save(
+    const saved = await save(
       () => api.undoCareEvent(recent.id, { expectedVersion: recent.version })
         .catch((error: unknown) => {
           if (error instanceof BabyCareApiError && error.code === 'care_state_conflict') {
@@ -220,6 +230,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
         setEditing(false);
       },
     );
+    if (saved) await Promise.all([reloadTimeline(), reloadHandoff()]);
   }
 
   return (
@@ -310,7 +321,11 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
         <RecentRecordCard
           record={recent}
           busy={busy}
-          onEdit={() => setEditing(true)}
+          onEdit={() => {
+            setRecentEditingVersion(recent.version);
+            setRecentLatestVersion(null);
+            setEditing(true);
+          }}
           onUndo={() => void undoRecent()}
         />
       ) : null}
@@ -319,12 +334,28 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
           input={recent.editInput}
           busy={busy}
           onSave={editRecent}
-          onCancel={() => setEditing(false)}
+          onCancel={() => {
+            setEditing(false);
+            setRecentEditingVersion(null);
+            setRecentLatestVersion(null);
+          }}
         />
       ) : null}
 
       {revisionConflict ? (
-        <p className="inline-message care-message" aria-live="polite">记录已被其他照护者修改，请刷新后确认</p>
+        <div className="inline-message care-message" aria-live="polite">
+          <p>记录已被其他照护者修改，请刷新后确认</p>
+          {recentLatestVersion !== null && recentEditingVersion !== null ? (
+            <>
+              <p>最新版本 {recentLatestVersion}，当前草稿基于版本 {recentEditingVersion}</p>
+              {recentLatestVersion !== recentEditingVersion ? (
+                <button type="button" className="text-button" onClick={() => {
+                  setRecentEditingVersion(recentLatestVersion);
+                }}>确认以最新版本为基础</button>
+              ) : <p>已确认以最新版本为基础，请再次保存。</p>}
+            </>
+          ) : null}
+        </div>
       ) : message ? <p className="inline-message care-message" aria-live="polite">{message}</p> : null}
 
       <CareTimeline
@@ -337,7 +368,19 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
         onCategoryChange={setCategory}
         onLoadMore={loadMore}
         onReload={reloadTimeline}
+        onOpenDetail={setDetailEventId}
       />
+      {detailEventId ? (
+        <CareEventDetail
+          key={detailEventId}
+          api={api}
+          eventId={detailEventId}
+          onClose={() => setDetailEventId(null)}
+          onChanged={async () => {
+            await Promise.all([reload(), reloadTimeline(), reloadHandoff()]);
+          }}
+        />
+      ) : null}
       <button type="button" className="text-button care-refresh" onClick={() => void reload()}>刷新护理状态</button>
     </section>
   );

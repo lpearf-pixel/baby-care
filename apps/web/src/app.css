@@ -8,7 +8,7 @@
 
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: 0.55; }
 
@@ -71,7 +71,8 @@ h2, h3, h4 { margin-top: 0; }
   gap: 7px;
   font-size: 0.9rem;
 }
-input {
+input,
+select {
   width: 100%;
   min-height: 44px;
   padding: 10px 12px;
@@ -205,6 +206,15 @@ input:focus-visible, button:focus-visible { outline: 2px solid currentColor; out
 .care-timeline-meta {
   margin: 0;
 }
+.care-detail-button { justify-self: start; padding-inline: 0; }
+.care-event-detail,
+.care-edit-fields,
+.care-revision-history { display: grid; gap: 14px; }
+.care-detail-facts { margin: 0; padding-left: 22px; line-height: 1.65; }
+.care-edit-group { padding: 12px; border-radius: 12px; background: color-mix(in srgb, CanvasText 5%, transparent); }
+.care-revision-list { display: grid; gap: 12px; margin: 0; padding-left: 22px; }
+.care-revision-list li { padding-bottom: 12px; border-bottom: 1px solid color-mix(in srgb, CanvasText 10%, transparent); }
+.care-revision-list p { margin: 7px 0 0; line-height: 1.5; }
 
 @media (max-width: 640px) {
   .shell { width: min(100% - 24px, 860px); padding-top: 24px; }

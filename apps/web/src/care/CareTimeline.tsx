@@ -19,6 +19,7 @@ export function CareTimeline({
   onCategoryChange,
   onLoadMore,
   onReload,
+  onOpenDetail,
 }: {
   items: CareTimelineItemDto[];
   category: CareTimelineCategory;
@@ -29,6 +30,7 @@ export function CareTimeline({
   onCategoryChange: (value: CareTimelineCategory) => void;
   onLoadMore: () => Promise<void>;
   onReload: () => Promise<void>;
+  onOpenDetail: (eventId: string) => void;
 }) {
   return (
     <section className="panel care-timeline" aria-label="护理时间线">
@@ -57,7 +59,7 @@ export function CareTimeline({
       {!loading && !items.length ? <p className="muted">暂无护理记录</p> : null}
 
       <div id="care-timeline-list" className="care-timeline-list">
-        {items.map((item) => <CareTimelineCard key={item.id} item={item} />)}
+        {items.map((item) => <CareTimelineCard key={item.id} item={item} onOpenDetail={onOpenDetail} />)}
       </div>
 
       {nextCursor ? (

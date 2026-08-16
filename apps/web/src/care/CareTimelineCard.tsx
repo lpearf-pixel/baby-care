@@ -66,7 +66,7 @@ function formatSummary(item: CareTimelineItemDto): string {
   }
 }
 
-export function CareTimelineCard({ item }: { item: CareTimelineItemDto }) {
+export function CareTimelineCard({ item, onOpenDetail }: { item: CareTimelineItemDto; onOpenDetail: (eventId: string) => void }) {
   return (
     <article className="panel care-timeline-card">
       <p className="care-timeline-time">
@@ -74,6 +74,7 @@ export function CareTimelineCard({ item }: { item: CareTimelineItemDto }) {
       </p>
       <strong>{formatSummary(item)}</strong>
       <p className="muted care-timeline-meta">{formatActor(item)}</p>
+      <button type="button" className="text-button care-detail-button" onClick={() => onOpenDetail(item.id)}>查看详情</button>
     </article>
   );
 }

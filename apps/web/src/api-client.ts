@@ -5,6 +5,7 @@ import type {
   CareHandoffBriefingDto,
   CareHomeSummaryDto,
   CareRevisionReceipt,
+  CareTimelineItemDto,
   CareTimelineQuery,
   CareTimelineResponse,
   CreateCareActionInput,
@@ -14,6 +15,7 @@ import type {
   CreateMeasurementInput,
   CreateNannyInput,
   DiaperEventDto,
+  EditCareEventInput,
   FamilyDto,
   FeedingQuickValuesDto,
   FeedingSessionDto,
@@ -30,6 +32,19 @@ import type {
   UpdateFamilyInput,
   WakeSleepInput,
 } from '@baby-care/contracts';
+
+export interface CareRevisionHistoryItemDto {
+  id: string;
+  eventId: string;
+  action: 'edit' | 'void';
+  actorUserId: string;
+  actorDisplayName: string;
+  createdAt: string;
+  fromVersion: number;
+  toVersion: number;
+  before: EditCareEventInput | { status: 'active' };
+  after: EditCareEventInput | { status: 'voided' };
+}
 
 export class BabyCareApiError extends Error {
   constructor(
@@ -89,6 +104,8 @@ export interface BabyCareApi {
   getCareHandoffSummary(handoffId: string): Promise<CareHandoffBriefingDto>;
   createCareHandoff(input: CreateCareHandoffInput): Promise<CareHandoffBriefingDto>;
   getCareTimeline(query: CareTimelineQuery): Promise<CareTimelineResponse>;
+  getCareEventDetail(eventId: string): Promise<CareTimelineItemDto>;
+  getCareEventRevisions(eventId: string): Promise<CareRevisionHistoryItemDto[]>;
   getFeedingQuickValues(liquidType: BottleLiquidType): Promise<FeedingQuickValuesDto>;
   createFeedingSession(input: CreateFeedingSessionInput): Promise<FeedingSessionDto>;
   createDiaper(input: CreateDiaperInput): Promise<DiaperEventDto>;
@@ -147,6 +164,8 @@ export const babyCareApi: BabyCareApi = {
     params.set('limit', String(query.limit));
     return request(`/api/care/timeline?${params.toString()}`);
   },
+  getCareEventDetail: (eventId) => request(`/api/care/events/${eventId}`),
+  getCareEventRevisions: (eventId) => request(`/api/care/events/${eventId}/revisions`),
   getFeedingQuickValues: (liquidType) =>
     request(`/api/care/feeding/quick-values?liquidType=${encodeURIComponent(liquidType)}`),
   createFeedingSession: (input) =>
