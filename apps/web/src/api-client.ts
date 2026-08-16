@@ -19,12 +19,14 @@ import type {
   FamilyDto,
   FeedingQuickValuesDto,
   FeedingSessionDto,
+  HandoffReminderRuleInput,
   MeasurementReceipt,
   MemberDto,
   SessionDto,
   SetupInput,
   SleepIntervalDto,
   StartSleepInput,
+  ReplaceHandoffReminderRulesInput,
   UndoCareEventRequest,
   UndoCareEventResponse,
   UpdateCareEventRequest,
@@ -32,6 +34,11 @@ import type {
   UpdateFamilyInput,
   WakeSleepInput,
 } from '@baby-care/contracts';
+
+export interface HandoffReminderState {
+  rules: HandoffReminderRuleInput[];
+  shouldPrompt: boolean;
+}
 
 export interface CareRevisionHistoryItemDto {
   id: string;
@@ -103,6 +110,8 @@ export interface BabyCareApi {
   getLatestCareHandoff(): Promise<CareHandoffBriefingDto | null>;
   getCareHandoffSummary(handoffId: string): Promise<CareHandoffBriefingDto>;
   createCareHandoff(input: CreateCareHandoffInput): Promise<CareHandoffBriefingDto>;
+  getHandoffReminders(): Promise<HandoffReminderState>;
+  replaceHandoffReminders(input: ReplaceHandoffReminderRulesInput): Promise<HandoffReminderState>;
   getCareTimeline(query: CareTimelineQuery): Promise<CareTimelineResponse>;
   getCareEventDetail(eventId: string): Promise<CareTimelineItemDto>;
   getCareEventRevisions(eventId: string): Promise<CareRevisionHistoryItemDto[]>;
@@ -154,6 +163,9 @@ export const babyCareApi: BabyCareApi = {
   getCareHandoffSummary: (handoffId) => request(`/api/care/handoffs/${handoffId}/summary`),
   createCareHandoff: (input) =>
     request('/api/care/handoffs', { method: 'POST', body: JSON.stringify(input) }),
+  getHandoffReminders: () => request('/api/care/handoff-reminders'),
+  replaceHandoffReminders: (input) =>
+    request('/api/care/handoff-reminders', { method: 'PUT', body: JSON.stringify(input) }),
   getCareTimeline: (query) => {
     const params = new URLSearchParams();
     if (query.before) params.set('before', query.before);

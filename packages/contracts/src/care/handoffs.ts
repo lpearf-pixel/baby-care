@@ -30,7 +30,7 @@ export const HandoffReminderRuleInputSchema = z.object({
 }).strict();
 
 export const ReplaceHandoffReminderRulesInputSchema = z.object({
-  rules: z.array(HandoffReminderRuleInputSchema).max(16),
+  rules: z.array(HandoffReminderRuleInputSchema).max(8),
 }).strict();
 
 export const CareHandoffBriefingDtoSchema = z.object({

@@ -11,6 +11,7 @@ import type { BabyCareApi } from '../api-client.js';
 import { BabyCareApiError } from '../api-client.js';
 import { CareSummary } from './CareSummary.js';
 import { CareEventDetail } from './CareEventDetail.js';
+import { CareDisplayMode } from './CareDisplayMode.js';
 import { CareTimeline } from './CareTimeline.js';
 import { CareWarningDialog } from './CareWarningDialog.js';
 import { DiaperForm } from './DiaperForm.js';
@@ -235,6 +236,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
 
   return (
     <section className="care-workspace" aria-label="Baby Care 护理工作台">
+      <CareDisplayMode />
       {loading ? <section className="panel"><p>正在加载护理状态…</p></section> : null}
       {!loading && summary ? <CareSummary summary={summary} /> : null}
       {!loading && !summary ? (
@@ -245,6 +247,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
       ) : null}
 
       <HandoffPanel
+        api={api}
         briefing={briefing}
         loading={handoffLoading}
         busy={handoffBusy}

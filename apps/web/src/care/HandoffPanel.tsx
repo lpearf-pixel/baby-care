@@ -1,5 +1,8 @@
 import type { CareHandoffBriefingDto } from '@baby-care/contracts';
+import { useState } from 'react';
+import type { BabyCareApi } from '../api-client.js';
 import { formatDateTime } from './CareTimelineCard.js';
+import { HandoffReminderSettings } from './HandoffReminderSettings.js';
 
 function windowLabel(briefing: CareHandoffBriefingDto): string {
   const from = formatDateTime(briefing.window.from);
@@ -23,6 +26,7 @@ function correctionSummary(briefing: CareHandoffBriefingDto): string {
 }
 
 export function HandoffPanel({
+  api,
   briefing,
   loading,
   busy,
@@ -31,14 +35,23 @@ export function HandoffPanel({
   onReload,
   onJumpToWindow,
 }: {
+  api: BabyCareApi;
   briefing: CareHandoffBriefingDto | null;
   loading: boolean;
   busy: boolean;
   message: string | null;
-  onTakeOver: () => Promise<void>;
+  onTakeOver: () => Promise<boolean>;
   onReload: () => Promise<void>;
   onJumpToWindow: (from: string, to: string) => void;
 }) {
+  const [takeoverVersion, setTakeoverVersion] = useState(0);
+
+  async function takeOver() {
+    const succeeded = await onTakeOver();
+    if (succeeded) setTakeoverVersion((version) => version + 1);
+    return succeeded;
+  }
+
   return (
     <section className="panel care-handoff" aria-label="交接摘要">
       <div className="care-panel-header">
@@ -103,10 +116,12 @@ export function HandoffPanel({
       ) : null}
 
       <div className="choice-row">
-        <button type="button" className="primary" disabled={busy} onClick={() => void onTakeOver()}>
+        <button type="button" className="primary" disabled={busy} onClick={() => void takeOver()}>
           我来接手
         </button>
       </div>
+
+      <HandoffReminderSettings api={api} onTakeOver={takeOver} takeoverVersion={takeoverVersion} />
     </section>
   );
 }

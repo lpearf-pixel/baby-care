@@ -383,7 +383,7 @@ describeDatabase('M3 explicit care handoff', () => {
         url: '/api/care/handoff-reminders',
         headers: careHeaders(context.cookie),
         payload: {
-          rules: Array.from({ length: 17 }, (_, index) => ({
+          rules: Array.from({ length: 9 }, (_, index) => ({
             localTime: `${String(index).padStart(2, '0')}:00`,
             weekdays: [4],
             enabled: true,

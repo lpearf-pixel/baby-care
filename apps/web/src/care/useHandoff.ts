@@ -70,7 +70,7 @@ export function useHandoff(api: BabyCareApi) {
   }, [api, applyBriefing]);
 
   const takeOver = useCallback(async () => {
-    if (takeOverInFlightRef.current || !canReadHandoff(api) || !canWriteHandoff(api)) return;
+    if (takeOverInFlightRef.current || !canReadHandoff(api) || !canWriteHandoff(api)) return false;
     takeOverInFlightRef.current = true;
     setBusy(true);
     setMessage(null);
@@ -84,8 +84,10 @@ export function useHandoff(api: BabyCareApi) {
       applyBriefing(next);
       takeOverRequestIdRef.current = null;
       setMessage('交接已记录');
+      return true;
     } catch {
       setMessage('交接记录失败，可重试');
+      return false;
     } finally {
       takeOverInFlightRef.current = false;
       setBusy(false);

@@ -91,6 +91,13 @@ describe('M3 care workspace contracts', () => {
     expect(ReplaceHandoffReminderRulesInputSchema.safeParse({
       rules: [{ localTime: '24:00', weekdays: [1, 1], enabled: true }],
     }).success).toBe(false);
+    expect(ReplaceHandoffReminderRulesInputSchema.safeParse({
+      rules: Array.from({ length: 9 }, (_, index) => ({
+        localTime: `${String(index).padStart(2, '0')}:00`,
+        weekdays: [1],
+        enabled: true,
+      })),
+    }).success).toBe(false);
 
     const checkpoint = {
       id: randomUUID(),
