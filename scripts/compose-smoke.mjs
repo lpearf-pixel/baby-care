@@ -355,6 +355,7 @@ const m3NannyDiaper = await request('/api/care/diapers', {
   body: {
     occurredAt: isoMinutesAgo(careAsOf, 8),
     clientRequestId: crypto.randomUUID(),
+    confirmedWarnings: ['possible_duplicate'],
     kind: 'urine_stool',
     stoolColor: 'yellow',
     stoolConsistency: 'seedy',
