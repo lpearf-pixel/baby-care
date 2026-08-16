@@ -55,11 +55,10 @@ export async function findHandoffByClientRequestId(
 ): Promise<HandoffCheckpointRow | null> {
   const result = await executor.query<HandoffCheckpointRow>(
     `${CHECKPOINT_SELECT}
-      where hc.family_id = $1 and hc.baby_id = $2
-        and hc.actor_user_id = $3 and hc.actor_membership_id = $4
-        and hc.client_request_id = $5
+      where hc.family_id = $1 and hc.actor_user_id = $2
+        and hc.client_request_id = $3
       limit 1`,
-    [actor.familyId, actor.babyId, actor.userId, actor.membershipId, clientRequestId],
+    [actor.familyId, actor.userId, clientRequestId],
   );
   return result.rows[0] ?? null;
 }

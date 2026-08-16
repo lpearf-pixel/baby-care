@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { CareHandoffBriefingDtoSchema } from '@baby-care/contracts';
 import type { CareActorContext } from '../src/care/care-auth.js';
+import { findHandoffByClientRequestId } from '../src/care/handoff-repository.js';
+import { createHandoffService } from '../src/care/handoff-service.js';
 import { createHandoffSummaryService } from '../src/care/handoff-summary-service.js';
 import { createM2TestApp, M2_TEST_ORIGIN } from './helpers/m2-family-app.js';
 
@@ -200,14 +202,32 @@ describeDatabase('M3 explicit care handoff', () => {
         clientRequestId: randomUUID(),
         components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 60, bottleCapacityMl: 150 }],
       });
-      await postCare(context, context.cookie, '/api/care/sleep/start', {
+      const completedSleep = await postCare(context, context.cookie, '/api/care/sleep/start', {
         occurredAt: '2026-08-13T06:20:00.000Z',
         clientRequestId: randomUUID(),
       });
-      await postCare(context, nannyCookie, '/api/care/sleep/wake', {
-        occurredAt: '2026-08-13T06:50:00.000Z',
-        clientRequestId: randomUUID(),
-      }, 200);
+      const revisedSleep = await context.app.inject({
+        method: 'PATCH',
+        url: `/api/care/events/${completedSleep.json().id}`,
+        headers: careHeaders(nannyCookie),
+        payload: {
+          eventType: 'sleep',
+          startedAt: '2026-08-13T06:20:00.000Z',
+          endedAt: '2026-08-13T06:50:00.000Z',
+        },
+      });
+      expect(revisedSleep.statusCode).toBe(200);
+      const seededRevision = await context.database.pool.query<{
+        revision_action: string;
+        actor_display_name: string;
+      }>(
+        `select cr.revision_action, u.display_name as actor_display_name
+           from care_event_revisions cr
+           join users u on u.id = cr.edit_actor_user_id
+          where cr.event_id = $1`,
+        [completedSleep.json().id],
+      );
+      expect(seededRevision.rows).toEqual([{ revision_action: 'edit', actor_display_name: 'Nanny' }]);
       for (let minute = 0; minute < 15; minute += 1) {
         await postCare(context, context.cookie, '/api/care/actions', {
           occurredAt: `2026-08-13T07:${String(minute).padStart(2, '0')}:00.000Z`,
@@ -369,6 +389,51 @@ describeDatabase('M3 explicit care handoff', () => {
       });
       expect(oversized.statusCode).toBe(400);
       expect(await countCheckpoints(context)).toBe(checkpointsBeforeReminderRead);
+    } finally {
+      await context.app.close();
+      await context.database.close();
+    }
+  });
+
+  it('recovers idempotency by the declared family-user-request key without crossing family or user scope', async () => {
+    const context = await createM2TestApp(testDatabaseUrl!);
+    try {
+      const actor = await dadActor(context);
+      const clientRequestId = randomUUID();
+      const handoffs = createHandoffService(context.database, () => new Date('2026-08-13T08:00:00.000Z'));
+      const original = await handoffs.create(actor, {
+        occurredAt: '2026-08-13T07:00:00.000Z',
+        clientRequestId,
+      }, 'idempotency-original');
+      const shiftedContext = {
+        ...actor,
+        babyId: randomUUID(),
+        membershipId: randomUUID(),
+      };
+
+      const recovered = await handoffs.create(shiftedContext, {
+        occurredAt: '2026-08-13T07:30:00.000Z',
+        clientRequestId,
+      }, 'idempotency-retry');
+      expect(recovered.checkpoint.id).toBe(original.checkpoint.id);
+      expect(recovered.checkpoint.occurredAt).toBe('2026-08-13T07:00:00.000Z');
+      expect(await countCheckpoints(context)).toBe(1);
+
+      const client = await context.database.pool.connect();
+      try {
+        expect((await findHandoffByClientRequestId(client, shiftedContext, clientRequestId))?.id)
+          .toBe(original.checkpoint.id);
+        expect(await findHandoffByClientRequestId(client, {
+          ...shiftedContext,
+          familyId: randomUUID(),
+        }, clientRequestId)).toBeNull();
+        expect(await findHandoffByClientRequestId(client, {
+          ...shiftedContext,
+          userId: randomUUID(),
+        }, clientRequestId)).toBeNull();
+      } finally {
+        client.release();
+      }
     } finally {
       await context.app.close();
       await context.database.close();

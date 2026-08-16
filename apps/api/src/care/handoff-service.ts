@@ -15,12 +15,24 @@ import {
   listHandoffReminderRules,
   loadFamilyTimeZone,
   replaceHandoffReminderRules,
+  type HandoffCheckpointRow,
 } from './handoff-repository.js';
 import { createHandoffSummaryService } from './handoff-summary-service.js';
 
 export interface HandoffReminderState {
   rules: HandoffReminderRuleInput[];
   shouldPrompt: boolean;
+}
+
+function actorForCheckpoint(actor: CareActorContext, checkpoint: HandoffCheckpointRow): CareActorContext {
+  if (checkpoint.family_id !== actor.familyId || checkpoint.actor_user_id !== actor.userId) {
+    throw new Error('Idempotent checkpoint does not belong to the authenticated family user.');
+  }
+  return {
+    ...actor,
+    babyId: checkpoint.baby_id,
+    membershipId: checkpoint.actor_membership_id ?? actor.membershipId,
+  };
 }
 
 export function createHandoffService(database: DatabaseContext, now: () => Date = () => new Date()) {
@@ -52,11 +64,13 @@ export function createHandoffService(database: DatabaseContext, now: () => Date 
     ): Promise<CareHandoffBriefingDto> {
       const client = await database.pool.connect();
       let checkpointId: string;
+      let summaryActor: CareActorContext;
       try {
         await client.query('begin');
         const existing = await findHandoffByClientRequestId(client, actor, input.clientRequestId);
         if (existing) {
           checkpointId = existing.id;
+          summaryActor = actorForCheckpoint(actor, existing);
           await client.query('commit');
         } else {
           const occurredAt = new Date(input.occurredAt);
@@ -75,6 +89,7 @@ export function createHandoffService(database: DatabaseContext, now: () => Date 
             ?? await findHandoffByClientRequestId(client, actor, input.clientRequestId);
           if (!checkpoint) throw new Error('Handoff checkpoint was not persisted.');
           checkpointId = checkpoint.id;
+          summaryActor = actorForCheckpoint(actor, checkpoint);
           if (inserted) {
             await writeAudit(client, {
               familyId: actor.familyId,
@@ -97,7 +112,7 @@ export function createHandoffService(database: DatabaseContext, now: () => Date 
       } finally {
         client.release();
       }
-      return summaries.byId(actor, checkpointId);
+      return summaries.byId(summaryActor, checkpointId);
     },
 
     reminders,
