@@ -1,12 +1,25 @@
 import type { CareTimelineItemDto } from '@baby-care/contracts';
 
-function pad(value: number): string {
-  return String(value).padStart(2, '0');
+function dateTimeParts(value: string, familyTimeZone: string) {
+  return new Map(new Intl.DateTimeFormat('en-CA', {
+    timeZone: familyTimeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(new Date(value)).map((part) => [part.type, part.value]));
 }
 
-export function formatDateTime(value: string): string {
-  const date = new Date(value);
-  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}`;
+export function localDateKey(value: string, familyTimeZone: string): string {
+  const parts = dateTimeParts(value, familyTimeZone);
+  return `${parts.get('year')}-${parts.get('month')}-${parts.get('day')}`;
+}
+
+export function formatDateTime(value: string, familyTimeZone = 'UTC'): string {
+  const parts = dateTimeParts(value, familyTimeZone);
+  return `${parts.get('year')}-${parts.get('month')}-${parts.get('day')} ${parts.get('hour')}:${parts.get('minute')}`;
 }
 
 function formatActor(item: CareTimelineItemDto): string {
@@ -30,7 +43,7 @@ function formatFeeding(item: Extract<CareTimelineItemDto, { eventType: 'feeding'
   }).join(' · ');
 }
 
-function formatSummary(item: CareTimelineItemDto): string {
+export function formatCareTimelineSummary(item: CareTimelineItemDto): string {
   switch (item.eventType) {
     case 'feeding':
       return formatFeeding(item);
@@ -66,13 +79,21 @@ function formatSummary(item: CareTimelineItemDto): string {
   }
 }
 
-export function CareTimelineCard({ item, onOpenDetail }: { item: CareTimelineItemDto; onOpenDetail: (eventId: string) => void }) {
+export function CareTimelineCard({
+  item,
+  familyTimeZone,
+  onOpenDetail,
+}: {
+  item: CareTimelineItemDto;
+  familyTimeZone: string;
+  onOpenDetail: (eventId: string) => void;
+}) {
   return (
     <article className="panel care-timeline-card">
       <p className="care-timeline-time">
-        <time dateTime={item.occurredAt}>{formatDateTime(item.occurredAt)}</time>
+        <time dateTime={item.occurredAt}>{formatDateTime(item.occurredAt, familyTimeZone)}</time>
       </p>
-      <strong>{formatSummary(item)}</strong>
+      <strong>{formatCareTimelineSummary(item)}</strong>
       <p className="muted care-timeline-meta">{formatActor(item)}</p>
       <button type="button" className="text-button care-detail-button" onClick={() => onOpenDetail(item.id)}>查看详情</button>
     </article>

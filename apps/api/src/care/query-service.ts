@@ -48,6 +48,8 @@ interface TimelineEventRow {
   actor_display_name: string | null;
 }
 
+type QueryExecutor = pg.Pool | pg.PoolClient;
+
 function eventFromTimelineRow(row: TimelineEventRow): CareEventRow {
   return {
     id: row.id,
@@ -112,7 +114,7 @@ function timelineItems(
   });
 }
 
-async function inReadSnapshot<T>(
+export async function inReadSnapshot<T>(
   database: DatabaseContext,
   operation: (client: pg.PoolClient) => Promise<T>,
 ): Promise<T> {
@@ -134,8 +136,12 @@ async function inReadSnapshot<T>(
 
 export function createQueryService(database: DatabaseContext) {
   return {
-    async summary(actor: CareActorContext, asOf: Date): Promise<CareHomeSummaryDto> {
-      const lastFeedResult = await database.pool.query<EventTimeRow>(
+    async summary(
+      actor: CareActorContext,
+      asOf: Date,
+      executor: QueryExecutor = database.pool,
+    ): Promise<CareHomeSummaryDto> {
+      const lastFeedResult = await executor.query<EventTimeRow>(
         `select id, occurred_at
            from care_events
           where family_id = $1 and baby_id = $2 and status = 'active'
@@ -147,7 +153,7 @@ export function createQueryService(database: DatabaseContext) {
       const lastFeedRow = lastFeedResult.rows[0];
       let lastFeeding: CareHomeSummaryDto['lastFeeding'] = null;
       if (lastFeedRow) {
-        const bottleResult = await database.pool.query<{
+        const bottleResult = await executor.query<{
           liquid_type: 'expressed_breast_milk' | 'formula';
           amount_ml: number;
         }>(
@@ -158,7 +164,7 @@ export function createQueryService(database: DatabaseContext) {
             limit 1`,
           [lastFeedRow.id],
         );
-        const directResult = await database.pool.query<{ minutes: number }>(
+        const directResult = await executor.query<{ minutes: number }>(
           `select coalesce(sum(duration_minutes), 0)::int as minutes
              from feeding_components
             where session_event_id = $1 and component_type = 'direct_breastfeeding'`,
@@ -173,7 +179,7 @@ export function createQueryService(database: DatabaseContext) {
         };
       }
 
-      const lastDiaperResult = await database.pool.query<{
+      const lastDiaperResult = await executor.query<{
         occurred_at: Date;
         kind: 'urine' | 'stool' | 'urine_stool';
       }>(
@@ -188,7 +194,7 @@ export function createQueryService(database: DatabaseContext) {
       );
       const lastDiaperRow = lastDiaperResult.rows[0];
 
-      const rollingResult = await database.pool.query<RollingRow>(
+      const rollingResult = await executor.query<RollingRow>(
         `select
            coalesce(sum(fc.amount_ml) filter (where fc.component_type = 'bottle'), 0)::int as bottle_total_ml,
            coalesce(sum(fc.amount_ml) filter (where fc.component_type = 'bottle' and fc.liquid_type = 'expressed_breast_milk'), 0)::int as expressed_breast_milk_ml,
@@ -211,12 +217,13 @@ export function createQueryService(database: DatabaseContext) {
         direct_breastfeeding_minutes: 0,
       };
 
-      const openSleepResult = await database.pool.query<{ event_id: string; started_at: Date }>(
+      const openSleepResult = await executor.query<{ event_id: string; started_at: Date }>(
         `select si.event_id, si.started_at
            from sleep_intervals si
            join care_events ce on ce.id = si.event_id
           where ce.family_id = $1 and ce.baby_id = $2 and ce.status = 'active'
-            and ce.event_type = 'sleep' and si.ended_at is null and si.started_at <= $3
+            and ce.event_type = 'sleep' and si.started_at <= $3
+            and (si.ended_at is null or si.ended_at > $3)
           order by si.started_at desc, ce.created_at desc, ce.id desc
           limit 2`,
         [actor.familyId, actor.babyId, asOf],
@@ -245,7 +252,11 @@ export function createQueryService(database: DatabaseContext) {
       };
     },
 
-    async timeline(actor: CareActorContext, query: CareTimelineQuery): Promise<CareTimelineResponse> {
+    async timeline(
+      actor: CareActorContext,
+      query: CareTimelineQuery,
+      snapshotClient?: pg.PoolClient,
+    ): Promise<CareTimelineResponse> {
       const values: unknown[] = [actor.familyId, actor.babyId];
       const clauses = [
         'ce.family_id = $1',
@@ -280,7 +291,7 @@ export function createQueryService(database: DatabaseContext) {
         clauses.push(`ce.event_type = $${index}`);
       }
       const limitIndex = addValue(query.limit + 1);
-      return inReadSnapshot(database, async (client) => {
+      const readTimeline = async (client: pg.PoolClient) => {
         const result = await client.query<TimelineEventRow>(
           `${TIMELINE_ENVELOPE_SELECT}
            where ${clauses.join('\n             and ')}
@@ -304,7 +315,8 @@ export function createQueryService(database: DatabaseContext) {
               })
             : null,
         };
-      });
+      };
+      return snapshotClient ? readTimeline(snapshotClient) : inReadSnapshot(database, readTimeline);
     },
 
     async detail(actor: CareActorContext, eventId: string): Promise<CareTimelineItemDto | null> {

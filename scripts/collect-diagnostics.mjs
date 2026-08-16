@@ -5,7 +5,7 @@ const OUTPUT_DIR = resolve('diagnostics/latest');
 const MAX_SOURCE_BYTES = 8192;
 const MAX_EVIDENCE_CHARS = 2048;
 const REDACTED = '[REDACTED]';
-const SENSITIVE_KEY = [
+const SENSITIVE_KEYS = new Set([
   'password',
   'passphrase',
   'authorization',
@@ -36,24 +36,97 @@ const SENSITIVE_KEY = [
   'value_kg',
   'weight',
   'note',
-].join('|');
+  'durationMinutes',
+  'duration_minutes',
+  'stoolColor',
+  'stool_color',
+  'stoolConsistency',
+  'stool_consistency',
+  'stoolAmount',
+  'stool_amount',
+  'method',
+  'components',
+  'relatedActions',
+  'related_actions',
+  'before_json',
+  'after_json',
+  'beforeJson',
+  'afterJson',
+  'snapshot',
+].map((key) => key.toLowerCase()));
+const SAFE_DIAGNOSTIC_KEYS = new Set([
+  'code',
+  'error_code',
+  'errorcode',
+  'event_code',
+  'eventcode',
+  'constraint',
+  'sqlstate',
+  'stage',
+  'component',
+]);
+
+function structuredValueEnd(value, start) {
+  const first = value[start];
+  if (first === '"' || first === "'") {
+    for (let index = start + 1; index < value.length; index += 1) {
+      if (value[index] === '\\') index += 1;
+      else if (value[index] === first) return index + 1;
+    }
+    return value.length;
+  }
+  if (first === '{' || first === '[') {
+    const openings = new Set(['{', '[']);
+    const closings = new Map([['}', '{'], [']', '[']]);
+    const stack = [];
+    let quote = null;
+    for (let index = start; index < value.length; index += 1) {
+      const character = value[index];
+      if (quote) {
+        if (character === '\\') index += 1;
+        else if (character === quote) quote = null;
+        continue;
+      }
+      if (character === '"' || character === "'") {
+        quote = character;
+      } else if (openings.has(character)) {
+        stack.push(character);
+      } else if (closings.has(character)) {
+        if (stack.at(-1) !== closings.get(character)) return index;
+        stack.pop();
+        if (stack.length === 0) return index + 1;
+      }
+    }
+    return value.length;
+  }
+  let end = start;
+  while (end < value.length && !/[\s,}\]]/.test(value[end])) end += 1;
+  return end;
+}
+
+function redactSensitiveFields(value) {
+  const keyPattern = /(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([A-Za-z_][A-Za-z0-9_-]*))\s*[:=]\s*/g;
+  let redacted = '';
+  let copiedThrough = 0;
+  let match;
+  while ((match = keyPattern.exec(value)) !== null) {
+    const key = (match[1] ?? match[2] ?? match[3] ?? '').toLowerCase();
+    if (!SENSITIVE_KEYS.has(key) && SAFE_DIAGNOSTIC_KEYS.has(key)) continue;
+    const valueStart = keyPattern.lastIndex;
+    const valueEnd = structuredValueEnd(value, valueStart);
+    redacted += value.slice(copiedThrough, valueStart);
+    redacted += REDACTED;
+    copiedThrough = valueEnd;
+    keyPattern.lastIndex = valueEnd;
+  }
+  return `${redacted}${value.slice(copiedThrough)}`;
+}
 
 function redactSensitiveEvidence(value) {
   let redacted = value;
   redacted = redacted.replace(/baby_care_session=[^;\s"']+/gi, `baby_care_session=${REDACTED}`);
   redacted = redacted.replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, `Bearer ${REDACTED}`);
-  redacted = redacted.replace(
-    /((?:"|')?components(?:"|')?\s*[:=]\s*)\[[\s\S]*?\]/gi,
-    (_match, prefix) => `${prefix}${REDACTED}`,
-  );
-
-  const keyedValue = new RegExp(
-    `((?:"|')?(?:${SENSITIVE_KEY})(?:"|')?\\s*[:=]\\s*)("(?:\\\\.|[^"])*"|'(?:\\\\.|[^'])*'|[^\\s,}\\]]+)`,
-    'gi',
-  );
-  redacted = redacted.replace(keyedValue, (_match, prefix) => `${prefix}${REDACTED}`);
-
-  return redacted;
+  return redactSensitiveFields(redacted);
 }
 
 function truncateTail(value, maximum = MAX_EVIDENCE_CHARS) {

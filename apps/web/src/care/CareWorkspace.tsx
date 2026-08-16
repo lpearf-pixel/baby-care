@@ -107,7 +107,7 @@ function measurementEdit(input: CreateMeasurementInput): EditCareEventInput {
   } as EditCareEventInput;
 }
 
-export function CareWorkspace({ api }: { api: BabyCareApi }) {
+export function CareWorkspace({ api, familyTimeZone = 'UTC' }: { api: BabyCareApi; familyTimeZone?: string }) {
   const [active, setActive] = useState<CareQuickAction | null>(null);
   const [recent, setRecent] = useState<RecentState | null>(null);
   const [editing, setEditing] = useState(false);
@@ -254,8 +254,9 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
         message={handoffMessage}
         onTakeOver={takeOver}
         onReload={reloadHandoff}
-        onJumpToWindow={(from, to) => {
-          setCategory('all');
+        familyTimeZone={familyTimeZone}
+        onJumpToWindow={(from, to, nextCategory) => {
+          setCategory(nextCategory);
           setWindow(from, to);
         }}
       />
@@ -372,12 +373,14 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
         onLoadMore={loadMore}
         onReload={reloadTimeline}
         onOpenDetail={setDetailEventId}
+        familyTimeZone={familyTimeZone}
       />
       {detailEventId ? (
         <CareEventDetail
           key={detailEventId}
           api={api}
           eventId={detailEventId}
+          familyTimeZone={familyTimeZone}
           onClose={() => setDetailEventId(null)}
           onChanged={async () => {
             await Promise.all([reload(), reloadTimeline(), reloadHandoff()]);

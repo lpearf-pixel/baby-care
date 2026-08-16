@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type pg from 'pg';
 import { describe, expect, it } from 'vitest';
 import { CareHandoffBriefingDtoSchema } from '@baby-care/contracts';
 import type { CareActorContext } from '../src/care/care-auth.js';
@@ -321,6 +322,14 @@ describeDatabase('M3 explicit care handoff', () => {
         clientRequestId: randomUUID(),
         action: { kind: 'burping' },
       });
+      const wokeAfterCheckpoint = await postCare(context, context.cookie, '/api/care/sleep/wake', {
+        occurredAt: '2026-08-13T08:02:00.000Z',
+        clientRequestId: randomUUID(),
+      });
+      expect(wokeAfterCheckpoint.json()).toMatchObject({
+        startedAt: '2026-08-13T07:50:00.000Z',
+        endedAt: '2026-08-13T08:02:00.000Z',
+      });
       const reopened = await context.app.inject({
         method: 'GET',
         url: `/api/care/handoffs/${briefing.checkpoint.id}/summary`,
@@ -328,6 +337,95 @@ describeDatabase('M3 explicit care handoff', () => {
       });
       expect(reopened.json().window.to).toBe('2026-08-13T08:00:00.000Z');
       expect(reopened.json().notableEventCount).toBe(22);
+      expect(reopened.json().careState.currentSleep).toEqual(briefing.careState.currentSleep);
+    } finally {
+      await context.app.close();
+      await context.database.close();
+    }
+  });
+
+  it('keeps every briefing fact on one snapshot while a concurrent edit is blocked between reads', async () => {
+    const context = await createM2TestApp(testDatabaseUrl!);
+    try {
+      await createCheckpoint(context, context.cookie, '2026-08-13T07:00:00.000Z');
+      const feeding = await postCare(context, context.cookie, '/api/care/feeding-sessions', {
+        occurredAt: '2026-08-13T07:10:00.000Z',
+        clientRequestId: randomUUID(),
+        components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 60, bottleCapacityMl: 150 }],
+      });
+      const handoff = await createCheckpoint(context, context.cookie, '2026-08-13T08:00:00.000Z');
+      const actor = await dadActor(context);
+      const checkpointId = handoff.json().checkpoint.id as string;
+      const eventId = feeding.json().id as string;
+
+      const mutablePool = context.database.pool as unknown as {
+        connect: () => Promise<pg.PoolClient>;
+      };
+      const originalConnect = mutablePool.connect.bind(context.database.pool);
+      let interceptNextConnection = true;
+      let announceSnapshot!: () => void;
+      let resumeBriefing!: () => void;
+      const snapshotEstablished = new Promise<void>((resolve) => { announceSnapshot = resolve; });
+      const mayContinue = new Promise<void>((resolve) => { resumeBriefing = resolve; });
+
+      mutablePool.connect = async () => {
+        const client = await originalConnect();
+        if (!interceptNextConnection) return client;
+        interceptNextConnection = false;
+        const mutableClient = client as unknown as {
+          query: (...args: unknown[]) => Promise<pg.QueryResult>;
+        };
+        const originalQuery = client.query.bind(client) as unknown as (
+          ...args: unknown[]
+        ) => Promise<pg.QueryResult>;
+        let paused = false;
+        mutableClient.query = async (...args: unknown[]) => {
+          const result = await originalQuery(...args);
+          const statement = typeof args[0] === 'string' ? args[0] : '';
+          if (!paused && statement.includes('where hc.id = $1')) {
+            paused = true;
+            announceSnapshot();
+            await mayContinue;
+          }
+          return result;
+        };
+        return client;
+      };
+
+      try {
+        const briefingPromise = createHandoffSummaryService(context.database).byId(actor, checkpointId);
+        await snapshotEstablished;
+        const edited = await context.app.inject({
+          method: 'PATCH',
+          url: `/api/care/events/${eventId}`,
+          headers: careHeaders(context.cookie),
+          payload: {
+            expectedVersion: 1,
+            event: {
+              eventType: 'feeding',
+              occurredAt: '2026-08-13T07:10:00.000Z',
+              components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 65, bottleCapacityMl: 150 }],
+            },
+          },
+        });
+        expect(edited.statusCode).toBe(200);
+        resumeBriefing();
+
+        const briefing = await briefingPromise;
+        expect(briefing.careState.lastFeeding?.bottle?.amountMl).toBe(60);
+        expect(briefing.feeding).toMatchObject({ bottleTotalMl: 60, formulaMl: 60 });
+        expect(briefing.notableEvents).toContainEqual(expect.objectContaining({
+          id: eventId,
+          payload: {
+            components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 60, bottleCapacityMl: 150 }],
+            relatedActions: [],
+          },
+        }));
+        expect(briefing.correctionCount).toBe(0);
+      } finally {
+        resumeBriefing();
+        mutablePool.connect = originalConnect;
+      }
     } finally {
       await context.app.close();
       await context.database.close();

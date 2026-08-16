@@ -3,6 +3,7 @@ import type {
   CareTimelineItemDto,
 } from '@baby-care/contracts';
 import { CareHandoffBriefingDtoSchema } from '@baby-care/contracts';
+import type pg from 'pg';
 import type { DatabaseContext } from '../db.js';
 import type { CareActorContext } from './care-auth.js';
 import {
@@ -12,7 +13,7 @@ import {
   findPreviousHandoff,
   type HandoffCheckpointRow,
 } from './handoff-repository.js';
-import { createQueryService } from './query-service.js';
+import { createQueryService, inReadSnapshot } from './query-service.js';
 
 const ROLLING_DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -61,10 +62,11 @@ function boundaryClause(column: string, hasPrevious: boolean): string {
 
 async function buildBriefing(
   database: DatabaseContext,
+  client: pg.PoolClient,
   actor: CareActorContext,
   checkpoint: HandoffCheckpointRow,
 ): Promise<CareHandoffBriefingDto> {
-  const previous = await findPreviousHandoff(database.pool, actor, checkpoint);
+  const previous = await findPreviousHandoff(client, actor, checkpoint);
   const to = checkpoint.occurred_at;
   const from = previous?.occurred_at ?? new Date(to.getTime() - ROLLING_DAY_MS);
   const hasPrevious = previous !== null;
@@ -74,14 +76,14 @@ async function buildBriefing(
   const queryService = createQueryService(database);
 
   const [careState, timeline, feedingResult, diaperResult, sleepResult, countResult, actorResult, correctionResult] = await Promise.all([
-    queryService.summary(actor, to),
+    queryService.summary(actor, to, client),
     queryService.timeline(actor, {
       from: from.toISOString(),
       to: to.toISOString(),
       category: 'all',
       limit: 20,
-    }),
-    database.pool.query<FeedingSummaryRow>(
+    }, client),
+    client.query<FeedingSummaryRow>(
       `select
          coalesce(sum(fc.amount_ml) filter (where fc.component_type = 'bottle'), 0)::int as bottle_total_ml,
          coalesce(sum(fc.amount_ml) filter (
@@ -102,7 +104,7 @@ async function buildBriefing(
         and ce.event_type = 'feeding' and ${componentBoundary}`,
       values,
     ),
-    database.pool.query<DiaperSummaryRow>(
+    client.query<DiaperSummaryRow>(
       `select
          count(*) filter (where de.kind = 'urine')::int as urine,
          count(*) filter (where de.kind = 'stool')::int as stool,
@@ -113,7 +115,7 @@ async function buildBriefing(
         and ce.event_type = 'diaper' and ${eventBoundary}`,
       values,
     ),
-    database.pool.query<SleepSummaryRow>(
+    client.query<SleepSummaryRow>(
       `select
          count(*)::int as intervals,
          coalesce(floor(sum(extract(epoch from (
@@ -126,13 +128,13 @@ async function buildBriefing(
         and si.started_at <= $4 and si.ended_at > $3`,
       values,
     ),
-    database.pool.query<{ count: number }>(
+    client.query<{ count: number }>(
       `select count(*)::int as count from care_events ce
         where ce.family_id = $1 and ce.baby_id = $2 and ce.status = 'active'
           and ${eventBoundary}`,
       values,
     ),
-    database.pool.query<ActorActivityRow>(
+    client.query<ActorActivityRow>(
       `select ce.actor_user_id, u.display_name as actor_display_name, count(*)::int as event_count
          from care_events ce
          left join users u on u.id = ce.actor_user_id
@@ -142,7 +144,7 @@ async function buildBriefing(
         order by count(*) desc, u.display_name nulls last, ce.actor_user_id`,
       values,
     ),
-    database.pool.query<CorrectionRow>(
+    client.query<CorrectionRow>(
       `select cr.event_id, cr.revision_action, u.display_name as actor_display_name, cr.created_at
          from care_event_revisions cr
          join care_events ce on ce.id = cr.event_id
@@ -204,14 +206,18 @@ async function buildBriefing(
 export function createHandoffSummaryService(database: DatabaseContext) {
   return {
     async latest(actor: CareActorContext): Promise<CareHandoffBriefingDto | null> {
-      const checkpoint = await findLatestHandoff(database.pool, actor);
-      return checkpoint ? buildBriefing(database, actor, checkpoint) : null;
+      return inReadSnapshot(database, async (client) => {
+        const checkpoint = await findLatestHandoff(client, actor);
+        return checkpoint ? buildBriefing(database, client, actor, checkpoint) : null;
+      });
     },
 
     async byId(actor: CareActorContext, handoffId: string): Promise<CareHandoffBriefingDto> {
-      const checkpoint = await findHandoffById(database.pool, actor, handoffId);
-      if (!checkpoint) throw new CareHandoffNotFoundError();
-      return buildBriefing(database, actor, checkpoint);
+      return inReadSnapshot(database, async (client) => {
+        const checkpoint = await findHandoffById(client, actor, handoffId);
+        if (!checkpoint) throw new CareHandoffNotFoundError();
+        return buildBriefing(database, client, actor, checkpoint);
+      });
     },
   };
 }

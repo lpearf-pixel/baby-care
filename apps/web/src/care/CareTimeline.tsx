@@ -1,5 +1,5 @@
 import type { CareTimelineCategory, CareTimelineItemDto } from '@baby-care/contracts';
-import { CareTimelineCard } from './CareTimelineCard.js';
+import { CareTimelineCard, localDateKey } from './CareTimelineCard.js';
 
 const categories: Array<{ value: CareTimelineCategory; label: string }> = [
   { value: 'all', label: '全部记录' },
@@ -20,6 +20,7 @@ export function CareTimeline({
   onLoadMore,
   onReload,
   onOpenDetail,
+  familyTimeZone,
 }: {
   items: CareTimelineItemDto[];
   category: CareTimelineCategory;
@@ -31,7 +32,16 @@ export function CareTimeline({
   onLoadMore: () => Promise<void>;
   onReload: () => Promise<void>;
   onOpenDetail: (eventId: string) => void;
+  familyTimeZone: string;
 }) {
+  const groups = items.reduce<Array<{ localDate: string; items: CareTimelineItemDto[] }>>((current, item) => {
+    const localDate = localDateKey(item.occurredAt, familyTimeZone);
+    const last = current.at(-1);
+    if (last?.localDate === localDate) last.items.push(item);
+    else current.push({ localDate, items: [item] });
+    return current;
+  }, []);
+
   return (
     <section className="panel care-timeline" aria-label="护理时间线">
       <div className="care-panel-header">
@@ -59,7 +69,22 @@ export function CareTimeline({
       {!loading && !items.length ? <p className="muted">暂无护理记录</p> : null}
 
       <div id="care-timeline-list" className="care-timeline-list">
-        {items.map((item) => <CareTimelineCard key={item.id} item={item} onOpenDetail={onOpenDetail} />)}
+        {groups.map((group) => {
+          const headingId = `care-timeline-date-${group.localDate}`;
+          return (
+            <section key={group.localDate} className="care-timeline-date-group" aria-labelledby={headingId}>
+              <h3 id={headingId}>{group.localDate}</h3>
+              {group.items.map((item) => (
+                <CareTimelineCard
+                  key={item.id}
+                  item={item}
+                  familyTimeZone={familyTimeZone}
+                  onOpenDetail={onOpenDetail}
+                />
+              ))}
+            </section>
+          );
+        })}
       </div>
 
       {nextCursor ? (

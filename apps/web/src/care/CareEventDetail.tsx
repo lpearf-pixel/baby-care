@@ -17,7 +17,7 @@ function amountLabel(value: 'small' | 'medium' | 'large'): string {
   return value === 'small' ? '少量' : value === 'medium' ? '中量' : '大量';
 }
 
-function detailFacts(item: CareTimelineItemDto): string[] {
+function detailFacts(item: CareTimelineItemDto, familyTimeZone: string): string[] {
   switch (item.eventType) {
     case 'feeding':
       return [
@@ -39,8 +39,8 @@ function detailFacts(item: CareTimelineItemDto): string[] {
       ];
     case 'sleep':
       return [
-        `睡眠开始 ${formatDateTime(item.payload.startedAt)}`,
-        item.payload.endedAt ? `睡眠结束 ${formatDateTime(item.payload.endedAt)}` : '睡眠结束 进行中',
+        `睡眠开始 ${formatDateTime(item.payload.startedAt, familyTimeZone)}`,
+        item.payload.endedAt ? `睡眠结束 ${formatDateTime(item.payload.endedAt, familyTimeZone)}` : '睡眠结束 进行中',
       ];
     case 'burping':
       return ['拍嗝'];
@@ -96,11 +96,13 @@ export function CareEventDetail({
   eventId,
   onClose,
   onChanged,
+  familyTimeZone,
 }: {
   api: BabyCareApi;
   eventId: string;
   onClose: () => void;
   onChanged: () => Promise<void>;
+  familyTimeZone: string;
 }) {
   const [detail, setDetail] = useState<CareTimelineItemDto | null>(null);
   const [revisions, setRevisions] = useState<CareRevisionHistoryItemDto[]>([]);
@@ -199,9 +201,9 @@ export function CareEventDetail({
       {detail ? (
         <>
           <ul className="care-detail-facts">
-            {detailFacts(detail).map((fact) => <li key={fact}>{fact}</li>)}
+            {detailFacts(detail, familyTimeZone).map((fact) => <li key={fact}>{fact}</li>)}
           </ul>
-          <p>实际发生时间 {formatDateTime(detail.occurredAt)}</p>
+          <p>实际发生时间 {formatDateTime(detail.occurredAt, familyTimeZone)}</p>
           <p className="muted care-timeline-meta">
             {detail.actorDisplayName ?? '系统'} · {sourceLabel(detail.source)}{detail.isBackfilled ? ' · 补记' : ''}
           </p>
@@ -234,7 +236,13 @@ export function CareEventDetail({
 
           {message ? <p className="inline-message care-message" aria-live="polite">{message}</p> : null}
           {editing && editingVersion !== null && detail.version !== editingVersion ? (
-            <p className="muted">最新版本 {detail.version}，当前草稿基于版本 {editingVersion}</p>
+            <div>
+              <p className="muted">最新版本 {detail.version}，当前草稿基于版本 {editingVersion}</p>
+              <button type="button" className="text-button" onClick={() => {
+                setEditingVersion(detail.version);
+                setMessage('已确认以最新版本为基础，请再次保存');
+              }}>确认以最新版本为基础</button>
+            </div>
           ) : null}
           <CareRevisionHistory revisions={revisions} />
         </>

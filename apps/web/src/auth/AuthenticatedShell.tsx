@@ -73,7 +73,7 @@ export function AuthenticatedShell({
         <button className="text-button" type="button" onClick={() => void onLogout()}>退出登录</button>
       </section>
 
-      <CareWorkspace api={api} />
+      <CareWorkspace api={api} familyTimeZone={family?.timezone ?? 'UTC'} />
 
       {loading ? <p className="foundation-note">正在加载家庭资料…</p> : null}
       {!loading && (!family || !baby) ? <p className="form-error" role="alert">{message ?? '家庭资料暂不可用'}</p> : null}

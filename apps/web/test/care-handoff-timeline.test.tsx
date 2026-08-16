@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.js';
 import { BabyCareApiError } from '../src/api-client.js';
@@ -268,7 +268,7 @@ describe('M3 handoff briefing and typed timeline', () => {
     expect(await screen.findByRole('region', { name: '交接摘要' })).toBeInTheDocument();
     expect(await screen.findByRole('region', { name: '护理时间线' })).toBeInTheDocument();
     expect(screen.getByText('最近24小时交接摘要')).toBeInTheDocument();
-    expect(screen.getByText('窗口 2026-08-12 08:00 → 2026-08-13 08:00')).toBeInTheDocument();
+    expect(screen.getByText('窗口 2026-08-12 16:00 → 2026-08-13 16:00')).toBeInTheDocument();
     expect(screen.getByText('Dad 6 条 · Nanny 4 条')).toBeInTheDocument();
     expect(screen.getByText('最近修正 1 条 · Nanny edit')).toBeInTheDocument();
     expect(screen.getByText('总瓶喂 420ml')).toBeInTheDocument();
@@ -281,7 +281,7 @@ describe('M3 handoff briefing and typed timeline', () => {
     expect(screen.getByRole('button', { name: '喂奶' })).toBeEnabled();
 
     for (const text of [
-      '2026-08-13 07:58',
+      '2026-08-13 15:58',
       '配方奶 70ml · 亲喂 12min',
       '尿布 · 尿+便',
       '睡眠 30min',
@@ -296,7 +296,7 @@ describe('M3 handoff briefing and typed timeline', () => {
       '系统 · Guardian 记录',
       '系统 · 导入记录',
     ]) {
-      expect(screen.getByText(text)).toBeInTheDocument();
+      expect(screen.getAllByText(text).length).toBeGreaterThan(0);
     }
     expect(screen.getAllByText('Dad · 手动记录').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Nanny · 手动记录').length).toBeGreaterThan(0);
@@ -342,12 +342,12 @@ describe('M3 handoff briefing and typed timeline', () => {
     });
     renderApp(api);
 
-    expect(await screen.findByText('交接窗口 2026-08-13 06:00 → 2026-08-13 08:00')).toBeInTheDocument();
+    expect(await screen.findByText('交接窗口 2026-08-13 14:00 → 2026-08-13 16:00')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '刷新交接摘要' }));
 
     await waitFor(() => expect(getCareHandoffSummary).toHaveBeenCalledWith('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'));
     expect(getLatestCareHandoff).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('交接窗口 2026-08-13 06:00 → 2026-08-13 08:00')).toBeInTheDocument();
+    expect(screen.getByText('交接窗口 2026-08-13 14:00 → 2026-08-13 16:00')).toBeInTheDocument();
   });
 
   it('keeps a recent-24h briefing pinned to its checkpoint when refreshed', async () => {
@@ -392,7 +392,7 @@ describe('M3 handoff briefing and typed timeline', () => {
     await waitFor(() => expect(createCareHandoff).toHaveBeenCalledTimes(2));
     expect(createCareHandoff.mock.calls[1]![0].clientRequestId).toBe(createCareHandoff.mock.calls[0]![0].clientRequestId);
     expect(await screen.findByText('交接已记录')).toBeInTheDocument();
-    expect(await screen.findByText('交接窗口 2026-08-13 06:00 → 2026-08-13 08:00')).toBeInTheDocument();
+    expect(await screen.findByText('交接窗口 2026-08-13 14:00 → 2026-08-13 16:00')).toBeInTheDocument();
     expect(getCareHandoffSummary).toHaveBeenCalledTimes(0);
   });
 
@@ -443,5 +443,86 @@ describe('M3 handoff briefing and typed timeline', () => {
     fireEvent.click(screen.getByRole('button', { name: '重试护理时间线' }));
 
     await waitFor(() => expect(getCareTimeline).toHaveBeenCalledTimes(2));
+  });
+
+  it.each([
+    ['rolling_24h', rollingBriefing],
+    ['checkpoint', checkpointBriefing],
+  ] as const)('renders care state and bounded notable facts with fixed %s timeline navigation', async (_mode, briefing) => {
+    const getCareTimeline = vi.fn(async () => ({ items: [], nextCursor: null }));
+    const notableBriefing = {
+      ...briefing,
+      notableEvents: [timelinePageOne[0]!, timelinePageOne[7]!],
+      notableEventCount: 27,
+    };
+    const api = makeApi({
+      getLatestCareHandoff: vi.fn(async () => notableBriefing),
+      getCareTimeline,
+    });
+    renderApp(api);
+
+    const handoff = await screen.findByRole('region', { name: '交接摘要' });
+    expect(await within(handoff).findByText('上次喂奶 · 配方奶 60ml · 45分钟前')).toBeInTheDocument();
+    expect(within(handoff).getByText('上次尿布 · 尿 · 1小时20分钟前')).toBeInTheDocument();
+    expect(within(handoff).getByText('睡眠中 · 32min')).toBeInTheDocument();
+    expect(within(handoff).getByText('显示 2 / 27 条重点记录')).toBeInTheDocument();
+    expect(within(handoff).getByText('喂药 · Vitamin D 0.5mL')).toBeInTheDocument();
+    expect(within(handoff).queryByText(/150ml/)).not.toBeInTheDocument();
+
+    fireEvent.click(within(handoff).getByRole('button', { name: '查看配方奶汇总' }));
+    await waitFor(() => expect(getCareTimeline).toHaveBeenLastCalledWith({
+      category: 'feeding',
+      from: briefing.window.from,
+      to: briefing.window.to,
+      limit: 20,
+    }));
+
+    fireEvent.click(within(handoff).getByRole('button', { name: '查看喂药 · Vitamin D 0.5mL' }));
+    await waitFor(() => expect(getCareTimeline).toHaveBeenLastCalledWith({
+      category: 'other',
+      from: briefing.window.from,
+      to: briefing.window.to,
+      limit: 20,
+    }));
+  });
+
+  it('uses the family timezone for DST-safe local-date groups across pagination', async () => {
+    const dstItems = [
+      {
+        ...timelineBase('20000000-0000-4000-8000-000000000001', '2026-11-01T09:30:00.000Z'),
+        eventType: 'burping' as const,
+        payload: { action: { kind: 'burping' as const } },
+      },
+      {
+        ...timelineBase('20000000-0000-4000-8000-000000000002', '2026-11-01T08:30:00.000Z'),
+        eventType: 'bathing' as const,
+        payload: { action: { kind: 'bathing' as const } },
+      },
+    ];
+    const priorLocalDay = {
+      ...timelineBase('20000000-0000-4000-8000-000000000003', '2026-11-01T06:30:00.000Z'),
+      eventType: 'crying' as const,
+      payload: { action: { kind: 'crying' as const, durationMinutes: 3 } },
+    };
+    const getCareTimeline = vi.fn()
+      .mockResolvedValueOnce({ items: dstItems, nextCursor: 'dst-page-2' })
+      .mockResolvedValueOnce({ items: [priorLocalDay], nextCursor: null });
+    const api = makeApi({
+      getFamily: vi.fn(async () => ({
+        id: session.familyId,
+        name: session.familyName,
+        timezone: 'America/Los_Angeles',
+        status: 'active' as const,
+      })),
+      getCareTimeline,
+    });
+    renderApp(api);
+
+    expect(await screen.findByRole('heading', { name: '2026-11-01' })).toBeInTheDocument();
+    expect(screen.getAllByText('2026-11-01 01:30')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '加载更多护理记录' }));
+    expect(await screen.findByRole('heading', { name: '2026-10-31' })).toBeInTheDocument();
+    expect(screen.getByText('2026-10-31 23:30')).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: '2026-11-01' })).toHaveLength(1);
   });
 });

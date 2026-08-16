@@ -76,4 +76,50 @@ describe('compact diagnostic privacy', () => {
     expect(evidence).toContain('care_event_owner_membership_fk');
     expect(evidence).toContain('[REDACTED]');
   });
+
+  it('redacts the extended care-field matrix and whole revision snapshots', async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), 'baby-care-diag-matrix-'));
+    const evidenceFile = resolve(cwd, 'integration.log');
+    const forbidden = [
+      '73-private-duration',
+      '74-private-duration-snake',
+      'private-stool-color',
+      'private-stool-consistency',
+      'private-stool-amount',
+      'private-measurement-method',
+      'private-related-action',
+      'private-before-note',
+      'private-before-milk',
+      'private-after-medication',
+      'private-after-dose',
+      'private-future-care-field',
+    ];
+    await writeFile(
+      evidenceFile,
+      [
+        'durationMinutes="73-private-duration" duration_minutes="74-private-duration-snake"',
+        'stoolColor="private-stool-color" stool_consistency="private-stool-consistency" stoolAmount="private-stool-amount"',
+        'method="private-measurement-method"',
+        'relatedActions=[{"kind":"spit_up","amount":"private-related-action"}]',
+        'before_json={"note":"private-before-note","components":[{"amountMl":"private-before-milk"}]}',
+        'after_json={',
+        '  "action":{"kind":"medication","medicationName":"private-after-medication",',
+        '  "dose":"private-after-dose"}',
+        '}',
+        'futureCareField="private-future-care-field"',
+        'constraint care_event_owner_membership_fk failed code=care_state_conflict',
+      ].join('\n'),
+      'utf8',
+    );
+
+    await runCollector(cwd, evidenceFile);
+    const summary = JSON.parse(
+      await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8'),
+    ) as { evidence: string };
+
+    for (const secret of forbidden) expect(summary.evidence).not.toContain(secret);
+    expect(summary.evidence).toContain('care_event_owner_membership_fk');
+    expect(summary.evidence).toContain('care_state_conflict');
+    expect(summary.evidence).toContain('[REDACTED]');
+  });
 });

@@ -156,7 +156,7 @@ describe('M3 complete care history correction', () => {
   it.each([
     [details[0]!, ['实际喝了 70ml', '奶瓶容量 150ml（不计入摄入量）', '亲喂 12min', '拍嗝', '少量吐奶']],
     [details[1]!, ['尿+便', '便便颜色 黄色', '便便性状 籽状', '便便量 中量']],
-    [details[2]!, ['睡眠开始 2026-08-13 05:10', '睡眠结束 2026-08-13 06:00']],
+    [details[2]!, ['睡眠开始 2026-08-13 13:10', '睡眠结束 2026-08-13 14:00']],
     [details[3]!, ['拍嗝']],
     [details[4]!, ['吐奶量 大量']],
     [details[5]!, ['哭闹时长 9min']],
@@ -167,7 +167,7 @@ describe('M3 complete care history correction', () => {
   ])('renders full typed facts for %s', async (item, facts) => {
     const { detail } = await openOnlyDetail(item);
     for (const fact of facts) expect(within(detail).getByText(fact)).toBeInTheDocument();
-    expect(within(detail).getByText('实际发生时间 2026-08-13 06:00')).toBeInTheDocument();
+    expect(within(detail).getByText('实际发生时间 2026-08-13 14:00')).toBeInTheDocument();
     expect(within(detail).getByText('Dad · 手动记录 · 补记')).toBeInTheDocument();
     expect(within(detail).getByText('版本 2')).toBeInTheDocument();
     expect(within(detail).getByText('备注 night note')).toBeInTheDocument();
@@ -341,10 +341,13 @@ describe('M3 complete care history correction', () => {
     const latest = { ...details[0]!, version: 3 };
     const getCareEventDetail = vi.fn()
       .mockResolvedValueOnce(details[0])
-      .mockResolvedValueOnce(latest);
-    const editCareEvent = vi.fn(async (_eventId: string, _input: UpdateCareEventRequest) => {
-      throw new BabyCareApiError('care_state_conflict', 'stale version');
-    });
+      .mockResolvedValueOnce(latest)
+      .mockResolvedValueOnce(latest)
+      .mockResolvedValue({ ...latest, version: 4 });
+    const editCareEvent = vi.fn()
+      .mockRejectedValueOnce(new BabyCareApiError('care_state_conflict', 'stale version'))
+      .mockRejectedValueOnce(new BabyCareApiError('care_state_conflict', 'stale version'))
+      .mockResolvedValueOnce({ id: ids.feeding, eventType: 'feeding' as const, status: 'active' as const, version: 4 });
     const { api } = await openOnlyDetail(details[0]!, { getCareEventDetail, editCareEvent });
     fireEvent.click(screen.getByRole('button', { name: '修改此记录' }));
     fireEvent.change(screen.getByLabelText('实际喝了（ml）'), { target: { value: '88' } });
@@ -359,7 +362,14 @@ describe('M3 complete care history correction', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
     await waitFor(() => expect(editCareEvent).toHaveBeenCalledTimes(2));
     expect(editCareEvent.mock.calls[1]![1]).toEqual(expect.objectContaining({ expectedVersion: 2 }));
-  });
+    expect(screen.getByLabelText('实际喝了（ml）')).toHaveValue(88);
+
+    fireEvent.click(screen.getByRole('button', { name: '确认以最新版本为基础' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
+    await waitFor(() => expect(editCareEvent).toHaveBeenCalledTimes(3));
+    expect(editCareEvent.mock.calls[2]![1]).toEqual(expect.objectContaining({ expectedVersion: 3 }));
+    expect(await screen.findByText('版本 4')).toBeInTheDocument();
+  }, 10_000);
 
   it('resets the editor when selecting a different timeline event', async () => {
     const first = details[0]!;
