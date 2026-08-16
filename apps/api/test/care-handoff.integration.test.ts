@@ -76,6 +76,20 @@ function careHeaders(cookie: string, traceId?: string) {
   return { origin: M2_TEST_ORIGIN, cookie, ...(traceId ? { 'x-trace-id': traceId } : {}) };
 }
 
+async function withinPhase<T>(phase: string, promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new Error(`${phase} timed out after ${timeoutMs}ms`)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 async function postCare(
   context: TestContext,
   cookie: string,
@@ -325,7 +339,7 @@ describeDatabase('M3 explicit care handoff', () => {
       const wokeAfterCheckpoint = await postCare(context, context.cookie, '/api/care/sleep/wake', {
         occurredAt: '2026-08-13T08:02:00.000Z',
         clientRequestId: randomUUID(),
-      });
+      }, 200);
       expect(wokeAfterCheckpoint.json()).toMatchObject({
         startedAt: '2026-08-13T07:50:00.000Z',
         endedAt: '2026-08-13T08:02:00.000Z',
@@ -361,15 +375,17 @@ describeDatabase('M3 explicit care handoff', () => {
       const mutablePool = context.database.pool as unknown as {
         connect: () => Promise<pg.PoolClient>;
       };
-      const originalConnect = mutablePool.connect.bind(context.database.pool);
+      const originalConnect = mutablePool.connect;
+      const connectPoolClient = originalConnect.bind(context.database.pool);
       let interceptNextConnection = true;
       let announceSnapshot!: () => void;
       let resumeBriefing!: () => void;
       const snapshotEstablished = new Promise<void>((resolve) => { announceSnapshot = resolve; });
       const mayContinue = new Promise<void>((resolve) => { resumeBriefing = resolve; });
+      const pendingOperations: Promise<unknown>[] = [];
 
       mutablePool.connect = async () => {
-        const client = await originalConnect();
+        const client = await connectPoolClient();
         if (!interceptNextConnection) return client;
         interceptNextConnection = false;
         const mutableClient = client as unknown as {
@@ -379,23 +395,29 @@ describeDatabase('M3 explicit care handoff', () => {
           ...args: unknown[]
         ) => Promise<pg.QueryResult>;
         let paused = false;
-        mutableClient.query = async (...args: unknown[]) => {
-          const result = await originalQuery(...args);
-          const statement = typeof args[0] === 'string' ? args[0] : '';
-          if (!paused && statement.includes('where hc.id = $1')) {
-            paused = true;
-            announceSnapshot();
-            await mayContinue;
-          }
-          return result;
+        let queryQueue = Promise.resolve();
+        mutableClient.query = (...args: unknown[]) => {
+          const query = queryQueue.then(async () => {
+            const result = await originalQuery(...args);
+            const statement = typeof args[0] === 'string' ? args[0] : '';
+            if (!paused && statement.includes('where hc.id = $1')) {
+              paused = true;
+              announceSnapshot();
+              await mayContinue;
+            }
+            return result;
+          });
+          queryQueue = query.then(() => undefined, () => undefined);
+          return query;
         };
         return client;
       };
 
       try {
         const briefingPromise = createHandoffSummaryService(context.database).byId(actor, checkpointId);
-        await snapshotEstablished;
-        const edited = await context.app.inject({
+        pendingOperations.push(briefingPromise);
+        await withinPhase('briefing snapshot establishment', snapshotEstablished, 5_000);
+        const editPromise = context.app.inject({
           method: 'PATCH',
           url: `/api/care/events/${eventId}`,
           headers: careHeaders(context.cookie),
@@ -408,10 +430,17 @@ describeDatabase('M3 explicit care handoff', () => {
             },
           },
         });
+        pendingOperations.push(editPromise);
+
+        const edited = await withinPhase(
+          'concurrent edit commit',
+          editPromise,
+          8_000,
+        );
         expect(edited.statusCode).toBe(200);
         resumeBriefing();
 
-        const briefing = await briefingPromise;
+        const briefing = await withinPhase('briefing completion', briefingPromise, 8_000);
         expect(briefing.careState.lastFeeding?.bottle?.amountMl).toBe(60);
         expect(briefing.feeding).toMatchObject({ bottleTotalMl: 60, formulaMl: 60 });
         expect(briefing.notableEvents).toContainEqual(expect.objectContaining({
@@ -424,13 +453,24 @@ describeDatabase('M3 explicit care handoff', () => {
         expect(briefing.correctionCount).toBe(0);
       } finally {
         resumeBriefing();
-        mutablePool.connect = originalConnect;
+        try {
+          await withinPhase(
+            'snapshot test operation cleanup',
+            Promise.allSettled(pendingOperations).then(() => undefined),
+            5_000,
+          );
+        } finally {
+          mutablePool.connect = originalConnect;
+        }
       }
     } finally {
-      await context.app.close();
-      await context.database.close();
+      try {
+        await context.app.close();
+      } finally {
+        await context.database.close();
+      }
     }
-  });
+  }, 30_000);
 
   it('replaces only the authenticated membership reminders without creating checkpoint facts', async () => {
     const context = await createM2TestApp(testDatabaseUrl!);
