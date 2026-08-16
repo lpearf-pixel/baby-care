@@ -67,7 +67,16 @@ function afterSnapshot(row: CareRevisionHistoryRow): CareRevisionHistoryItemDto[
 
 export function createRevisionQueryService(database: DatabaseContext) {
   return {
-    async list(actor: CareActorContext, eventId: string): Promise<CareRevisionHistoryItemDto[]> {
+    async list(actor: CareActorContext, eventId: string): Promise<CareRevisionHistoryItemDto[] | null> {
+      const scopedEvent = await database.pool.query<{ exists: boolean }>(
+        `select true as exists
+           from care_events
+          where id = $1 and family_id = $2 and baby_id = $3
+          limit 1`,
+        [eventId, actor.familyId, actor.babyId],
+      );
+      if (!scopedEvent.rows[0]?.exists) return null;
+
       const result = await database.pool.query<CareRevisionHistoryRow>(
         `select cr.id, cr.event_id, cr.revision_action, cr.edit_actor_user_id,
                 u.display_name as actor_display_name, cr.created_at,

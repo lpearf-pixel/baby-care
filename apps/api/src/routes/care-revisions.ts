@@ -84,6 +84,14 @@ export function registerCareRevisionRoutes(
     if (!params.success) {
       return reply.code(400).send({ code: 'validation_failed', message: 'Invalid care event id.', traceId: request.id });
     }
-    return reply.send(await dependencies.revisionQueryService.list(actor, params.data.eventId));
+    const history = await dependencies.revisionQueryService.list(actor, params.data.eventId);
+    if (!history) {
+      return reply.code(404).send({
+        code: 'care_event_not_found',
+        message: 'Care event was not found.',
+        traceId: request.id,
+      });
+    }
+    return reply.send(history);
   });
 }

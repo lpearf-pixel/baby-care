@@ -424,7 +424,7 @@ describeDatabase('M3 version-aware care revisions', () => {
       });
 
       const foreignActor = { ...dad, familyId: randomUUID() };
-      expect(await createRevisionQueryService(context.database).list(foreignActor, eventId)).toEqual([]);
+      expect(await createRevisionQueryService(context.database).list(foreignActor, eventId)).toBeNull();
     } finally {
       await context.app.close();
       await context.database.close();
