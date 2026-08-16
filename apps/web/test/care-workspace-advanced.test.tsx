@@ -199,6 +199,7 @@ describe('M2 warnings, frequent care, and corrections', () => {
       startedAt: '2026-08-13T07:30:00.000Z',
       endedAt: '2026-08-13T08:00:00.000Z',
       note: null,
+      version: 7,
     }));
     const api = makeApi({ getCareSummary, wakeSleep });
     renderWithApi(api);
@@ -210,7 +211,7 @@ describe('M2 warnings, frequent care, and corrections', () => {
     fireEvent.click(screen.getByRole('button', { name: '撤销' }));
     await waitFor(() => expect(api.undoCareEvent).toHaveBeenCalledWith(
       '88888888-8888-4888-8888-888888888888',
-      { expectedVersion: 2 },
+      { expectedVersion: 7 },
     ));
   });
 
@@ -237,5 +238,29 @@ describe('M2 warnings, frequent care, and corrections', () => {
       '55555555-5555-4555-8555-555555555555',
       expect.objectContaining({ expectedVersion: 1 }),
     );
+  });
+
+  it('consumes a committed edit receipt even when the following summary refresh fails', async () => {
+    const getCareSummary = vi.fn()
+      .mockResolvedValueOnce(emptySummary)
+      .mockResolvedValueOnce(emptySummary)
+      .mockRejectedValueOnce(new Error('refresh failed'));
+    const api = makeApi({ getCareSummary });
+    renderWithApi(api);
+    await openFormulaFeed();
+    fireEvent.change(screen.getByLabelText('实际喝了（ml）'), { target: { value: '60' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存瓶喂' }));
+    await screen.findByText('刚刚记录：配方奶 60ml');
+
+    fireEvent.click(screen.getByRole('button', { name: '修改' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
+
+    expect(await screen.findByText('记录已保存，护理状态刷新失败，请手动刷新')).toBeInTheDocument();
+    expect(screen.getByText('刚刚记录：配方奶 60ml')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '撤销' }));
+    await waitFor(() => expect(api.undoCareEvent).toHaveBeenCalledWith(
+      '55555555-5555-4555-8555-555555555555',
+      { expectedVersion: 2 },
+    ));
   });
 });

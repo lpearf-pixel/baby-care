@@ -24,8 +24,8 @@ interface CareRevisionHistoryRow {
   actor_display_name: string;
   created_at: Date;
   from_version: number;
+  to_version: number;
   event_type: EditCareEventInput['eventType'];
-  event_note: string | null;
   before_json: unknown;
   after_json: unknown;
 }
@@ -37,10 +37,9 @@ const LegacySleepSnapshotSchema = z.object({
   endedAt: z.string().datetime({ offset: true }).nullable(),
 }).strict();
 
-function editSnapshot(
+export function normalizeRevisionEditSnapshot(
   value: unknown,
   eventType: EditCareEventInput['eventType'],
-  note: string | null,
 ): EditCareEventInput {
   const typed = EditCareEventInputSchema.safeParse(value);
   if (typed.success) return typed.data;
@@ -49,7 +48,6 @@ function editSnapshot(
     return EditCareEventInputSchema.parse({
       eventType: 'sleep',
       ...sleep,
-      ...(note === null ? {} : { note }),
     });
   }
   return EditCareEventInputSchema.parse(value);
@@ -58,13 +56,13 @@ function editSnapshot(
 function beforeSnapshot(row: CareRevisionHistoryRow): CareRevisionHistoryItemDto['before'] {
   const value = row.before_json;
   const active = ActiveSnapshotSchema.safeParse(value);
-  return active.success ? active.data : editSnapshot(value, row.event_type, row.event_note);
+  return active.success ? active.data : normalizeRevisionEditSnapshot(value, row.event_type);
 }
 
 function afterSnapshot(row: CareRevisionHistoryRow): CareRevisionHistoryItemDto['after'] {
   return row.revision_action === 'void'
     ? VoidedSnapshotSchema.parse(row.after_json)
-    : editSnapshot(row.after_json, row.event_type, row.event_note);
+    : normalizeRevisionEditSnapshot(row.after_json, row.event_type);
 }
 
 export function createRevisionQueryService(database: DatabaseContext) {
@@ -73,14 +71,14 @@ export function createRevisionQueryService(database: DatabaseContext) {
       const result = await database.pool.query<CareRevisionHistoryRow>(
         `select cr.id, cr.event_id, cr.revision_action, cr.edit_actor_user_id,
                 u.display_name as actor_display_name, cr.created_at,
-                row_number() over (order by cr.created_at, cr.id)::int as from_version,
-                ce.event_type, ce.note as event_note,
+                cr.from_version, cr.to_version,
+                ce.event_type,
                 cr.before_json, cr.after_json
            from care_event_revisions cr
            join care_events ce on ce.id = cr.event_id
            join users u on u.id = cr.edit_actor_user_id
           where cr.event_id = $1 and ce.family_id = $2 and ce.baby_id = $3
-          order by cr.created_at, cr.id`,
+          order by cr.from_version`,
         [eventId, actor.familyId, actor.babyId],
       );
       return result.rows.map((row) => ({
@@ -91,7 +89,7 @@ export function createRevisionQueryService(database: DatabaseContext) {
         actorDisplayName: row.actor_display_name,
         createdAt: row.created_at.toISOString(),
         fromVersion: row.from_version,
-        toVersion: row.from_version + 1,
+        toVersion: row.to_version,
         before: beforeSnapshot(row),
         after: afterSnapshot(row),
       }));

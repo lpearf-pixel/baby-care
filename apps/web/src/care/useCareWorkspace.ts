@@ -58,9 +58,13 @@ export function useCareWorkspace(api: BabyCareApi) {
     setMessage(null);
     try {
       const result = await action();
-      await reload();
       onSuccess?.(result);
-      setMessage('记录已保存');
+      try {
+        await reload();
+        setMessage('记录已保存');
+      } catch {
+        setMessage('记录已保存，护理状态刷新失败，请手动刷新');
+      }
       return true;
     } catch (error) {
       const warnings = warningsFromError(error);
@@ -87,10 +91,14 @@ export function useCareWorkspace(api: BabyCareApi) {
     try {
       const codes = pending.warnings.map((warning) => warning.code);
       const result = await pending.retry(codes);
-      await reload();
       pending.onSuccess?.(result);
       setPendingWarning(null);
-      setMessage('记录已保存');
+      try {
+        await reload();
+        setMessage('记录已保存');
+      } catch {
+        setMessage('记录已保存，护理状态刷新失败，请手动刷新');
+      }
     } catch (error) {
       const warnings = warningsFromError(error);
       if (warnings) {

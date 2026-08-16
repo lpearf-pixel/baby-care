@@ -94,6 +94,8 @@ async function voidLinkedActions(
       eventId: event.id,
       actor,
       action: 'void',
+      fromVersion: event.version,
+      toVersion: event.version + 1,
       before,
       after: { status: 'voided' },
       traceId,
@@ -204,16 +206,6 @@ async function applyEditPayload(
 
 export function createRevisionService(database: DatabaseContext, now: () => Date = () => new Date()) {
   return {
-    async currentVersion(actor: CareActorContext, eventId: string): Promise<number | null> {
-      const result = await database.pool.query<{ version: number }>(
-        `select version
-           from care_events
-          where id = $1 and family_id = $2 and baby_id = $3 and status = 'active'`,
-        [eventId, actor.familyId, actor.babyId],
-      );
-      return result.rows[0]?.version ?? null;
-    },
-
     async edit(
       actor: CareActorContext,
       eventId: string,
@@ -247,6 +239,8 @@ export function createRevisionService(database: DatabaseContext, now: () => Date
           eventId,
           actor,
           action: 'edit',
+          fromVersion: event.version,
+          toVersion: event.version + 1,
           before,
           after: inputSnapshot(input),
           traceId,
@@ -288,6 +282,8 @@ export function createRevisionService(database: DatabaseContext, now: () => Date
           eventId,
           actor,
           action: 'void',
+          fromVersion: event.version,
+          toVersion: event.version + 1,
           before,
           after: { status: 'voided' },
           traceId,

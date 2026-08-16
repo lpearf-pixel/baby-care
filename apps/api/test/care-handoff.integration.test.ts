@@ -211,9 +211,12 @@ describeDatabase('M3 explicit care handoff', () => {
         url: `/api/care/events/${completedSleep.json().id}`,
         headers: careHeaders(nannyCookie),
         payload: {
-          eventType: 'sleep',
-          startedAt: '2026-08-13T06:20:00.000Z',
-          endedAt: '2026-08-13T06:50:00.000Z',
+          expectedVersion: 1,
+          event: {
+            eventType: 'sleep',
+            startedAt: '2026-08-13T06:20:00.000Z',
+            endedAt: '2026-08-13T06:50:00.000Z',
+          },
         },
       });
       expect(revisedSleep.statusCode).toBe(200);

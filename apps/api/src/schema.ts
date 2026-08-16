@@ -342,12 +342,19 @@ export const careEventRevisions = pgTable(
       .notNull()
       .references(() => familyMemberships.id, { onDelete: 'restrict' }),
     revisionAction: careRevisionAction('revision_action').notNull(),
+    fromVersion: integer('from_version').notNull(),
+    toVersion: integer('to_version').notNull(),
     beforeJson: jsonb('before_json').$type<Record<string, unknown>>(),
     afterJson: jsonb('after_json').$type<Record<string, unknown>>(),
     traceId: text('trace_id').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('care_event_revisions_event_idx').on(table.eventId, table.createdAt)],
+  (table) => [
+    index('care_event_revisions_event_idx').on(table.eventId, table.createdAt),
+    uniqueIndex('care_event_revisions_event_from_version_idx').on(table.eventId, table.fromVersion),
+    check('care_event_revisions_version_positive', sql`${table.fromVersion} > 0`),
+    check('care_event_revisions_version_step', sql`${table.toVersion} = ${table.fromVersion} + 1`),
+  ],
 );
 
 export const careHandoffCheckpoints = pgTable(

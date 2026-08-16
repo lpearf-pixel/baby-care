@@ -1,9 +1,7 @@
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import {
-  EditCareEventInputSchema,
   UndoCareEventRequestSchema,
   UpdateCareEventRequestSchema,
-  type UpdateCareEventRequest,
 } from '@baby-care/contracts';
 import { z } from 'zod';
 import type { CareAuth } from '../care/care-auth.js';
@@ -16,17 +14,6 @@ import type { RevisionService } from '../care/revision-service.js';
 import type { RevisionQueryService } from '../care/revision-query-service.js';
 
 const EventParamsSchema = z.object({ eventId: z.string().uuid() }).strict();
-
-function parseUpdateRequest(value: unknown): UpdateCareEventRequest | null {
-  const versioned = UpdateCareEventRequestSchema.safeParse(value);
-  if (versioned.success) return versioned.data;
-
-  // M2 clients implicitly loaded a newly created version-1 record. Keeping that
-  // narrow assumption preserves their safe first correction while all later
-  // writes still conflict after the version advances.
-  const legacy = EditCareEventInputSchema.safeParse(value);
-  return legacy.success ? { expectedVersion: 1, event: legacy.data } : null;
-}
 
 function sendRevisionError(reply: FastifyReply, traceId: string, error: unknown) {
   if (error instanceof CareEventNotFoundError) {
@@ -53,16 +40,16 @@ export function registerCareRevisionRoutes(
     const actor = await dependencies.careAuth.requireWrite(request, reply);
     if (!actor) return;
     const params = EventParamsSchema.safeParse(request.params);
-    const input = parseUpdateRequest(request.body);
-    if (!params.success || !input) {
+    const input = UpdateCareEventRequestSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
       return reply.code(400).send({ code: 'validation_failed', message: 'Invalid care edit.', traceId: request.id });
     }
     try {
       return reply.send(await dependencies.revisionService.edit(
         actor,
         params.data.eventId,
-        input.expectedVersion,
-        input.event,
+        input.data.expectedVersion,
+        input.data.event,
         request.id,
       ));
     } catch (error) {
@@ -74,20 +61,15 @@ export function registerCareRevisionRoutes(
     const actor = await dependencies.careAuth.requireWrite(request, reply);
     if (!actor) return;
     const params = EventParamsSchema.safeParse(request.params);
-    const parsedInput = UndoCareEventRequestSchema.safeParse(request.body);
-    const legacyRequest = request.body === undefined;
-    if (!params.success || (!parsedInput.success && !legacyRequest)) {
+    const input = UndoCareEventRequestSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
       return reply.code(400).send({ code: 'validation_failed', message: 'Invalid care undo.', traceId: request.id });
     }
     try {
-      const expectedVersion = parsedInput.success
-        ? parsedInput.data.expectedVersion
-        : await dependencies.revisionService.currentVersion(actor, params.data.eventId);
-      if (expectedVersion === null) throw new CareEventNotFoundError();
       return reply.send(await dependencies.revisionService.undo(
         actor,
         params.data.eventId,
-        expectedVersion,
+        input.data.expectedVersion,
         request.id,
       ));
     } catch (error) {

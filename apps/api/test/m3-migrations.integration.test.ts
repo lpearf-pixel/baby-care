@@ -61,6 +61,18 @@ describeDatabase('M3 care workspace migrations', () => {
     const tables = new Set(result.rows.map((row) => row.table_name));
     expect(tables.has('care_handoff_checkpoints')).toBe(true);
     expect(tables.has('care_handoff_reminder_rules')).toBe(true);
+
+    const revisionColumns = await database.pool.query<{ column_name: string; is_nullable: string }>(
+      `select column_name, is_nullable
+         from information_schema.columns
+        where table_schema = 'public' and table_name = 'care_event_revisions'
+          and column_name in ('from_version', 'to_version')
+        order by column_name`,
+    );
+    expect(revisionColumns.rows).toEqual([
+      { column_name: 'from_version', is_nullable: 'NO' },
+      { column_name: 'to_version', is_nullable: 'NO' },
+    ]);
   });
 
   it('rejects mismatched family/baby and membership/user identities for checkpoints', async () => {

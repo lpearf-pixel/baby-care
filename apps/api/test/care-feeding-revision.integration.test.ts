@@ -33,14 +33,17 @@ describeDatabase('M2 feeding correction and undo', () => {
         url: `/api/care/events/${eventId}`,
         headers: { origin: M2_TEST_ORIGIN, cookie: context.cookie },
         payload: {
-          eventType: 'feeding',
-          occurredAt: '2026-08-13T07:31:00.000Z',
-          note: 'corrected session',
-          components: [
-            { kind: 'direct_breastfeeding', durationMinutes: 10 },
-            { kind: 'bottle', liquidType: 'formula', amountMl: 75, bottleCapacityMl: 150 },
-          ],
-          relatedActions: [{ kind: 'spit_up', amount: 'medium' }],
+          expectedVersion: 1,
+          event: {
+            eventType: 'feeding',
+            occurredAt: '2026-08-13T07:31:00.000Z',
+            note: 'corrected session',
+            components: [
+              { kind: 'direct_breastfeeding', durationMinutes: 10 },
+              { kind: 'bottle', liquidType: 'formula', amountMl: 75, bottleCapacityMl: 150 },
+            ],
+            relatedActions: [{ kind: 'spit_up', amount: 'medium' }],
+          },
         },
       });
       expect(edited.statusCode).toBe(200);
@@ -97,6 +100,7 @@ describeDatabase('M2 feeding correction and undo', () => {
         method: 'POST',
         url: `/api/care/events/${eventId}/undo`,
         headers: { origin: M2_TEST_ORIGIN, cookie: context.cookie },
+        payload: { expectedVersion: 1 },
       });
       expect(undone.statusCode).toBe(200);
       expect(undone.json()).toMatchObject({ id: eventId, status: 'voided' });

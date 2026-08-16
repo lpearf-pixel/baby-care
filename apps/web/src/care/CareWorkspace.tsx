@@ -226,7 +226,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
               setRecent({
                 id: result.id,
                 label: '开始睡觉',
-                version: 1,
+                version: result.version,
                 editInput: {
                   eventType: 'sleep',
                   startedAt: result.startedAt,
@@ -243,7 +243,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
               setRecent({
                 id: result.id,
                 label: '醒来',
-                version: 2,
+                version: result.version,
                 editInput: {
                   eventType: 'sleep',
                   startedAt: result.startedAt,

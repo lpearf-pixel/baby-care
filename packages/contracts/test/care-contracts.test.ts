@@ -9,6 +9,7 @@ import {
   CareHandoffBriefingDtoSchema,
   CreateCareHandoffInputSchema,
   ReplaceHandoffReminderRulesInputSchema,
+  SleepIntervalDtoSchema,
   UndoCareEventRequestSchema,
   UpdateCareEventRequestSchema,
 } from '../src/index.js';
@@ -60,6 +61,18 @@ describe('M2 care contracts', () => {
 });
 
 describe('M3 care workspace contracts', () => {
+  it('returns the authoritative version with a sleep write receipt', () => {
+    expect(SleepIntervalDtoSchema.parse({
+      id: '11111111-1111-4111-8111-111111111111',
+      occurredAt: '2026-08-13T07:20:00.000Z',
+      status: 'active',
+      startedAt: '2026-08-13T07:20:00.000Z',
+      endedAt: '2026-08-13T07:40:00.000Z',
+      note: null,
+      version: 3,
+    }).version).toBe(3);
+  });
+
   it('accepts only client-owned handoff fields and validates reminder schedules', () => {
     const clientRequestId = randomUUID();
 

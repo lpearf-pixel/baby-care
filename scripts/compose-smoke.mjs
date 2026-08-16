@@ -239,14 +239,17 @@ await request(`/api/care/events/${formulaEventId}`, {
   method: 'PATCH',
   cookie: dadCookie,
   body: {
-    eventType: 'feeding',
-    occurredAt: formulaAt,
-    components: [{
-      kind: 'bottle',
-      liquidType: 'formula',
-      amountMl: 65,
-      bottleCapacityMl: 150,
-    }],
+    expectedVersion: 1,
+    event: {
+      eventType: 'feeding',
+      occurredAt: formulaAt,
+      components: [{
+        kind: 'bottle',
+        liquidType: 'formula',
+        amountMl: 65,
+        bottleCapacityMl: 150,
+      }],
+    },
   },
 });
 
@@ -261,6 +264,7 @@ console.log('SMOKE_OK component=m2-care-edit');
 await request(`/api/care/events/${formulaEventId}/undo`, {
   method: 'POST',
   cookie: dadCookie,
+  body: { expectedVersion: 2 },
 });
 
 const undoneSummary = await request(`/api/care/summary?at=${encodeURIComponent(careAsOf.toISOString())}`, {
