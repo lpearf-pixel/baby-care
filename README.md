@@ -63,7 +63,16 @@ After login, Dad, Mom, and an active Nanny can use the care workspace for `xiang
 - recent care records can be corrected or voided without deleting the original history;
 - care attribution comes from the authenticated server session, not from client-supplied family/baby/actor identifiers.
 
-The production-mode Docker Compose smoke starts from an empty PostgreSQL volume and exercises setup, authentication/authorization, feeding, diaper, sleep, summary, edit/undo, and Nanny attribution through the real Web/API container route.
+The M3 workspace adds operational handoff and history tools without changing those M2 care semantics:
+
+- an explicit Dad/Mom/Nanny takeover creates an immutable checkpoint and a derived briefing; the first takeover uses a clearly labeled recent-24-hour fallback;
+- checkpoint briefings show the fixed shift window, current care state, consumed milk totals, diaper/sleep facts, notable typed events, caregiver activity, and later corrections;
+- the typed timeline supports small category filters, cursor pagination, event detail, actor/source attribution, and backfill markers;
+- historical corrections require the current event version, stale edits or undo return `care_state_conflict`, and append-only revision history remains readable;
+- optional reminder rules are scoped to the signed-in caregiver and never create authoritative handoff checkpoints;
+- auto/day/night display preference is stored per browser/device, with no acknowledgement sound from the Web app.
+
+The production-mode Docker Compose smoke starts from an empty PostgreSQL volume and preserves the M1/M2 flow, then exercises Dad/Nanny takeover, fallback and checkpoint briefings, consumed-amount recomputation, typed cursor timeline/detail, version-aware correction, stale-undo conflict, revision history, and reminder/checkpoint separation through the real Web/API container route.
 
 ## Privacy and diagnostics
 

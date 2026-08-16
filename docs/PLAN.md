@@ -9,7 +9,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 ## Current state
 
-Current milestone: **M3 — Care Workspace — implementation in progress**
+Current milestone: **M3 — Care Workspace — release candidate awaiting production Compose and exact-head CI**
 Completed milestone: **M2 — Care Recording MVP — implementation complete**  
 Previous milestone: **M1 — Family and baby foundation — verified complete**
 
@@ -62,13 +62,22 @@ M3 sources:
 
 A fresh five-job CI on the exact final M2 head remains the authoritative release evidence and must include this file, `.agent/current-milestone.json`, README, migration metadata, and production smoke.
 
-## Next milestone — M3 Care Workspace
+## M3 implemented release-candidate scope
 
-M3 should improve timeline comprehension, handoff, correction workflows, and day/night operational UX using the M2 care facts already implemented. It must not silently expand into Guardian/JoyAI/Qwen integration; Guardian integration remains a later milestone.
+The M3 branch implements explicit caregiver takeover, recent-24-hour fallback and fixed checkpoint briefings, typed/filterable cursor timeline and event detail, version-aware historical correction with append-only history, caregiver-scoped non-authoritative reminders, and per-device low-disturbance day/night Web behavior.
+
+The production smoke now preserves the M1/M2 assertions and covers the complete M3 release flow with these exact terminal markers:
+
+- `SMOKE_OK component=m3-handoff`
+- `SMOKE_OK component=m3-typed-timeline`
+- `SMOKE_OK component=m3-revision-conflict`
+- `SMOKE_OK component=m3-care-workspace-release-flow`
+
+M3 is **not marked complete** yet. The disposable production Compose flow could not run in the Task 9 workspace because the Docker CLI is unavailable. Release closure requires the controller to push the final candidate and record a single exact-head CI run where static, unit/contracts, PostgreSQL integration, production build, and production Compose smoke all pass.
 
 ## Hard scope boundaries
 
-No Guardian ingestion, JoyAI/Qwen runtime, automated feeding recognition, diagnosis/dose recommendation, cloud deployment, or `main` modification/merge in M2.
+No Guardian ingestion, JoyAI/Qwen runtime, automated feeding recognition, diagnosis/dose recommendation, cloud deployment, or `main` modification/merge in M3.
 
 ## Working rule
 

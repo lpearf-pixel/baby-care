@@ -1,6 +1,6 @@
 # Baby Care Work Handoff Summary
 
-Updated: 2026-08-14
+Updated: 2026-08-16
 Repository: `lpearf-pixel/baby-care`
 
 This file is the short handoff for a fresh Work/chat. Read it together with `agent.md`, `docs/PLAN.md`, and `.agent/current-milestone.json` before planning or coding.
@@ -8,7 +8,7 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 ## 1. Current authoritative state
 
 - Current completed milestone: **M2 — Care Recording MVP**.
-- Next milestone: **M3 — Care Workspace**, status **ready for design**.
+- Current milestone: **M3 — Care Workspace**, implementation release candidate awaiting production Compose and exact-head five-job CI.
 - M1 authoritative baseline: `codex/m1-family-baby-foundation @ 76d578a464ec2ab1f8eb1f8f33d8e429caff10ba`.
 - M1 authoritative CI: `31707486985` — 5/5 PASS.
 - M2 authoritative implementation branch: `codex/m2-care-recording-implementation`.
@@ -16,6 +16,10 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 - M2 final authoritative CI on that head: `31768875691` — static / unit / PostgreSQL integration / production build / production Compose smoke all PASS.
 - M2 Draft PR: **#4 — `M2: care recording MVP`**, base `codex/m1-family-baby-foundation`.
 - `main` has not been modified or merged for M2. Keep PR #4 Draft unless the user explicitly approves merge/integration.
+- M3 implementation branch: `codex/m3-care-workspace-implementation`.
+- M3 approved design: `docs/superpowers/specs/2026-08-15-m3-care-workspace-design.md`.
+- M3 implementation plan: `docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md`.
+- M3 verified head and CI run remain unset until one exact final head passes static, unit/contracts, PostgreSQL integration, production build, and production Compose smoke.
 
 Release-gate history:
 
@@ -51,20 +55,20 @@ The production-mode empty-DB Docker Compose flow already verifies the real stack
 
 Important invariant: bottle capacity 150 ml never contributes to intake total.
 
-## 4. M3 starting scope
+## 4. M3 implemented release-candidate scope
 
 M3 is **Care Workspace**, not Guardian integration.
 
-M3 should design and then improve, using the existing M2 facts rather than redefining them:
+The branch now implements these stable M3 capabilities while preserving the M2 facts above:
 
-- care timeline comprehension;
-- family handoff / 交接班 workflow;
-- day/night operational UX;
-- correction/history usability;
-- current-state comprehension for sleep-deprived caregivers;
-- keeping common actions reachable in roughly 2-3 taps.
+- explicit Dad/Mom/Nanny takeover checkpoints with a recent-24-hour fallback for the first handoff;
+- derived fixed-window briefings with current state, consumed milk totals, diaper/sleep facts, notable typed events, caregiver activity, and correction activity;
+- a typed, filterable, cursor-paginated care timeline with detail, actor/source attribution, and backfill markers;
+- complete historical correction with expected-version conflict handling and append-only revision history;
+- caregiver-scoped optional on-screen reminders that do not create checkpoint facts;
+- per-browser/device auto/day/night display choice and no Web acknowledgement sound.
 
-Do not begin M3 implementation before a dedicated M3 design/spec is written and approved.
+The production smoke preserves M1/M2 and encodes the complete M3 flow, but Task 9 could not execute Docker locally because the Docker CLI is unavailable. Do not mark M3 complete until the controller records the four M3 smoke markers and all five CI jobs passing on one exact final head.
 
 ## 5. Baby Guardian / baby-monitor-local boundary
 
@@ -164,45 +168,46 @@ This remains separate from the current M3 Care Workspace implementation. The fir
 
 ## 9. Fresh Work entry point
 
-The next Work should begin with **M3 design**, not M2 implementation and not Guardian coding.
+The next Work should close the **M3 release gate**, not redesign or reimplement M2/M3 and not begin Guardian coding.
 
 Recommended first sequence:
 
 1. Read the authoritative state files.
-2. Verify live branch/PR/CI state without changing anything.
-3. Review the existing M2 Web/PWA workspace and M2 contracts only as needed.
-4. Draft the M3 Care Workspace design around timeline comprehension, handoff, day/night UX, and correction/history usability.
-5. Preserve all M2 semantics above.
-6. Explicitly keep Guardian/audio/AI outside M3 unless the user separately approves a scope change.
-7. Present the M3 design for approval before implementation.
+2. Push the controller-approved Task 9 candidate without modifying `main`.
+3. Require static, unit/contracts, PostgreSQL integration, production build, and production Compose smoke on the same exact head.
+4. Confirm the four exact M3 smoke markers from the production Compose job.
+5. Record `m3_verified_head`, `m3_verified_ci_run`, and `m3_verification_result` only from that authoritative run.
+6. Keep Guardian/audio/AI outside M3 unless the user separately approves a scope change.
 
-## 10. Copy/paste prompt for the next Work
+## 10. Copy/paste prompt for the controller release gate
 
 ```text
 你现在接管长期项目 `lpearf-pixel/baby-care`。
 
-先不要直接开发。先读取并核验真实仓库状态：
+先读取并核验真实仓库状态：
 
 - `agent.md`
 - `summary.md`
 - `docs/PLAN.md`
 - `.agent/current-milestone.json`
-- `docs/superpowers/specs/2026-08-13-m2-care-recording-mvp-design.md`
-- `docs/superpowers/plans/2026-08-13-m2-care-recording-mvp-reviewed.md`
-- Draft PR #4
+- `docs/superpowers/specs/2026-08-15-m3-care-workspace-design.md`
+- `docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md`
+- `.superpowers/sdd/2026-08-16-m3-care-workspace-implementation/task-9-report.md`
 
-当前权威 M2 分支是 `codex/m2-care-recording-implementation`。M2 Care Recording MVP 已完成并通过最终 5/5 CI；不要重新实现 M2，不要修改或合并 `main`。
+当前 M3 候选分支是 `codex/m3-care-workspace-implementation`。Task 9 已准备完整 production smoke，但执行环境没有 Docker CLI，因此不得在得到 CI 证据前声称 M3 完成。不要重新实现 M2/M3，不要修改或合并 `main`。
 
-你的当前任务是开始 **M3 Care Workspace**：先做设计，不直接写代码。重点是 timeline comprehension、family handoff/交接班、day/night operational UX、correction/history usability，并保持常用操作适合单手、睡眠不足场景。
+你的当前任务是 push controller 批准的最终候选，并要求同一 exact head 的 static、unit/contracts、PostgreSQL integration、production build、production Compose smoke 5/5 PASS。Compose 日志必须出现四个精确 marker：`m3-handoff`、`m3-typed-timeline`、`m3-revision-conflict`、`m3-care-workspace-release-flow`。
 
 必须保留 M2 已确定的语义：奶瓶容量不等于摄入量；瓶喂实际 ml；母乳瓶喂与配方奶分开；亲喂只记录总时长、不做左右乳计时、不推算 ml；rolling 24h；warning 显式确认；edit 保留 revision；undo=void；actor/family/baby/source 由服务端认证上下文派生；药物只记录事实，不推荐/计算剂量。
 
 `baby-monitor-local`/Guardian 是独立系统。小米 MJSXJ17CM 音频已经被识别为未来 Guardian 多模态输入候选，但当前 live audio track 尚需真机 probe。不要把 Guardian/JoyAI/Qwen/自动喂奶识别直接塞进 M3；除非我明确批准新的集成设计。
 
-工作方式：普通可逆工作自动继续；使用 GitHub 公共 runner；失败自行诊断修复重跑；不要让我执行普通本地命令；只在重大产品方向、凭据/支付、破坏性/不可逆操作或必须真人硬件验收时找我。规格批准后继续开发、测试、CI、review，直到当前里程碑计划结束。
+工作方式：普通可逆工作自动继续；使用 GitHub 公共 runner；失败自行诊断修复重跑；不要让我执行普通本地命令；只在重大产品方向、凭据/支付、破坏性/不可逆操作或必须真人硬件验收时找我。
 
 先给我：
-1. 真实仓库/分支/PR/CI核验结果；
-2. M3 设计输入和你认为需要解决的核心交互问题；
-3. 一版可审核的 M3 设计规格。
+1. 最终 branch 和 exact HEAD；
+2. 五作业 CI run ID 与逐项结论；
+3. 四个 production Compose marker；
+4. 后补的 `m3_verified_head`、`m3_verified_ci_run`、`m3_verification_result`；
+5. `main` 未修改/未合并的确认。
 ```
