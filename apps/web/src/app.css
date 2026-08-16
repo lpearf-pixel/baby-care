@@ -128,6 +128,10 @@ input:focus-visible, button:focus-visible { outline: 2px solid currentColor; out
   gap: 14px;
   margin-bottom: 24px;
 }
+.authenticated-shell {
+  display: grid;
+  gap: 16px;
+}
 .care-summary h2 { margin-bottom: 16px; }
 .care-summary-grid {
   display: grid;
@@ -178,12 +182,36 @@ input:focus-visible, button:focus-visible { outline: 2px solid currentColor; out
 .recent-record strong { line-height: 1.45; }
 .other-care-grid button { flex: 1 1 120px; }
 .care-refresh { justify-self: start; min-height: 36px; padding-block: 6px; opacity: 0.7; }
+.care-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.care-handoff,
+.care-timeline {
+  display: grid;
+  gap: 14px;
+}
+.care-timeline-list {
+  display: grid;
+  gap: 10px;
+}
+.care-timeline-card {
+  display: grid;
+  gap: 8px;
+}
+.care-timeline-time,
+.care-timeline-meta {
+  margin: 0;
+}
 
 @media (max-width: 640px) {
   .shell { width: min(100% - 24px, 860px); padding-top: 24px; }
   .workspace-grid, .form-grid, .facts, .care-summary-grid { grid-template-columns: 1fr; }
   .full-span, .full-width { grid-column: 1; }
   .identity-card { align-items: flex-start; }
+  .care-panel-header { flex-direction: column; }
   .member-list li { grid-template-columns: 1fr auto; }
   .member-list li span:last-child { grid-column: 1 / -1; }
   .nanny-admin, .custom-time-row { grid-template-columns: 1fr; }

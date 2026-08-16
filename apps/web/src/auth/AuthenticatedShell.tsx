@@ -61,7 +61,7 @@ export function AuthenticatedShell({
   }
 
   return (
-    <>
+    <div className="authenticated-shell">
       <section className="identity-card">
         <div>
           <p className="label">当前照护者</p>
@@ -96,6 +96,6 @@ export function AuthenticatedShell({
       {!loading && family && baby && session.permissionLevel === 'caregiver' ? (
         <NannyFamilyView family={family} baby={baby} members={members} />
       ) : null}
-    </>
+    </div>
   );
 }

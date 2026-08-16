@@ -2,9 +2,13 @@ import type {
   BabyDto,
   BottleLiquidType,
   CareActionReceipt,
+  CareHandoffBriefingDto,
   CareHomeSummaryDto,
   CareRevisionReceipt,
+  CareTimelineQuery,
+  CareTimelineResponse,
   CreateCareActionInput,
+  CreateCareHandoffInput,
   CreateDiaperInput,
   CreateFeedingSessionInput,
   CreateMeasurementInput,
@@ -81,6 +85,10 @@ export interface BabyCareApi {
   setNannyStatus(membershipId: string, status: 'active' | 'disabled'): Promise<MemberDto>;
   resetNannyPassword(membershipId: string, newPassword: string): Promise<void>;
   getCareSummary(at: string): Promise<CareHomeSummaryDto>;
+  getLatestCareHandoff(): Promise<CareHandoffBriefingDto | null>;
+  getCareHandoffSummary(handoffId: string): Promise<CareHandoffBriefingDto>;
+  createCareHandoff(input: CreateCareHandoffInput): Promise<CareHandoffBriefingDto>;
+  getCareTimeline(query: CareTimelineQuery): Promise<CareTimelineResponse>;
   getFeedingQuickValues(liquidType: BottleLiquidType): Promise<FeedingQuickValuesDto>;
   createFeedingSession(input: CreateFeedingSessionInput): Promise<FeedingSessionDto>;
   createDiaper(input: CreateDiaperInput): Promise<DiaperEventDto>;
@@ -125,6 +133,20 @@ export const babyCareApi: BabyCareApi = {
       body: JSON.stringify({ newPassword }),
     }),
   getCareSummary: (at) => request(`/api/care/summary?at=${encodeURIComponent(at)}`),
+  getLatestCareHandoff: () => request('/api/care/handoffs/latest'),
+  getCareHandoffSummary: (handoffId) => request(`/api/care/handoffs/${handoffId}/summary`),
+  createCareHandoff: (input) =>
+    request('/api/care/handoffs', { method: 'POST', body: JSON.stringify(input) }),
+  getCareTimeline: (query) => {
+    const params = new URLSearchParams();
+    if (query.before) params.set('before', query.before);
+    if (query.cursor) params.set('cursor', query.cursor);
+    if (query.from) params.set('from', query.from);
+    if (query.to) params.set('to', query.to);
+    params.set('category', query.category);
+    params.set('limit', String(query.limit));
+    return request(`/api/care/timeline?${params.toString()}`);
+  },
   getFeedingQuickValues: (liquidType) =>
     request(`/api/care/feeding/quick-values?liquidType=${encodeURIComponent(liquidType)}`),
   createFeedingSession: (input) =>

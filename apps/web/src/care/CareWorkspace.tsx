@@ -10,15 +10,19 @@ import type {
 import type { BabyCareApi } from '../api-client.js';
 import { BabyCareApiError } from '../api-client.js';
 import { CareSummary } from './CareSummary.js';
+import { CareTimeline } from './CareTimeline.js';
 import { CareWarningDialog } from './CareWarningDialog.js';
 import { DiaperForm } from './DiaperForm.js';
 import { FeedingForm } from './FeedingForm.js';
+import { HandoffPanel } from './HandoffPanel.js';
 import { OtherCareForm } from './OtherCareForm.js';
 import { QuickRecordBar, type CareQuickAction } from './QuickRecordBar.js';
 import { RecentEditPanel } from './RecentEditPanel.js';
 import { RecentRecordCard, type RecentCareRecord } from './RecentRecordCard.js';
 import { SleepControls } from './SleepControls.js';
+import { useCareTimeline } from './useCareTimeline.js';
 import { useCareWorkspace } from './useCareWorkspace.js';
+import { useHandoff } from './useHandoff.js';
 
 interface RecentState extends RecentCareRecord {
   editInput: EditCareEventInput;
@@ -117,6 +121,26 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
     confirmWarning,
     cancelWarning,
   } = useCareWorkspace(api);
+  const {
+    briefing,
+    loading: handoffLoading,
+    busy: handoffBusy,
+    message: handoffMessage,
+    takeOver,
+    reload: reloadHandoff,
+  } = useHandoff(api);
+  const {
+    items: timelineItems,
+    nextCursor,
+    loading: timelineLoading,
+    loadingMore: timelineLoadingMore,
+    message: timelineMessage,
+    category,
+    setCategory,
+    setWindow,
+    loadMore,
+    reload: reloadTimeline,
+  } = useCareTimeline(api);
 
   async function saveFeeding(input: CreateFeedingSessionInput) {
     return save(
@@ -209,6 +233,19 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
         </section>
       ) : null}
 
+      <HandoffPanel
+        briefing={briefing}
+        loading={handoffLoading}
+        busy={handoffBusy}
+        message={handoffMessage}
+        onTakeOver={takeOver}
+        onReload={reloadHandoff}
+        onJumpToWindow={(from, to) => {
+          setCategory('all');
+          setWindow(from, to);
+        }}
+      />
+
       <QuickRecordBar active={active} onSelect={(next) => {
         setEditing(false);
         setActive(active === next ? null : next);
@@ -289,6 +326,18 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
       {revisionConflict ? (
         <p className="inline-message care-message" aria-live="polite">记录已被其他照护者修改，请刷新后确认</p>
       ) : message ? <p className="inline-message care-message" aria-live="polite">{message}</p> : null}
+
+      <CareTimeline
+        items={timelineItems}
+        category={category}
+        loading={timelineLoading}
+        loadingMore={timelineLoadingMore}
+        nextCursor={nextCursor}
+        message={timelineMessage}
+        onCategoryChange={setCategory}
+        onLoadMore={loadMore}
+        onReload={reloadTimeline}
+      />
       <button type="button" className="text-button care-refresh" onClick={() => void reload()}>刷新护理状态</button>
     </section>
   );
