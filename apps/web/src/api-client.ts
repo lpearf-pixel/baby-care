@@ -1,18 +1,36 @@
 import type {
   BabyDto,
+  BottleLiquidType,
+  CareActionReceipt,
+  CareHomeSummaryDto,
+  CareRevisionReceipt,
+  CreateCareActionInput,
+  CreateDiaperInput,
+  CreateFeedingSessionInput,
+  CreateMeasurementInput,
   CreateNannyInput,
+  DiaperEventDto,
+  EditCareEventInput,
   FamilyDto,
+  FeedingQuickValuesDto,
+  FeedingSessionDto,
+  MeasurementReceipt,
   MemberDto,
   SessionDto,
   SetupInput,
+  SleepIntervalDto,
+  StartSleepInput,
+  UndoCareEventResponse,
   UpdateBabyInput,
   UpdateFamilyInput,
+  WakeSleepInput,
 } from '@baby-care/contracts';
 
 export class BabyCareApiError extends Error {
   constructor(
     readonly code: string,
     message: string,
+    readonly details?: unknown,
   ) {
     super(message);
     this.name = 'BabyCareApiError';
@@ -30,13 +48,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   });
 
   if (!response.ok) {
-    let error: { code?: string; message?: string } = {};
+    let error: { code?: string; message?: string; details?: unknown } = {};
     try {
       error = (await response.json()) as typeof error;
     } catch {
       // Keep a stable generic client error if the server response is not JSON.
     }
-    throw new BabyCareApiError(error.code ?? 'request_failed', error.message ?? '请求失败，请稍后再试');
+    throw new BabyCareApiError(
+      error.code ?? 'request_failed',
+      error.message ?? '请求失败，请稍后再试',
+      error.details,
+    );
   }
 
   if (response.status === 204) return undefined as T;
@@ -57,6 +79,16 @@ export interface BabyCareApi {
   createNanny(input: CreateNannyInput): Promise<MemberDto>;
   setNannyStatus(membershipId: string, status: 'active' | 'disabled'): Promise<MemberDto>;
   resetNannyPassword(membershipId: string, newPassword: string): Promise<void>;
+  getCareSummary(at: string): Promise<CareHomeSummaryDto>;
+  getFeedingQuickValues(liquidType: BottleLiquidType): Promise<FeedingQuickValuesDto>;
+  createFeedingSession(input: CreateFeedingSessionInput): Promise<FeedingSessionDto>;
+  createDiaper(input: CreateDiaperInput): Promise<DiaperEventDto>;
+  startSleep(input: StartSleepInput): Promise<SleepIntervalDto>;
+  wakeSleep(input: WakeSleepInput): Promise<SleepIntervalDto>;
+  createCareAction(input: CreateCareActionInput): Promise<CareActionReceipt>;
+  createMeasurement(input: CreateMeasurementInput): Promise<MeasurementReceipt>;
+  editCareEvent(eventId: string, input: EditCareEventInput): Promise<CareRevisionReceipt>;
+  undoCareEvent(eventId: string): Promise<UndoCareEventResponse>;
 }
 
 export const babyCareApi: BabyCareApi = {
@@ -91,4 +123,23 @@ export const babyCareApi: BabyCareApi = {
       method: 'POST',
       body: JSON.stringify({ newPassword }),
     }),
+  getCareSummary: (at) => request(`/api/care/summary?at=${encodeURIComponent(at)}`),
+  getFeedingQuickValues: (liquidType) =>
+    request(`/api/care/feeding/quick-values?liquidType=${encodeURIComponent(liquidType)}`),
+  createFeedingSession: (input) =>
+    request('/api/care/feeding-sessions', { method: 'POST', body: JSON.stringify(input) }),
+  createDiaper: (input) =>
+    request('/api/care/diapers', { method: 'POST', body: JSON.stringify(input) }),
+  startSleep: (input) =>
+    request('/api/care/sleep/start', { method: 'POST', body: JSON.stringify(input) }),
+  wakeSleep: (input) =>
+    request('/api/care/sleep/wake', { method: 'POST', body: JSON.stringify(input) }),
+  createCareAction: (input) =>
+    request('/api/care/actions', { method: 'POST', body: JSON.stringify(input) }),
+  createMeasurement: (input) =>
+    request('/api/care/measurements', { method: 'POST', body: JSON.stringify(input) }),
+  editCareEvent: (eventId, input) =>
+    request(`/api/care/events/${eventId}`, { method: 'PATCH', body: JSON.stringify(input) }),
+  undoCareEvent: (eventId) =>
+    request(`/api/care/events/${eventId}/undo`, { method: 'POST' }),
 };

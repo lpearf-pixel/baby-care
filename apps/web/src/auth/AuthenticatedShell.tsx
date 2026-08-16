@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { BabyDto, FamilyDto, MemberDto, SessionDto } from '@baby-care/contracts';
 import type { BabyCareApi } from '../api-client.js';
+import { CareWorkspace } from '../care/CareWorkspace.js';
 import { AdminFamilyPanel } from '../family/AdminFamilyPanel.js';
 import { NannyFamilyView } from '../family/NannyFamilyView.js';
 
@@ -71,6 +72,8 @@ export function AuthenticatedShell({
         </div>
         <button className="text-button" type="button" onClick={() => void onLogout()}>退出登录</button>
       </section>
+
+      <CareWorkspace api={api} />
 
       {loading ? <p className="foundation-note">正在加载家庭资料…</p> : null}
       {!loading && (!family || !baby) ? <p className="form-error" role="alert">{message ?? '家庭资料暂不可用'}</p> : null}

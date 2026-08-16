@@ -143,6 +143,84 @@ sleep_started
 sleep_ended
 ```
 
+### Voice-first care interactions
+
+The user has approved **voice-first interaction** as the long-term primary path for routine Baby Care data, with the assistant wake name **小小**. Touch/PWA entry remains available as the reliable fallback and correction surface.
+
+Example start:
+
+```text
+嘿，小小，我要喂奶了
+```
+
+The voice layer should eventually support four operation families:
+
+- create/start/end care: feeding, diaper/stool, sleep/wake, burping, spit-up, crying, bathing, temperature, weight, and medication actually administered;
+- query: current state, last relevant event, and rolling 24-hour summaries;
+- correct: change amount/time/detail, complete a candidate, or correct the most recent event;
+- undo: void the most recent matching event while preserving revision history.
+
+This direction does not change the deployment boundary:
+
+- `baby-monitor-local` owns the local **Voice Care Gateway**: Xiaomi audio acquisition, short in-memory buffering, VAD/wake-word/ASR, dialogue state, deterministic intent extraction, local spoken acknowledgement, camera-side process observation, and the candidate-event/outbox lifecycle.
+- `baby-care` remains the source of truth for family care records. It receives versioned semantic candidates through the Guardian Adapter/API and owns authenticated caregiver attribution, confirmation, correction, revision history, undo, Dashboard display, and analytics.
+- Guardian must never write directly to the Baby Care database.
+- Raw continuous audio/video remains local by default. Prefer short in-memory audio windows that are discarded after intent extraction; do not upload continuous household audio to Baby Care.
+- The assistant wake name `小小` is independent of the baby's current display nickname `xiangxiang`.
+- The camera microphone must not use guessed voice identity as authoritative Dad/Mom/Nanny attribution. Use a revocable Baby Care-issued active-caregiver session/lease; without one, create a system-sourced candidate requiring confirmation.
+
+### Voice safety and confirmation tiers
+
+Voice commands are transactional care inputs, not casual chat. Use the cheapest deterministic path first; an LLM may normalize ambiguous language but must not directly execute consequential writes.
+
+- Low-risk, reversible facts (for example diaper, burping, bathing) may use a short acknowledgement plus immediate undo.
+- Quantity/time measurements (for example bottle amount, temperature, weight, event time) must repeat the recognized critical value when confidence is not clearly high or a rule flags it.
+- Medication is factual recording only. It must capture medication name, dose, unit, and administered time; require explicit confirmation; never recommend medication or calculate a dose.
+- Low-confidence, contradictory, duplicate, unusual, or actor-ambiguous commands become `needs_confirmation`.
+- AI/Guardian candidates never silently overwrite human records.
+
+A voice command creates a semantic candidate or opens a care session. The contract should preserve at least:
+
+```text
+event_id
+session_id
+operation
+care_kind
+normalized_payload
+started_at
+ended_at
+source_device
+active_caregiver_lease_id
+asr_confidence
+intent_confidence
+confirmation_state
+value_origin
+evidence_pointer
+contract_version
+idempotency_key
+```
+
+The M2 feeding semantics remain authoritative:
+
+- bottle volume means actual consumed ml;
+- expressed breast milk and formula remain distinct;
+- direct breastfeeding records total session minutes and never inferred ml;
+- a configured/default bottle amount is a suggested candidate value only until a caregiver confirms or edits it;
+- analytics must distinguish defaulted, machine-inferred, and human-confirmed values.
+
+### Night interaction policy
+
+Night use must minimize the chance of waking the baby:
+
+- quiet hours, acknowledgement volume cap, speech rate, and response style are configuration, not hard-coded household assumptions;
+- prefer a very short, low-volume acknowledgement for successful low-risk actions;
+- do not raise volume automatically merely because crying or room noise is high; fall back to a soft chime, PWA visual/haptic confirmation, or a pending confirmation state;
+- medication and ambiguous critical values still require confirmation, but use concise prompts;
+- TTS playback must not trigger the wake word or feed back into ASR; use capture ducking/echo control and a post-playback guard window;
+- the output sink is pluggable. Phase 1 should use a proven local macOS/i9 or external-speaker sink with configurable night volume; Xiaomi camera-speaker/two-way talk remains optional until its local protocol is proven.
+
+Before implementation, the hardware track must prove whether the live Xiaomi `MJSXJ17CM` `cs2+udp` source exposes a usable audio track. Build this as a dedicated integration track with its own approved specification; do not silently expand M3 Care Workspace.
+
 ## 7. Baby Agent Orchestrator
 
 A dedicated Agent Orchestrator is part of the target architecture. The M2 Mac is the preferred AI orchestration node; the i9/Guardian machine remains the fast perception node.

@@ -9,4 +9,6 @@ export type Capability =
   | 'baby.update'
   | 'members.read'
   | 'members.manage'
-  | 'credentials.reset_nanny';
+  | 'credentials.reset_nanny'
+  | 'care.read'
+  | 'care.write';

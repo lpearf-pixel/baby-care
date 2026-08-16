@@ -120,10 +120,6 @@ export function App({ api = babyCareApi }: AppProps) {
       {state.kind === 'authenticated' ? (
         <AuthenticatedShell api={api} session={state.session} onLogout={handleLogout} />
       ) : null}
-
-      <p className="foundation-note">
-        M1 只启用家庭身份、权限和基础资料。护理记录将在真实家庭习惯确认后进入下一阶段。
-      </p>
     </main>
   );
 }

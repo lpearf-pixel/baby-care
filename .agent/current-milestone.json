@@ -1,33 +1,55 @@
 {
   "schema_version": 1,
-  "milestone": "M2 Care Recording MVP",
-  "status": "ready_for_implementation_planning",
-  "branch": "codex/m2-care-recording-mvp",
+  "milestone": "M3 Care Workspace",
+  "status": "ready_for_design",
+  "branch": "codex/m2-care-recording-implementation",
   "completed_milestones": [
     "M0 Repository and delivery foundation",
-    "M1 Family and baby foundation"
+    "M1 Family and baby foundation",
+    "M2 Care Recording MVP"
   ],
-  "m0_verified_ci_run": 31674964075,
   "m1_state": "verified_complete",
   "m1_authoritative_branch": "codex/m1-family-baby-foundation",
+  "m1_authoritative_head": "76d578a464ec2ab1f8eb1f8f33d8e429caff10ba",
+  "m1_authoritative_ci_run": 31707486985,
   "m1_h_state": "closed",
-  "m1_h_branch": "codex/m1-h-production-flow",
-  "m1_h_validation_ci_run": 31707034192,
+  "m2_state": "verified_complete",
   "m2_design_branch": "codex/m2-care-recording-mvp",
+  "m2_design_head": "eadb8f1d41770b5ef940f16993e57a4cb8ee6bc5",
   "m2_design_status": "approved",
-  "baby_display_name": "xiangxiang",
+  "m2_implementation_branch": "codex/m2-care-recording-implementation",
+  "m2_release_branch": "codex/m2-task11-release-gate",
+  "m2_implementation_plan": "docs/superpowers/plans/2026-08-13-m2-care-recording-mvp-reviewed.md",
   "m2_real_care_habits_gate": "satisfied",
   "m2_production_baseline_blocker": "cleared",
-  "next_scope": [
-    "review approved M2 written specification",
-    "create M2 implementation plan",
-    "execute M2 only after implementation plan approval"
+  "m2_drizzle_snapshot": "reconciled",
+  "m2_verified_head": "631805f8144d3ece6e2df90468fa4562e0431fc3",
+  "m2_verified_ci_run": 31768708846,
+  "m2_verification_result": "static/unit/postgresql-integration/build/production-compose-smoke 5/5 PASS",
+  "completed_tasks": [
+    "Task 1 Care Foundation Schema, Common Contracts, and Authorization",
+    "Task 2 Deterministic Care Rules",
+    "Task 3 Authenticated Ownership, Idempotency, and Revision Primitives",
+    "Task 4 Mixed Feeding Sessions and Dynamic Quick Values",
+    "Task 5 Diaper and Sleep Recording",
+    "Task 6 Frequent Care Actions and Measurements",
+    "Task 7 Summary Timeline Revision and Undo",
+    "Task 8 Fast Care Web Workspace",
+    "Task 9 Care Warnings Corrections and Frequent Events",
+    "Task 10 Concurrent Caregiver and Privacy Gate",
+    "Task 11 Production Compose Release Flow"
   ],
-  "do_not_start_before_m2_implementation_plan": [
-    "M2 care schema migration",
-    "M2 care API implementation",
-    "M2 care Web interaction implementation",
+  "next_scope": [
+    "care timeline comprehension",
+    "family handoff workflow",
+    "day/night operational UX",
+    "correction and history usability"
+  ],
+  "do_not_start_in_m3_without_separate_design": [
     "Guardian integration",
-    "JoyAI/Qwen runtime"
+    "JoyAI/Qwen runtime",
+    "automated feeding recognition",
+    "medical diagnosis or dose recommendation",
+    "cloud deployment"
   ]
 }

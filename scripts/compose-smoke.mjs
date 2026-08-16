@@ -8,6 +8,10 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isoMinutesAgo(asOf, minutes) {
+  return new Date(asOf.getTime() - minutes * 60_000).toISOString();
+}
+
 async function waitFor(path, expectedStatus = 200) {
   let last = 'not attempted';
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -155,3 +159,147 @@ if (dadUpdate.payload?.name !== 'Xiangxiang Home') {
 }
 
 console.log('SMOKE_OK component=m1-family-authorization');
+
+const careAsOf = new Date();
+const formulaAt = isoMinutesAgo(careAsOf, 30);
+const directAt = isoMinutesAgo(careAsOf, 25);
+const sleepAt = isoMinutesAgo(careAsOf, 20);
+const diaperAt = isoMinutesAgo(careAsOf, 10);
+
+const formulaFeed = await request('/api/care/feeding-sessions', {
+  method: 'POST',
+  expectedStatus: 201,
+  cookie: dadCookie,
+  body: {
+    occurredAt: formulaAt,
+    clientRequestId: crypto.randomUUID(),
+    components: [{
+      kind: 'bottle',
+      liquidType: 'formula',
+      amountMl: 60,
+      bottleCapacityMl: 150,
+    }],
+  },
+});
+const formulaEventId = formulaFeed.payload?.id;
+if (typeof formulaEventId !== 'string') throw new Error('SMOKE_FAILED formula event id missing');
+
+await request('/api/care/feeding-sessions', {
+  method: 'POST',
+  expectedStatus: 201,
+  cookie: dadCookie,
+  body: {
+    occurredAt: directAt,
+    clientRequestId: crypto.randomUUID(),
+    components: [{ kind: 'direct_breastfeeding', durationMinutes: 18 }],
+  },
+});
+
+await request('/api/care/diapers', {
+  method: 'POST',
+  expectedStatus: 201,
+  cookie: dadCookie,
+  body: {
+    occurredAt: diaperAt,
+    clientRequestId: crypto.randomUUID(),
+    kind: 'urine_stool',
+    stoolColor: 'yellow',
+    stoolConsistency: 'seedy',
+    stoolAmount: 'medium',
+  },
+});
+
+await request('/api/care/sleep/start', {
+  method: 'POST',
+  expectedStatus: 201,
+  cookie: dadCookie,
+  body: {
+    occurredAt: sleepAt,
+    clientRequestId: crypto.randomUUID(),
+  },
+});
+
+const firstSummary = await request(`/api/care/summary?at=${encodeURIComponent(careAsOf.toISOString())}`, {
+  cookie: dadCookie,
+});
+if (
+  firstSummary.payload?.rolling24h?.bottleTotalMl !== 60
+  || firstSummary.payload?.rolling24h?.formulaMl !== 60
+  || firstSummary.payload?.rolling24h?.directBreastfeedingSessions !== 1
+  || firstSummary.payload?.rolling24h?.directBreastfeedingMinutes !== 18
+) {
+  throw new Error('SMOKE_FAILED initial M2 summary mismatch');
+}
+if (firstSummary.payload?.rolling24h?.bottleTotalMl === 150) {
+  throw new Error('SMOKE_FAILED bottle capacity leaked into intake total');
+}
+console.log('SMOKE_OK component=m2-care-summary-initial');
+
+await request(`/api/care/events/${formulaEventId}`, {
+  method: 'PATCH',
+  cookie: dadCookie,
+  body: {
+    eventType: 'feeding',
+    occurredAt: formulaAt,
+    components: [{
+      kind: 'bottle',
+      liquidType: 'formula',
+      amountMl: 65,
+      bottleCapacityMl: 150,
+    }],
+  },
+});
+
+const editedSummary = await request(`/api/care/summary?at=${encodeURIComponent(careAsOf.toISOString())}`, {
+  cookie: dadCookie,
+});
+if (editedSummary.payload?.rolling24h?.bottleTotalMl !== 65) {
+  throw new Error('SMOKE_FAILED edited bottle total mismatch');
+}
+console.log('SMOKE_OK component=m2-care-edit');
+
+await request(`/api/care/events/${formulaEventId}/undo`, {
+  method: 'POST',
+  cookie: dadCookie,
+});
+
+const undoneSummary = await request(`/api/care/summary?at=${encodeURIComponent(careAsOf.toISOString())}`, {
+  cookie: dadCookie,
+});
+if (
+  undoneSummary.payload?.rolling24h?.bottleTotalMl !== 0
+  || undoneSummary.payload?.rolling24h?.directBreastfeedingSessions !== 1
+  || undoneSummary.payload?.rolling24h?.directBreastfeedingMinutes !== 18
+) {
+  throw new Error('SMOKE_FAILED undo summary mismatch');
+}
+console.log('SMOKE_OK component=m2-care-undo');
+
+const nannyCare = await request('/api/care/actions', {
+  method: 'POST',
+  expectedStatus: 201,
+  cookie: nannyCookie,
+  body: {
+    occurredAt: isoMinutesAgo(careAsOf, 1),
+    clientRequestId: crypto.randomUUID(),
+    action: { kind: 'bathing' },
+  },
+});
+const nannyEventId = nannyCare.payload?.id;
+if (typeof nannyEventId !== 'string') throw new Error('SMOKE_FAILED Nanny care event id missing');
+
+const timeline = await request(`/api/care/timeline?before=${encodeURIComponent(careAsOf.toISOString())}&limit=20`, {
+  cookie: dadCookie,
+});
+const nannyTimelineItem = Array.isArray(timeline.payload?.items)
+  ? timeline.payload.items.find((item) => item.id === nannyEventId)
+  : undefined;
+if (
+  nannyTimelineItem?.actorDisplayName !== 'Nanny'
+  || nannyTimelineItem?.source !== 'manual'
+  || nannyTimelineItem?.eventType !== 'bathing'
+) {
+  throw new Error('SMOKE_FAILED Nanny care attribution mismatch');
+}
+console.log('SMOKE_OK component=m2-nanny-attribution');
+console.log('SMOKE_OK component=m2-care-release-flow');
