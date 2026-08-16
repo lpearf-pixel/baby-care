@@ -24,29 +24,31 @@ async function migratedDatabase(): Promise<DatabaseContext> {
 
 async function seedOwnership(context: DatabaseContext) {
   const familyA = '10000000-0000-4000-8000-000000000001';
-  const familyB = '20000000-0000-4000-8000-000000000002';
   const babyA = '30000000-0000-4000-8000-000000000003';
-  const babyB = '40000000-0000-4000-8000-000000000004';
+  const missingBaby = '40000000-0000-4000-8000-000000000004';
   const userA = '50000000-0000-4000-8000-000000000005';
   const membershipA = '60000000-0000-4000-8000-000000000006';
+  const userB = '70000000-0000-4000-8000-000000000007';
+  const membershipB = '80000000-0000-4000-8000-000000000008';
   await context.pool.query(
-    `insert into families (id, name, timezone) values ($1, 'A', 'Asia/Shanghai'), ($2, 'B', 'Asia/Shanghai')`,
-    [familyA, familyB],
+    `insert into families (id, name, timezone) values ($1, 'A', 'Asia/Shanghai')`,
+    [familyA],
   );
   await context.pool.query(
-    `insert into babies (id, family_id, display_name) values ($1, $2, 'a'), ($3, $4, 'b')`,
-    [babyA, familyA, babyB, familyB],
+    `insert into babies (id, family_id, display_name) values ($1, $2, 'a')`,
+    [babyA, familyA],
   );
   await context.pool.query(
-    `insert into users (id, login_name, display_name, password_hash) values ($1, 'dad', 'Dad', 'hash')`,
-    [userA],
+    `insert into users (id, login_name, display_name, password_hash)
+     values ($1, 'dad', 'Dad', 'hash'), ($2, 'mom', 'Mom', 'hash')`,
+    [userA, userB],
   );
   await context.pool.query(
     `insert into family_memberships (id, family_id, user_id, relationship, permission_level)
-     values ($1, $2, $3, 'dad', 'family_admin')`,
-    [membershipA, familyA, userA],
+     values ($1, $2, $3, 'dad', 'family_admin'), ($4, $2, $5, 'mom', 'family_admin')`,
+    [membershipA, familyA, userA, membershipB, userB],
   );
-  return { familyA, familyB, babyA, babyB, userA, membershipA };
+  return { familyA, babyA, missingBaby, userA, membershipA, userB, membershipB };
 }
 
 describeDatabase('M3 care workspace migrations', () => {
@@ -61,7 +63,7 @@ describeDatabase('M3 care workspace migrations', () => {
     expect(tables.has('care_handoff_reminder_rules')).toBe(true);
   });
 
-  it('rejects cross-family baby and membership identities for checkpoints', async () => {
+  it('rejects mismatched family/baby and membership/user identities for checkpoints', async () => {
     database = await migratedDatabase();
     const ids = await seedOwnership(database);
 
@@ -69,15 +71,15 @@ describeDatabase('M3 care workspace migrations', () => {
       `insert into care_handoff_checkpoints
         (family_id, baby_id, actor_user_id, actor_membership_id, source, occurred_at, client_request_id, trace_id)
        values ($1, $2, $3, $4, 'manual', now(), '70000000-0000-4000-8000-000000000007', 'trace')`,
-      [ids.familyB, ids.babyA, ids.userA, ids.membershipA],
-    )).rejects.toMatchObject({ code: '23503' });
+      [ids.familyA, ids.missingBaby, ids.userA, ids.membershipA],
+    )).rejects.toMatchObject({ code: '23503', constraint: 'care_handoff_checkpoints_family_baby_fk' });
 
     await expect(database.pool.query(
       `insert into care_handoff_checkpoints
         (family_id, baby_id, actor_user_id, actor_membership_id, source, occurred_at, client_request_id, trace_id)
        values ($1, $2, $3, $4, 'manual', now(), '80000000-0000-4000-8000-000000000008', 'trace')`,
-      [ids.familyB, ids.babyB, ids.userA, ids.membershipA],
-    )).rejects.toMatchObject({ code: '23503' });
+      [ids.familyA, ids.babyA, ids.userA, ids.membershipB],
+    )).rejects.toMatchObject({ code: '23503', constraint: 'care_handoff_checkpoints_actor_membership_fk' });
   });
 
   it('enforces checkpoint idempotency and reminder bounds while preserving a valid local time', async () => {
