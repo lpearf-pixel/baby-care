@@ -57,6 +57,7 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
   if (dependencies.database && dependencies.appOrigin) {
     const authService = createAuthService(dependencies.database, now);
     const careAuth = createCareAuth({ authService, appOrigin: dependencies.appOrigin });
+    const queryService = createQueryService(dependencies.database);
     registerAuthRoutes(app, {
       authService,
       appOrigin: dependencies.appOrigin,
@@ -89,7 +90,7 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
     });
     registerCareQueryRoutes(app, {
       careAuth,
-      queryService: createQueryService(dependencies.database),
+      queryService,
     });
     registerCareRevisionRoutes(app, {
       careAuth,

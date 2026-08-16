@@ -1,6 +1,8 @@
+import type pg from 'pg';
 import type {
   CareHomeSummaryDto,
   CareSource,
+  CareTimelineQuery,
   CareTimelineItemDto,
   CareTimelineResponse,
 } from '@baby-care/contracts';
@@ -9,7 +11,8 @@ import { isCareEventBackfilled } from '@baby-care/domain';
 import type { DatabaseContext } from '../db.js';
 import type { CareActorContext } from './care-auth.js';
 import type { CareEventRow } from './care-event-repository.js';
-import { loadCareSnapshot } from './revision-snapshot.js';
+import { loadCareTimelinePayloads } from './care-read-model.js';
+import { decodeTimelineCursor, encodeTimelineCursor } from './timeline-cursor.js';
 
 interface EventTimeRow {
   id: string;
@@ -63,24 +66,11 @@ function eventFromTimelineRow(row: TimelineEventRow): CareEventRow {
   };
 }
 
-async function toTimelineItem(client: import('pg').PoolClient, row: TimelineEventRow): Promise<CareTimelineItemDto> {
+function toTimelineItem(
+  row: TimelineEventRow,
+  payload: CareTimelineItemDto['payload'],
+): CareTimelineItemDto {
   const event = eventFromTimelineRow(row);
-  const snapshot = await loadCareSnapshot(client, event);
-  const payload = event.eventType === 'feeding'
-    ? { components: snapshot.components, relatedActions: snapshot.relatedActions }
-    : event.eventType === 'diaper'
-      ? {
-          kind: snapshot.kind,
-          stoolColor: snapshot.stoolColor ?? null,
-          stoolConsistency: snapshot.stoolConsistency ?? null,
-          stoolAmount: snapshot.stoolAmount ?? null,
-        }
-      : event.eventType === 'sleep'
-        ? { startedAt: snapshot.startedAt, endedAt: snapshot.endedAt }
-        : event.eventType === 'temperature' || event.eventType === 'weight'
-          ? { measurement: snapshot.measurement }
-          : { action: snapshot.action };
-
   return CareTimelineItemDtoSchema.parse({
     id: event.id,
     eventType: event.eventType,
@@ -96,6 +86,44 @@ async function toTimelineItem(client: import('pg').PoolClient, row: TimelineEven
     isBackfilled: isCareEventBackfilled(event.occurredAt, event.createdAt),
     payload,
   });
+}
+
+const TIMELINE_ENVELOPE_SELECT = `select ce.id, ce.family_id, ce.baby_id, ce.actor_user_id, ce.actor_membership_id,
+       ce.source, ce.event_type, ce.occurred_at, ce.created_at, ce.updated_at,
+       ce.status, ce.version, ce.client_request_id, ce.note, ce.trace_id,
+       u.display_name as actor_display_name
+  from care_events ce
+  left join users u on u.id = ce.actor_user_id`;
+
+function timelineItems(
+  rows: readonly TimelineEventRow[],
+  payloads: ReadonlyMap<string, CareTimelineItemDto['payload']>,
+): CareTimelineItemDto[] {
+  return rows.map((row) => {
+    const payload = payloads.get(row.id);
+    if (!payload) throw new Error(`Care payload missing for event ${row.id}.`);
+    return toTimelineItem(row, payload);
+  });
+}
+
+async function inReadSnapshot<T>(
+  database: DatabaseContext,
+  operation: (client: pg.PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await database.pool.connect();
+  try {
+    await client.query('begin isolation level repeatable read read only');
+    try {
+      const result = await operation(client);
+      await client.query('commit');
+      return result;
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    }
+  } finally {
+    client.release();
+  }
 }
 
 export function createQueryService(database: DatabaseContext) {
@@ -211,28 +239,82 @@ export function createQueryService(database: DatabaseContext) {
       };
     },
 
-    async timeline(actor: CareActorContext, before: Date, limit: number): Promise<CareTimelineResponse> {
-      const client = await database.pool.connect();
-      try {
-        const result = await client.query<TimelineEventRow>(
-          `select ce.id, ce.family_id, ce.baby_id, ce.actor_user_id, ce.actor_membership_id,
-                  ce.source, ce.event_type, ce.occurred_at, ce.created_at, ce.updated_at,
-                  ce.status, ce.version, ce.client_request_id, ce.note, ce.trace_id,
-                  u.display_name as actor_display_name
-           from care_events ce
-           left join users u on u.id = ce.actor_user_id
-          where ce.family_id = $1 and ce.baby_id = $2 and ce.status = 'active'
-            and ce.occurred_at <= $3
-          order by ce.occurred_at desc, ce.created_at desc, ce.id desc
-          limit $4`,
-          [actor.familyId, actor.babyId, before, limit],
-        );
-        const items: CareTimelineItemDto[] = [];
-        for (const row of result.rows) items.push(await toTimelineItem(client, row));
-        return { items, nextCursor: null };
-      } finally {
-        client.release();
+    async timeline(actor: CareActorContext, query: CareTimelineQuery): Promise<CareTimelineResponse> {
+      const values: unknown[] = [actor.familyId, actor.babyId];
+      const clauses = [
+        'ce.family_id = $1',
+        'ce.baby_id = $2',
+        "ce.status = 'active'",
+      ];
+      const addValue = (value: unknown): number => values.push(value);
+
+      if (query.before) {
+        const index = addValue(new Date(query.before));
+        clauses.push(`ce.occurred_at <= $${index}`);
       }
+      if (query.cursor) {
+        const cursor = decodeTimelineCursor(query.cursor);
+        const occurredIndex = addValue(new Date(cursor.occurredAt));
+        const createdIndex = addValue(new Date(cursor.createdAt));
+        const idIndex = addValue(cursor.id);
+        clauses.push(`(ce.occurred_at, ce.created_at, ce.id) < ($${occurredIndex}, $${createdIndex}, $${idIndex})`);
+      }
+      if (query.from) {
+        const index = addValue(new Date(query.from));
+        clauses.push(`ce.occurred_at >= $${index}`);
+      }
+      if (query.to) {
+        const index = addValue(new Date(query.to));
+        clauses.push(`ce.occurred_at <= $${index}`);
+      }
+      if (query.category === 'other') {
+        clauses.push("ce.event_type not in ('feeding', 'diaper', 'sleep')");
+      } else if (query.category !== 'all') {
+        const index = addValue(query.category);
+        clauses.push(`ce.event_type = $${index}`);
+      }
+      const limitIndex = addValue(query.limit + 1);
+      return inReadSnapshot(database, async (client) => {
+        const result = await client.query<TimelineEventRow>(
+          `${TIMELINE_ENVELOPE_SELECT}
+           where ${clauses.join('\n             and ')}
+           order by ce.occurred_at desc, ce.created_at desc, ce.id desc
+           limit $${limitIndex}`,
+          values,
+        );
+        const hasMore = result.rows.length > query.limit;
+        const selected = result.rows.slice(0, query.limit);
+        const events = selected.map(eventFromTimelineRow);
+        const payloads = await loadCareTimelinePayloads(client, events);
+        const items = timelineItems(selected, payloads);
+        const last = hasMore ? selected.at(-1) : undefined;
+        return {
+          items,
+          nextCursor: last
+            ? encodeTimelineCursor({
+                occurredAt: last.occurred_at.toISOString(),
+                createdAt: last.created_at.toISOString(),
+                id: last.id,
+              })
+            : null,
+        };
+      });
+    },
+
+    async detail(actor: CareActorContext, eventId: string): Promise<CareTimelineItemDto | null> {
+      return inReadSnapshot(database, async (client) => {
+        const result = await client.query<TimelineEventRow>(
+          `${TIMELINE_ENVELOPE_SELECT}
+           where ce.id = $1 and ce.family_id = $2 and ce.baby_id = $3
+           limit 1`,
+          [eventId, actor.familyId, actor.babyId],
+        );
+        const row = result.rows[0];
+        if (!row) return null;
+        const event = eventFromTimelineRow(row);
+        const payloads = await loadCareTimelinePayloads(client, [event]);
+        return timelineItems([row], payloads)[0]!;
+      });
     },
   };
 }
