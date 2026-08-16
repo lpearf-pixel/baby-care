@@ -465,6 +465,19 @@ describeDatabase('M3 explicit care handoff', () => {
         rules: [{ localTime: '16:00', weekdays: [4], enabled: true }],
         shouldPrompt: true,
       });
+      await context.database.pool.query(
+        `update families set timezone = 'Not/A_Real_Zone' where status = 'active'`,
+      );
+      const legacyTimezoneRead = await context.app.inject({
+        method: 'GET',
+        url: '/api/care/handoff-reminders',
+        headers: { cookie: context.cookie },
+      });
+      expect(legacyTimezoneRead.statusCode).toBe(200);
+      expect(legacyTimezoneRead.json()).toEqual({
+        rules: [{ localTime: '16:00', weekdays: [4], enabled: true }],
+        shouldPrompt: false,
+      });
       expect(await countCheckpoints(context)).toBe(checkpointsBeforeReminderRead);
 
       const nannyRead = await context.app.inject({

@@ -371,6 +371,30 @@ describe('M3 complete care history correction', () => {
     expect(await screen.findByText('版本 4')).toBeInTheDocument();
   }, 10_000);
 
+  it('refreshes conflict detail even when revision history fails and lets history retry', async () => {
+    const latest = { ...details[0]!, version: 3 };
+    const getCareEventDetail = vi.fn()
+      .mockResolvedValueOnce(details[0])
+      .mockResolvedValue(latest);
+    const getCareEventRevisions = vi.fn()
+      .mockResolvedValueOnce([])
+      .mockRejectedValueOnce(new Error('revision read failed'))
+      .mockResolvedValueOnce([]);
+    const editCareEvent = vi.fn()
+      .mockRejectedValueOnce(new BabyCareApiError('care_state_conflict', 'stale version'));
+    await openOnlyDetail(details[0]!, { getCareEventDetail, getCareEventRevisions, editCareEvent });
+    fireEvent.click(screen.getByRole('button', { name: '修改此记录' }));
+    fireEvent.change(screen.getByLabelText('实际喝了（ml）'), { target: { value: '88' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
+
+    expect(await screen.findByText('最新版本 3，当前草稿基于版本 2')).toBeInTheDocument();
+    expect(screen.getByLabelText('实际喝了（ml）')).toHaveValue(88);
+    expect(screen.getByText('修订历史暂时无法加载')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重试修订历史' }));
+    await waitFor(() => expect(getCareEventRevisions).toHaveBeenCalledTimes(3));
+    expect(screen.getByText('暂无修订')).toBeInTheDocument();
+  });
+
   it('resets the editor when selecting a different timeline event', async () => {
     const first = details[0]!;
     const second = details[1]!;
@@ -492,10 +516,10 @@ describe('M3 complete care history correction', () => {
       getCareEventRevisions: vi.fn(async () => revisions),
     });
     const history = within(detail).getByRole('region', { name: '修订历史' });
-    expect(within(history).getByText('Nanny · 修改 · 版本 1 → 2 · 2026-08-13 06:10')).toBeInTheDocument();
-    expect(within(history).getByText('修改前：配方奶实际喝了 60ml（奶瓶容量 150ml，不计入摄入量） · 拍嗝 · 时间 2026-08-13 06:00 · 备注 before note')).toBeInTheDocument();
-    expect(within(history).getByText('修改后：配方奶实际喝了 70ml（奶瓶容量 150ml，不计入摄入量） · 少量吐奶 · 时间 2026-08-13 06:05 · 备注 after note')).toBeInTheDocument();
-    expect(within(history).getByText('Dad · 撤销 · 版本 2 → 3 · 2026-08-13 06:20')).toBeInTheDocument();
+    expect(within(history).getByText('Nanny · 修改 · 版本 1 → 2 · 2026-08-13 14:10')).toBeInTheDocument();
+    expect(within(history).getByText('修改前：配方奶实际喝了 60ml（奶瓶容量 150ml，不计入摄入量） · 拍嗝 · 时间 2026-08-13 14:00 · 备注 before note')).toBeInTheDocument();
+    expect(within(history).getByText('修改后：配方奶实际喝了 70ml（奶瓶容量 150ml，不计入摄入量） · 少量吐奶 · 时间 2026-08-13 14:05 · 备注 after note')).toBeInTheDocument();
+    expect(within(history).getByText('Dad · 撤销 · 版本 2 → 3 · 2026-08-13 14:20')).toBeInTheDocument();
     expect(within(history).getByText('修改前：有效记录')).toBeInTheDocument();
     expect(within(history).getByText('修改后：已撤销')).toBeInTheDocument();
     for (const rawJsonToken of ['{', '}', '[', ']', '"']) {

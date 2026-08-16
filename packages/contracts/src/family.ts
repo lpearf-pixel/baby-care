@@ -1,10 +1,23 @@
 import { z } from 'zod';
 
+export function isValidIanaTimeZone(value: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const IanaTimeZoneSchema = z.string().trim().min(1).max(80).refine(isValidIanaTimeZone, {
+  message: 'Timezone must be a valid IANA time zone.',
+});
+
 export const FamilyDtoSchema = z
   .object({
     id: z.string().uuid(),
     name: z.string(),
-    timezone: z.string(),
+    timezone: IanaTimeZoneSchema,
     status: z.literal('active'),
   })
   .strict();
@@ -31,7 +44,7 @@ export const MemberDtoSchema = z
 export const UpdateFamilyInputSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
-    timezone: z.string().trim().min(1).max(80).optional(),
+    timezone: IanaTimeZoneSchema.optional(),
   })
   .strict()
   .refine((value) => value.name !== undefined || value.timezone !== undefined, {

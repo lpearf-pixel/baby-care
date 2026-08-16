@@ -6,7 +6,7 @@ function amountLabel(value: 'small' | 'medium' | 'large'): string {
   return value === 'small' ? '少量' : value === 'medium' ? '中量' : '大量';
 }
 
-function editSnapshotLabel(snapshot: EditCareEventInput): string {
+function editSnapshotLabel(snapshot: EditCareEventInput, familyTimeZone: string): string {
   let facts: string[];
   switch (snapshot.eventType) {
     case 'feeding': {
@@ -22,7 +22,7 @@ function editSnapshotLabel(snapshot: EditCareEventInput): string {
       facts = [`尿布${snapshot.kind === 'urine' ? '尿' : snapshot.kind === 'stool' ? '便' : '尿+便'}${snapshot.stoolColor ? ` · ${snapshot.stoolColor}` : ''}${snapshot.stoolConsistency ? ` · ${snapshot.stoolConsistency}` : ''}${snapshot.stoolAmount ? ` · ${snapshot.stoolAmount}` : ''}`];
       break;
     case 'sleep':
-      return [`睡眠 ${formatDateTime(snapshot.startedAt)}${snapshot.endedAt ? ` → ${formatDateTime(snapshot.endedAt)}` : ' → 进行中'}`, ...(snapshot.note ? [`备注 ${snapshot.note}`] : [])].join(' · ');
+      return [`睡眠 ${formatDateTime(snapshot.startedAt, familyTimeZone)}${snapshot.endedAt ? ` → ${formatDateTime(snapshot.endedAt, familyTimeZone)}` : ' → 进行中'}`, ...(snapshot.note ? [`备注 ${snapshot.note}`] : [])].join(' · ');
     case 'burping':
       facts = ['拍嗝'];
       break;
@@ -49,27 +49,42 @@ function editSnapshotLabel(snapshot: EditCareEventInput): string {
       facts = [snapshot.measurement.kind === 'weight' ? `体重 ${snapshot.measurement.valueKg}kg` : '体重'];
       break;
   }
-  return [...facts, `时间 ${formatDateTime(snapshot.occurredAt)}`, ...(snapshot.note ? [`备注 ${snapshot.note}`] : [])].join(' · ');
+  return [...facts, `时间 ${formatDateTime(snapshot.occurredAt, familyTimeZone)}`, ...(snapshot.note ? [`备注 ${snapshot.note}`] : [])].join(' · ');
 }
 
-function snapshotLabel(snapshot: CareRevisionHistoryItemDto['before'] | CareRevisionHistoryItemDto['after']): string {
+function snapshotLabel(snapshot: CareRevisionHistoryItemDto['before'] | CareRevisionHistoryItemDto['after'], familyTimeZone: string): string {
   if ('status' in snapshot) return snapshot.status === 'active' ? '有效记录' : '已撤销';
-  return editSnapshotLabel(snapshot);
+  return editSnapshotLabel(snapshot, familyTimeZone);
 }
 
-export function CareRevisionHistory({ revisions }: { revisions: CareRevisionHistoryItemDto[] }) {
+export function CareRevisionHistory({
+  revisions,
+  error = false,
+  onRetry,
+  familyTimeZone = 'UTC',
+}: {
+  revisions: CareRevisionHistoryItemDto[];
+  error?: boolean;
+  onRetry?: () => void;
+  familyTimeZone?: string;
+}) {
   return (
     <section className="care-revision-history" aria-label="修订历史">
       <h3>修订历史</h3>
-      {!revisions.length ? <p className="muted">暂无修订</p> : (
+      {error ? (
+        <div>
+          <p className="muted">修订历史暂时无法加载</p>
+          <button type="button" className="text-button" onClick={onRetry}>重试修订历史</button>
+        </div>
+      ) : !revisions.length ? <p className="muted">暂无修订</p> : (
         <ol className="care-revision-list">
           {revisions.map((revision) => (
             <li key={revision.id}>
               <strong>
-                {revision.actorDisplayName} · {revision.action === 'edit' ? '修改' : '撤销'} · 版本 {revision.fromVersion} → {revision.toVersion} · {formatDateTime(revision.createdAt)}
+                {revision.actorDisplayName} · {revision.action === 'edit' ? '修改' : '撤销'} · 版本 {revision.fromVersion} → {revision.toVersion} · {formatDateTime(revision.createdAt, familyTimeZone)}
               </strong>
-              <p>修改前：{snapshotLabel(revision.before)}</p>
-              <p>修改后：{snapshotLabel(revision.after)}</p>
+              <p>修改前：{snapshotLabel(revision.before, familyTimeZone)}</p>
+              <p>修改后：{snapshotLabel(revision.after, familyTimeZone)}</p>
             </li>
           ))}
         </ol>

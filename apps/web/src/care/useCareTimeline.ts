@@ -68,6 +68,11 @@ export function useCareTimeline(api: BabyCareApi) {
     setWindowState({ from, to });
   }, []);
 
+  const clearFilters = useCallback(() => {
+    setCategoryState('all');
+    setWindowState(null);
+  }, []);
+
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore || !canReadTimeline(api)) return;
     setLoadingMore(true);
@@ -93,6 +98,7 @@ export function useCareTimeline(api: BabyCareApi) {
     window,
     setCategory,
     setWindow,
+    clearFilters,
     loadMore,
     reload: useCallback(async () => {
       if (!canReadTimeline(api)) {

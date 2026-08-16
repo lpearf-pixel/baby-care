@@ -1,5 +1,5 @@
 import type { CareTimelineCategory, CareTimelineItemDto } from '@baby-care/contracts';
-import { CareTimelineCard, localDateKey } from './CareTimelineCard.js';
+import { CareTimelineCard, formatDateTime, localDateKey } from './CareTimelineCard.js';
 
 const categories: Array<{ value: CareTimelineCategory; label: string }> = [
   { value: 'all', label: '全部记录' },
@@ -21,6 +21,8 @@ export function CareTimeline({
   onReload,
   onOpenDetail,
   familyTimeZone,
+  window,
+  onShowAll,
 }: {
   items: CareTimelineItemDto[];
   category: CareTimelineCategory;
@@ -33,6 +35,8 @@ export function CareTimeline({
   onReload: () => Promise<void>;
   onOpenDetail: (eventId: string) => void;
   familyTimeZone: string;
+  window: { from: string; to: string } | null;
+  onShowAll: () => void;
 }) {
   const groups = items.reduce<Array<{ localDate: string; items: CareTimelineItemDto[] }>>((current, item) => {
     const localDate = localDateKey(item.occurredAt, familyTimeZone);
@@ -43,7 +47,7 @@ export function CareTimeline({
   }, []);
 
   return (
-    <section className="panel care-timeline" aria-label="护理时间线">
+    <section id="care-timeline" className="panel care-timeline" aria-label="护理时间线" tabIndex={-1}>
       <div className="care-panel-header">
         <h2>护理时间线</h2>
         <button type="button" className="text-button" onClick={() => void onReload()}>重试护理时间线</button>
@@ -55,12 +59,19 @@ export function CareTimeline({
             key={option.value}
             type="button"
             className={category === option.value ? 'primary' : 'secondary'}
-            onClick={() => onCategoryChange(option.value)}
+            onClick={() => option.value === 'all' ? onShowAll() : onCategoryChange(option.value)}
           >
             {option.label}
           </button>
         ))}
       </div>
+
+      {window ? (
+        <div className="care-timeline-window" role="status">
+          <p>当前固定窗口 {`${formatDateTime(window.from, familyTimeZone)} → ${formatDateTime(window.to, familyTimeZone)}`}</p>
+          <button type="button" className="text-button" onClick={onShowAll}>退出固定窗口，查看全部记录</button>
+        </div>
+      ) : <p className="muted">当前显示全部护理记录</p>}
 
       <p className="inline-message care-message" role="status" aria-live="polite">
         {message ?? (loading ? '正在加载护理时间线…' : '护理时间线已更新')}

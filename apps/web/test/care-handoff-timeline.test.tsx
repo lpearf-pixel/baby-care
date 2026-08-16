@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.js';
 import { BabyCareApiError } from '../src/api-client.js';
+import { formatDateTime, localDateKey } from '../src/care/CareTimelineCard.js';
 
 const session = {
   userId: '11111111-1111-4111-8111-111111111111',
@@ -255,6 +256,11 @@ afterEach(() => {
 });
 
 describe('M3 handoff briefing and typed timeline', () => {
+  it('falls back to UTC when a legacy family row contains an invalid timezone', () => {
+    expect(formatDateTime('2026-08-13T07:58:00.000Z', 'Not/A_Real_Zone')).toBe('2026-08-13 07:58');
+    expect(localDateKey('2026-08-13T23:58:00.000Z', 'Not/A_Real_Zone')).toBe('2026-08-13');
+  });
+
   it('renders the recent-24h briefing, separated feeding facts, typed timeline, and cursor continuation accessibly', async () => {
     const getCareTimeline = vi.fn()
       .mockResolvedValueOnce({ items: timelinePageOne, nextCursor: 'cursor-page-2' })
@@ -476,6 +482,19 @@ describe('M3 handoff briefing and typed timeline', () => {
       to: briefing.window.to,
       limit: 20,
     }));
+    const timeline = screen.getByRole('region', { name: '护理时间线' });
+    expect(timeline).toHaveFocus();
+    expect(within(timeline).getByText(
+      `当前固定窗口 ${formatDateTime(briefing.window.from, 'Asia/Shanghai')} → ${formatDateTime(briefing.window.to, 'Asia/Shanghai')}`,
+    )).toBeInTheDocument();
+
+    fireEvent.click(within(timeline).getByRole('button', { name: '退出固定窗口，查看全部记录' }));
+    await waitFor(() => expect(getCareTimeline).toHaveBeenLastCalledWith({
+      category: 'all',
+      limit: 20,
+    }));
+    expect(within(timeline).getByText('当前显示全部护理记录')).toBeInTheDocument();
+    expect(within(timeline).queryByRole('button', { name: '退出固定窗口，查看全部记录' })).not.toBeInTheDocument();
 
     fireEvent.click(within(handoff).getByRole('button', { name: '查看喂药 · Vitamin D 0.5mL' }));
     await waitFor(() => expect(getCareTimeline).toHaveBeenLastCalledWith({

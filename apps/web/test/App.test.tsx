@@ -103,6 +103,19 @@ describe('Baby Care family workspace', () => {
     expect(screen.getByRole('button', { name: '保存宝宝资料' })).toBeInTheDocument();
   });
 
+  it('rejects an invalid IANA timezone before saving family settings', async () => {
+    const api = fakeApi();
+    renderWithApi(api);
+
+    const timezone = await screen.findByLabelText('时区');
+    fireEvent.change(timezone, { target: { value: 'Not/A_Real_Zone' } });
+
+    expect(screen.getByText('请输入有效的 IANA 时区（例如 Asia/Shanghai）')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '保存家庭资料' })).toBeDisabled();
+    fireEvent.submit(timezone.closest('form')!);
+    expect(api.updateFamily).not.toHaveBeenCalled();
+  });
+
   it('shows Nanny the shared care workspace and a read-only family view without admin actions', async () => {
     const api = fakeApi({ getSession: vi.fn(async () => nannySession) });
     renderWithApi(api);

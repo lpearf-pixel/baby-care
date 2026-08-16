@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import type { BabyDto, FamilyDto, MemberDto } from '@baby-care/contracts';
+import { isValidIanaTimeZone, type BabyDto, type FamilyDto, type MemberDto } from '@baby-care/contracts';
 
 export function AdminFamilyPanel({
   family,
@@ -47,9 +47,11 @@ export function AdminFamilyPanel({
     () => members.find((member) => member.relationship === 'nanny'),
     [members],
   );
+  const timezoneValid = isValidIanaTimeZone(timezone.trim());
 
   async function saveFamily(event: FormEvent) {
     event.preventDefault();
+    if (!timezoneValid) return;
     await onUpdateFamily({ name: familyName, timezone });
   }
 
@@ -81,9 +83,10 @@ export function AdminFamilyPanel({
         </label>
         <label className="full-width">
           时区
-          <input value={timezone} onChange={(event) => setTimezone(event.target.value)} />
+          <input value={timezone} onChange={(event) => setTimezone(event.target.value)} aria-invalid={!timezoneValid} />
         </label>
-        <button className="secondary full-width" type="submit" disabled={busy}>保存家庭资料</button>
+        {!timezoneValid ? <p className="form-error full-width">请输入有效的 IANA 时区（例如 Asia/Shanghai）</p> : null}
+        <button className="secondary full-width" type="submit" disabled={busy || !timezoneValid}>保存家庭资料</button>
       </form>
 
       <form className="panel form-grid" onSubmit={(event) => void saveBaby(event)}>

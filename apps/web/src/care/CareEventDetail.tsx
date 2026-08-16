@@ -106,6 +106,7 @@ export function CareEventDetail({
 }) {
   const [detail, setDetail] = useState<CareTimelineItemDto | null>(null);
   const [revisions, setRevisions] = useState<CareRevisionHistoryItemDto[]>([]);
+  const [revisionError, setRevisionError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -113,14 +114,24 @@ export function CareEventDetail({
   const [confirmingUndo, setConfirmingUndo] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const reload = useCallback(async () => {
-    const [nextDetail, nextRevisions] = await Promise.all([
-      api.getCareEventDetail(eventId),
-      api.getCareEventRevisions(eventId),
-    ]);
-    setDetail(nextDetail);
-    setRevisions(nextRevisions);
+  const reloadRevisions = useCallback(async () => {
+    try {
+      const nextRevisions = await api.getCareEventRevisions(eventId);
+      setRevisions(nextRevisions);
+      setRevisionError(false);
+    } catch (error) {
+      setRevisionError(true);
+      throw error;
+    }
   }, [api, eventId]);
+
+  const reload = useCallback(async () => {
+    const [detailResult] = await Promise.allSettled([
+      api.getCareEventDetail(eventId).then(setDetail),
+      reloadRevisions(),
+    ]);
+    if (detailResult.status === 'rejected') throw detailResult.reason;
+  }, [api, eventId, reloadRevisions]);
 
   useEffect(() => {
     let active = true;
@@ -244,7 +255,12 @@ export function CareEventDetail({
               }}>确认以最新版本为基础</button>
             </div>
           ) : null}
-          <CareRevisionHistory revisions={revisions} />
+          <CareRevisionHistory
+            revisions={revisions}
+            error={revisionError}
+            familyTimeZone={familyTimeZone}
+            onRetry={() => void reloadRevisions().catch(() => undefined)}
+          />
         </>
       ) : null}
 

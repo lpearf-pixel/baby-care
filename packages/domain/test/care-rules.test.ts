@@ -139,5 +139,12 @@ describe('M3 care workspace rules', () => {
       familyTimeZone: 'Asia/Shanghai',
       now: new Date('2026-08-17T00:30:00Z'),
     })).toBe(false);
+    expect(isVisible({
+      localTime: '08:30',
+      weekdayMask: 1,
+      enabled: true,
+      familyTimeZone: 'Not/A_Real_Zone',
+      now: new Date('2026-08-17T08:30:00Z'),
+    })).toBe(true);
   });
 });

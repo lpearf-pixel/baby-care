@@ -143,6 +143,8 @@ export function CareWorkspace({ api, familyTimeZone = 'UTC' }: { api: BabyCareAp
     category,
     setCategory,
     setWindow,
+    window: timelineWindow,
+    clearFilters: clearTimelineFilters,
     loadMore,
     reload: reloadTimeline,
   } = useCareTimeline(api);
@@ -258,6 +260,9 @@ export function CareWorkspace({ api, familyTimeZone = 'UTC' }: { api: BabyCareAp
         onJumpToWindow={(from, to, nextCategory) => {
           setCategory(nextCategory);
           setWindow(from, to);
+          const timeline = document.getElementById('care-timeline');
+          timeline?.focus({ preventScroll: true });
+          timeline?.scrollIntoView?.({ block: 'start' });
         }}
       />
 
@@ -374,6 +379,8 @@ export function CareWorkspace({ api, familyTimeZone = 'UTC' }: { api: BabyCareAp
         onReload={reloadTimeline}
         onOpenDetail={setDetailEventId}
         familyTimeZone={familyTimeZone}
+        window={timelineWindow}
+        onShowAll={clearTimelineFilters}
       />
       {detailEventId ? (
         <CareEventDetail

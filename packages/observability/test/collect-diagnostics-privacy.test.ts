@@ -122,4 +122,40 @@ describe('compact diagnostic privacy', () => {
     expect(summary.evidence).toContain('care_state_conflict');
     expect(summary.evidence).toContain('[REDACTED]');
   });
+
+  it('drops unkeyed assertion bodies while retaining only allowlisted diagnostic metadata', async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), 'baby-care-diag-diff-'));
+    const evidenceFile = resolve(cwd, 'integration.log');
+    await writeFile(
+      evidenceFile,
+      [
+        'FAIL care-event.test.ts > edit conflict',
+        '- Expected',
+        '- "private care note body"',
+        '+ Received',
+        '+ "another private body"',
+        'event_id=11111111-1111-4111-8111-111111111111 event_type=feeding status=failed',
+        'trace_id=trace-safe-123 duration_ms=47 code=care_state_conflict',
+        'constraint care_event_owner_membership_fk failed',
+      ].join('\n'),
+      'utf8',
+    );
+
+    await runCollector(cwd, evidenceFile);
+    const summary = JSON.parse(
+      await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8'),
+    ) as { evidence: string };
+
+    expect(summary.evidence).not.toContain('private care note body');
+    expect(summary.evidence).not.toContain('another private body');
+    expect(summary.evidence).not.toContain('- Expected');
+    expect(summary.evidence).not.toContain('+ Received');
+    expect(summary.evidence).toContain('event_id=11111111-1111-4111-8111-111111111111');
+    expect(summary.evidence).toContain('event_type=feeding');
+    expect(summary.evidence).toContain('status=failed');
+    expect(summary.evidence).toContain('trace_id=trace-safe-123');
+    expect(summary.evidence).toContain('duration_ms=47');
+    expect(summary.evidence).toContain('code=care_state_conflict');
+    expect(summary.evidence).toContain('constraint=care_event_owner_membership_fk');
+  });
 });

@@ -31,13 +31,25 @@ export function isHandoffReminderVisible(input: {
 }): boolean {
   if (!input.enabled) return false;
 
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: input.familyTimeZone,
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-    weekday: 'short',
-  }).formatToParts(input.now);
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: input.familyTimeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      weekday: 'short',
+    });
+  } catch {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'UTC',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      weekday: 'short',
+    });
+  }
+  const parts = formatter.formatToParts(input.now);
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   const weekday = weekdayByName[values.weekday ?? ''];
 

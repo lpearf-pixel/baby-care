@@ -102,6 +102,12 @@ describeDatabase('M1 family authorization API', () => {
     });
     expect(nannyCreateMember.statusCode).toBe(403);
 
+    const invalidTimezone = await app.inject({
+      method: 'PATCH', url: '/api/family', headers: { origin: APP_ORIGIN, cookie: dadCookie }, payload: { timezone: 'Not/A_Real_Zone' },
+    });
+    expect(invalidTimezone.statusCode).toBe(400);
+    expect(invalidTimezone.json()).toMatchObject({ code: 'validation_failed' });
+
     const dadFamilyPatch = await app.inject({
       method: 'PATCH', url: '/api/family', headers: { origin: APP_ORIGIN, cookie: dadCookie }, payload: { name: 'Xiangxiang Home', timezone: 'Asia/Shanghai' },
     });
