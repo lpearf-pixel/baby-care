@@ -3,6 +3,8 @@ import pg from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import { CareTimelineItemDtoSchema, CareTimelineResponseSchema } from '@baby-care/contracts';
 import type { CareActorContext } from '../src/care/care-auth.js';
+import type { CareEventRow } from '../src/care/care-event-repository.js';
+import { loadCareTimelinePayloads } from '../src/care/care-read-model.js';
 import { createQueryService } from '../src/care/query-service.js';
 import { decodeTimelineCursor, encodeTimelineCursor } from '../src/care/timeline-cursor.js';
 import { createM2TestApp, M2_TEST_ORIGIN } from './helpers/m2-family-app.js';
@@ -256,6 +258,42 @@ describeDatabase('M3 care workspace timeline and detail', () => {
     }
   });
 
+  it('fails if sub-millisecond database timestamps create a cursor pagination gap', async () => {
+    const context = await createM2TestApp(testDatabaseUrl!);
+    try {
+      const ids = await createTimelineFixture(context);
+      const expectedOrder = Object.values(ids).sort((left, right) => (left < right ? 1 : left > right ? -1 : 0));
+      await context.database.pool.query(
+        `update care_events
+            set created_at = case id
+              when $1 then '2026-08-13T07:55:00.123456Z'::timestamptz
+              when $2 then '2026-08-13T07:55:00.123400Z'::timestamptz
+              when $3 then '2026-08-13T07:55:00.122900Z'::timestamptz
+            end
+          where id = any($4::uuid[])`,
+        [expectedOrder[0], expectedOrder[1], expectedOrder[2], expectedOrder],
+      );
+      const firstResponse = await context.app.inject({
+        method: 'GET',
+        url: '/api/care/timeline?limit=1',
+        headers: { cookie: context.cookie },
+      });
+      const firstPage = CareTimelineResponseSchema.parse(firstResponse.json());
+      expect(decodeTimelineCursor(firstPage.nextCursor!).createdAt).toBe('2026-08-13T07:55:00.123456Z');
+      const secondResponse = await context.app.inject({
+        method: 'GET',
+        url: `/api/care/timeline?limit=1&cursor=${encodeURIComponent(firstPage.nextCursor!)}`,
+        headers: { cookie: context.cookie },
+      });
+      const secondPage = CareTimelineResponseSchema.parse(secondResponse.json());
+
+      expect([firstPage.items[0]!.id, secondPage.items[0]!.id]).toEqual(expectedOrder.slice(0, 2));
+    } finally {
+      await context.app.close();
+      await context.database.close();
+    }
+  });
+
   it('fails if malformed or obsolete cursors do not return the same restartable validation response', async () => {
     const context = await createM2TestApp(testDatabaseUrl!);
     try {
@@ -411,6 +449,76 @@ describeDatabase('M3 care workspace timeline and detail', () => {
       query.mockRestore();
     } finally {
       vi.restoreAllMocks();
+      await context.app.close();
+      await context.database.close();
+    }
+  });
+
+  it('fails if a feeding payload includes a related action owned by another family or baby', async () => {
+    const context = await createM2TestApp(testDatabaseUrl!);
+    const client = await context.database.pool.connect();
+    let transactionOpen = false;
+    try {
+      const ids = await createTimelineFixture(context);
+      const current = await client.query<{
+        family_id: string;
+        baby_id: string;
+        actor_user_id: string;
+        actor_membership_id: string;
+        created_at: Date;
+        updated_at: Date;
+      }>(
+        `select family_id, baby_id, actor_user_id, actor_membership_id, created_at, updated_at
+           from care_events where id = $1`,
+        [ids.feeding],
+      );
+      const row = current.rows[0]!;
+      const feedingEvent: CareEventRow = {
+        id: ids.feeding,
+        familyId: row.family_id,
+        babyId: row.baby_id,
+        actorUserId: row.actor_user_id,
+        actorMembershipId: row.actor_membership_id,
+        source: 'manual',
+        eventType: 'feeding',
+        occurredAt: new Date(occurredAt),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        status: 'active',
+        version: 1,
+        clientRequestId: null,
+        note: null,
+        traceId: 'foreign-related-action-test',
+      };
+
+      await client.query('begin');
+      transactionOpen = true;
+      await client.query('drop index families_single_active_idx');
+      await client.query('drop index babies_one_per_family_idx');
+      const foreignAction = await client.query<{ id: string }>(
+        `with foreign_family as (
+           insert into families (name, timezone) values ('Foreign', 'UTC') returning id
+         ), foreign_baby as (
+           insert into babies (family_id, display_name) select id, 'other baby' from foreign_family returning id, family_id
+         )
+         insert into care_events (family_id, baby_id, source, event_type, occurred_at, trace_id)
+         select family_id, id, 'import', 'burping', $1, 'foreign-related-action-test' from foreign_baby
+         returning id`,
+        [occurredAt],
+      );
+      await client.query(
+        `insert into care_actions (event_id, action_type, feeding_session_event_id)
+         values ($1, 'burping', $2)`,
+        [foreignAction.rows[0]!.id, ids.feeding],
+      );
+
+      const payloads = await loadCareTimelinePayloads(client, [feedingEvent]);
+      expect(payloads.get(ids.feeding)).toMatchObject({ relatedActions: [] });
+      await client.query('rollback');
+      transactionOpen = false;
+    } finally {
+      if (transactionOpen) await client.query('rollback');
+      client.release();
       await context.app.close();
       await context.database.close();
     }

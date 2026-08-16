@@ -36,7 +36,9 @@ interface TimelineEventRow {
   source: CareSource;
   event_type: CareEventRow['eventType'];
   occurred_at: Date;
+  cursor_occurred_at: string;
   created_at: Date;
+  cursor_created_at: string;
   updated_at: Date;
   status: CareEventRow['status'];
   version: number;
@@ -89,7 +91,11 @@ function toTimelineItem(
 }
 
 const TIMELINE_ENVELOPE_SELECT = `select ce.id, ce.family_id, ce.baby_id, ce.actor_user_id, ce.actor_membership_id,
-       ce.source, ce.event_type, ce.occurred_at, ce.created_at, ce.updated_at,
+       ce.source, ce.event_type, ce.occurred_at,
+       to_char(ce.occurred_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_occurred_at,
+       ce.created_at,
+       to_char(ce.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as cursor_created_at,
+       ce.updated_at,
        ce.status, ce.version, ce.client_request_id, ce.note, ce.trace_id,
        u.display_name as actor_display_name
   from care_events ce
@@ -254,8 +260,8 @@ export function createQueryService(database: DatabaseContext) {
       }
       if (query.cursor) {
         const cursor = decodeTimelineCursor(query.cursor);
-        const occurredIndex = addValue(new Date(cursor.occurredAt));
-        const createdIndex = addValue(new Date(cursor.createdAt));
+        const occurredIndex = addValue(cursor.occurredAt);
+        const createdIndex = addValue(cursor.createdAt);
         const idIndex = addValue(cursor.id);
         clauses.push(`(ce.occurred_at, ce.created_at, ce.id) < ($${occurredIndex}, $${createdIndex}, $${idIndex})`);
       }
@@ -292,8 +298,8 @@ export function createQueryService(database: DatabaseContext) {
           items,
           nextCursor: last
             ? encodeTimelineCursor({
-                occurredAt: last.occurred_at.toISOString(),
-                createdAt: last.created_at.toISOString(),
+                occurredAt: last.cursor_occurred_at,
+                createdAt: last.cursor_created_at,
                 id: last.id,
               })
             : null,

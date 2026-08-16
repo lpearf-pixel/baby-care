@@ -102,7 +102,8 @@ export async function loadCareTimelinePayloads(
 ): Promise<Map<string, TimelinePayload>> {
   const payloads = new Map<string, TimelinePayload>();
 
-  const feedingIds = idsFor(events, ['feeding']);
+  const feedingEvents = events.filter((event) => event.eventType === 'feeding');
+  const feedingIds = feedingEvents.map((event) => event.id);
   if (feedingIds.length > 0) {
     const feeding = new Map<string, {
       components: Array<ReturnType<typeof feedingComponent>>;
@@ -124,11 +125,19 @@ export async function loadCareTimelinePayloads(
               null::int as amount_ml, null::int as duration_minutes, null::int as bottle_capacity_ml,
               ca.action_type::text as action_type, ca.spit_up_amount::text as spit_up_amount
          from care_actions ca
+         join unnest($1::uuid[], $2::uuid[], $3::uuid[])
+           as scoped(event_id, family_id, baby_id)
+           on scoped.event_id = ca.feeding_session_event_id
          join care_events ce on ce.id = ca.event_id
         where ca.feeding_session_event_id = any($1::uuid[]) and ce.status = 'active'
+          and ce.family_id = scoped.family_id and ce.baby_id = scoped.baby_id
           and ca.action_type in ('burping', 'spit_up')
         order by event_id, sort_at, sort_id`,
-      [feedingIds],
+      [
+        feedingIds,
+        feedingEvents.map((event) => event.familyId),
+        feedingEvents.map((event) => event.babyId),
+      ],
     );
     for (const row of result.rows) {
       const payload = feeding.get(row.event_id);
