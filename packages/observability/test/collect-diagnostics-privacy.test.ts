@@ -54,10 +54,15 @@ describe('compact diagnostic privacy', () => {
     );
 
     await runCollector(cwd, evidenceFile);
-    const summary = await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8');
+    const summary = JSON.parse(
+      await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8'),
+    ) as unknown;
 
-    for (const secret of forbidden) expect(summary).not.toContain(secret);
-    expect(summary).toContain('care_event_owner_membership_fk');
-    expect(summary).toContain('[REDACTED]');
+    expect(summary).toEqual(expect.objectContaining({ evidence: expect.any(String) }));
+    const evidence = (summary as { evidence: string }).evidence;
+
+    for (const secret of forbidden) expect(evidence).not.toContain(secret);
+    expect(evidence).toContain('care_event_owner_membership_fk');
+    expect(evidence).toContain('[REDACTED]');
   });
 });
