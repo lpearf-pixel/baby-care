@@ -483,6 +483,55 @@ describe('M3 handoff briefing and typed timeline', () => {
     }));
   });
 
+  it('ignores an old A load-more response after an A to B to A query cycle', async () => {
+    let resolveOldA!: (value: { items: typeof timelinePageTwo; nextCursor: null }) => void;
+    const oldA = new Promise<{ items: typeof timelinePageTwo; nextCursor: null }>((resolve) => {
+      resolveOldA = resolve;
+    });
+    let rejectNewA!: (reason: Error) => void;
+    const newAFailure = new Promise<never>((_resolve, reject) => {
+      rejectNewA = reject;
+    });
+    let resolveNewARetry!: (value: { items: never[]; nextCursor: null }) => void;
+    const newARetry = new Promise<{ items: never[]; nextCursor: null }>((resolve) => {
+      resolveNewARetry = resolve;
+    });
+    const getCareTimeline = vi.fn()
+      .mockResolvedValueOnce({ items: [timelinePageOne[0]!], nextCursor: 'old-a-cursor' })
+      .mockReturnValueOnce(oldA)
+      .mockResolvedValueOnce({ items: [timelinePageOne[1]!], nextCursor: null })
+      .mockResolvedValueOnce({ items: [timelinePageOne[2]!], nextCursor: 'new-a-cursor' })
+      .mockReturnValueOnce(newAFailure)
+      .mockReturnValueOnce(newARetry);
+    const api = makeApi({ getCareTimeline });
+    renderApp(api);
+
+    const timeline = await screen.findByRole('region', { name: '护理时间线' });
+    await within(timeline).findByText('配方奶 70ml · 亲喂 12min');
+    fireEvent.click(within(timeline).getByRole('button', { name: '加载更多护理记录' }));
+    await waitFor(() => expect(getCareTimeline).toHaveBeenCalledTimes(2));
+
+    fireEvent.click(within(timeline).getByRole('button', { name: '只看尿布' }));
+    expect(await within(timeline).findByText('尿布 · 尿+便')).toBeInTheDocument();
+    fireEvent.click(within(timeline).getByRole('button', { name: '全部记录' }));
+    expect(await within(timeline).findByText('睡眠 30min')).toBeInTheDocument();
+
+    fireEvent.click(within(timeline).getByRole('button', { name: '加载更多护理记录' }));
+    await act(async () => rejectNewA(new Error('new A failed')));
+    expect(await within(timeline).findByText('护理时间线加载更多失败，可重试')).toBeInTheDocument();
+
+    fireEvent.click(within(timeline).getByRole('button', { name: '加载更多护理记录' }));
+    await waitFor(() => expect(getCareTimeline).toHaveBeenCalledTimes(6));
+    expect(within(timeline).getByRole('button', { name: '加载更多护理记录' })).toBeDisabled();
+
+    await act(async () => resolveOldA({ items: timelinePageTwo, nextCursor: null }));
+    expect(within(timeline).queryByText('母乳瓶喂 50ml')).not.toBeInTheDocument();
+    expect(within(timeline).getByText('护理时间线加载更多失败，可重试')).toBeInTheDocument();
+    expect(within(timeline).getByRole('button', { name: '加载更多护理记录' })).toBeDisabled();
+
+    await act(async () => resolveNewARetry({ items: [], nextCursor: null }));
+  });
+
   it.each([
     ['rolling_24h', rollingBriefing],
     ['checkpoint', checkpointBriefing],

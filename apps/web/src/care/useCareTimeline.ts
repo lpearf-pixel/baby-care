@@ -28,42 +28,46 @@ export function useCareTimeline(api: BabyCareApi) {
     limit: 20,
     ...(window ? { from: window.from, to: window.to } : {}),
   }), [category, window]);
-  const queryIdentity = useMemo(() => JSON.stringify({ baseQuery, reloadToken }), [baseQuery, reloadToken]);
-  const queryIdentityRef = useRef(queryIdentity);
+  const queryGenerationRef = useRef(0);
   const apiRef = useRef(api);
-  queryIdentityRef.current = queryIdentity;
   apiRef.current = api;
 
   useEffect(() => {
+    const requestGeneration = ++queryGenerationRef.current;
     let active = true;
+    const isCurrentRequest = () => active
+      && queryGenerationRef.current === requestGeneration
+      && apiRef.current === api;
+    const invalidateRequest = () => {
+      active = false;
+      if (queryGenerationRef.current === requestGeneration) queryGenerationRef.current += 1;
+    };
     if (!canReadTimeline(api)) {
       setItems([]);
       setNextCursor(null);
       setMessage('护理时间线暂时无法加载');
       setLoading(false);
-      return;
+      return invalidateRequest;
     }
     setLoading(true);
     setLoadingMore(false);
     setMessage(null);
     void api.getCareTimeline(baseQuery)
       .then((response) => {
-        if (!active) return;
+        if (!isCurrentRequest()) return;
         setItems(response.items);
         setNextCursor(response.nextCursor);
       })
       .catch(() => {
-        if (!active) return;
+        if (!isCurrentRequest()) return;
         setItems([]);
         setNextCursor(null);
         setMessage('护理时间线暂时无法加载');
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (isCurrentRequest()) setLoading(false);
       });
-    return () => {
-      active = false;
-    };
+    return invalidateRequest;
   }, [api, baseQuery, reloadToken]);
 
   const setCategory = useCallback((value: CareTimelineCategory) => {
@@ -81,22 +85,23 @@ export function useCareTimeline(api: BabyCareApi) {
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore || !canReadTimeline(api)) return;
-    const requestQueryIdentity = queryIdentity;
+    const requestGeneration = queryGenerationRef.current;
     const requestApi = api;
+    const isCurrentRequest = () => queryGenerationRef.current === requestGeneration && apiRef.current === requestApi;
     setLoadingMore(true);
     try {
       const response = await api.getCareTimeline({ ...baseQuery, cursor: nextCursor });
-      if (queryIdentityRef.current !== requestQueryIdentity || apiRef.current !== requestApi) return;
+      if (!isCurrentRequest()) return;
       setItems((current) => [...current, ...response.items]);
       setNextCursor(response.nextCursor);
       setMessage(null);
     } catch {
-      if (queryIdentityRef.current !== requestQueryIdentity || apiRef.current !== requestApi) return;
+      if (!isCurrentRequest()) return;
       setMessage('护理时间线加载更多失败，可重试');
     } finally {
-      if (queryIdentityRef.current === requestQueryIdentity && apiRef.current === requestApi) setLoadingMore(false);
+      if (isCurrentRequest()) setLoadingMore(false);
     }
-  }, [api, baseQuery, loadingMore, nextCursor, queryIdentity]);
+  }, [api, baseQuery, loadingMore, nextCursor]);
 
   return {
     items,
