@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import type pg from 'pg';
 import { describe, expect, it } from 'vitest';
 import { CareHandoffBriefingDtoSchema } from '@baby-care/contracts';
 import type { CareActorContext } from '../src/care/care-auth.js';
 import { findHandoffByClientRequestId } from '../src/care/handoff-repository.js';
 import { createHandoffService } from '../src/care/handoff-service.js';
 import { createHandoffSummaryService } from '../src/care/handoff-summary-service.js';
+import { inReadSnapshot } from '../src/care/query-service.js';
 import { createM2TestApp, M2_TEST_ORIGIN } from './helpers/m2-family-app.js';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -358,116 +358,84 @@ describeDatabase('M3 explicit care handoff', () => {
     }
   });
 
-  it('keeps every briefing fact on one snapshot while a concurrent edit is blocked between reads', async () => {
+  it('keeps repeatable-read care facts stable after a concurrent edit commits', async () => {
     const context = await createM2TestApp(testDatabaseUrl!);
+    let resumeSnapshot!: () => void;
+    const mayContinue = new Promise<void>((resolve) => { resumeSnapshot = resolve; });
+    const pendingOperations: Promise<unknown>[] = [];
     try {
-      await createCheckpoint(context, context.cookie, '2026-08-13T07:00:00.000Z');
       const feeding = await postCare(context, context.cookie, '/api/care/feeding-sessions', {
         occurredAt: '2026-08-13T07:10:00.000Z',
         clientRequestId: randomUUID(),
         components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 60, bottleCapacityMl: 150 }],
       });
-      const handoff = await createCheckpoint(context, context.cookie, '2026-08-13T08:00:00.000Z');
-      const actor = await dadActor(context);
-      const checkpointId = handoff.json().checkpoint.id as string;
       const eventId = feeding.json().id as string;
-
-      const mutablePool = context.database.pool as unknown as {
-        connect: () => Promise<pg.PoolClient>;
-      };
-      const originalConnect = mutablePool.connect;
-      const connectPoolClient = originalConnect.bind(context.database.pool);
-      let interceptNextConnection = true;
       let announceSnapshot!: () => void;
-      let resumeBriefing!: () => void;
       const snapshotEstablished = new Promise<void>((resolve) => { announceSnapshot = resolve; });
-      const mayContinue = new Promise<void>((resolve) => { resumeBriefing = resolve; });
-      const pendingOperations: Promise<unknown>[] = [];
 
-      mutablePool.connect = async () => {
-        const client = await connectPoolClient();
-        if (!interceptNextConnection) return client;
-        interceptNextConnection = false;
-        const mutableClient = client as unknown as {
-          query: (...args: unknown[]) => Promise<pg.QueryResult>;
-        };
-        const originalQuery = client.query.bind(client) as unknown as (
-          ...args: unknown[]
-        ) => Promise<pg.QueryResult>;
-        let paused = false;
-        let queryQueue = Promise.resolve();
-        mutableClient.query = (...args: unknown[]) => {
-          const query = queryQueue.then(async () => {
-            const result = await originalQuery(...args);
-            const statement = typeof args[0] === 'string' ? args[0] : '';
-            if (!paused && statement.includes('where hc.id = $1')) {
-              paused = true;
-              announceSnapshot();
-              await mayContinue;
-            }
-            return result;
-          });
-          queryQueue = query.then(() => undefined, () => undefined);
-          return query;
-        };
-        return client;
-      };
-
-      try {
-        const briefingPromise = createHandoffSummaryService(context.database).byId(actor, checkpointId);
-        pendingOperations.push(briefingPromise);
-        await withinPhase('briefing snapshot establishment', snapshotEstablished, 5_000);
-        const editPromise = context.app.inject({
-          method: 'PATCH',
-          url: `/api/care/events/${eventId}`,
-          headers: careHeaders(context.cookie),
-          payload: {
-            expectedVersion: 1,
-            event: {
-              eventType: 'feeding',
-              occurredAt: '2026-08-13T07:10:00.000Z',
-              components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 65, bottleCapacityMl: 150 }],
-            },
-          },
-        });
-        pendingOperations.push(editPromise);
-
-        const edited = await withinPhase(
-          'concurrent edit commit',
-          editPromise,
-          8_000,
-        );
-        expect(edited.statusCode).toBe(200);
-        resumeBriefing();
-
-        const briefing = await withinPhase('briefing completion', briefingPromise, 8_000);
-        expect(briefing.careState.lastFeeding?.bottle?.amountMl).toBe(60);
-        expect(briefing.feeding).toMatchObject({ bottleTotalMl: 60, formulaMl: 60 });
-        expect(briefing.notableEvents).toContainEqual(expect.objectContaining({
-          id: eventId,
-          payload: {
-            components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 60, bottleCapacityMl: 150 }],
-            relatedActions: [],
-          },
-        }));
-        expect(briefing.correctionCount).toBe(0);
-      } finally {
-        resumeBriefing();
-        try {
-          await withinPhase(
-            'snapshot test operation cleanup',
-            Promise.allSettled(pendingOperations).then(() => undefined),
-            5_000,
+      const snapshotPromise = inReadSnapshot(context.database, async (client) => {
+        const readAmount = async () => {
+          const result = await client.query<{ amount_ml: number }>(
+            `select amount_ml::int as amount_ml
+               from feeding_components
+              where session_event_id = $1 and component_type = 'bottle'`,
+            [eventId],
           );
-        } finally {
-          mutablePool.connect = originalConnect;
-        }
-      }
+          return result.rows[0]?.amount_ml ?? null;
+        };
+        const beforeCommit = await readAmount();
+        announceSnapshot();
+        await mayContinue;
+        const afterCommit = await readAmount();
+        return { beforeCommit, afterCommit };
+      });
+      pendingOperations.push(snapshotPromise);
+      await withinPhase('repeatable-read snapshot establishment', snapshotEstablished, 5_000);
+
+      const editPromise = context.app.inject({
+        method: 'PATCH',
+        url: `/api/care/events/${eventId}`,
+        headers: careHeaders(context.cookie),
+        payload: {
+          expectedVersion: 1,
+          event: {
+            eventType: 'feeding',
+            occurredAt: '2026-08-13T07:10:00.000Z',
+            components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 65, bottleCapacityMl: 150 }],
+          },
+        },
+      });
+      pendingOperations.push(editPromise);
+      const edited = await withinPhase('concurrent edit commit', editPromise, 8_000);
+      expect(edited.statusCode).toBe(200);
+
+      resumeSnapshot();
+      const snapshot = await withinPhase('repeatable-read completion', snapshotPromise, 5_000);
+      expect(snapshot).toEqual({ beforeCommit: 60, afterCommit: 60 });
+
+      const currentPromise = context.database.pool.query<{ amount_ml: number }>(
+        `select amount_ml::int as amount_ml
+           from feeding_components
+          where session_event_id = $1 and component_type = 'bottle'`,
+        [eventId],
+      );
+      pendingOperations.push(currentPromise);
+      const current = await withinPhase('committed value observation', currentPromise, 5_000);
+      expect(current.rows[0]?.amount_ml).toBe(65);
     } finally {
       try {
-        await context.app.close();
+        resumeSnapshot();
+        await withinPhase(
+          'snapshot test operation cleanup',
+          Promise.allSettled(pendingOperations).then(() => undefined),
+          5_000,
+        );
       } finally {
-        await context.database.close();
+        try {
+          await context.app.close();
+        } finally {
+          await context.database.close();
+        }
       }
     }
   }, 30_000);

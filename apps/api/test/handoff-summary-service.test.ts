@@ -90,9 +90,10 @@ describe('handoff briefing read snapshot', () => {
     const poolQuery = vi.fn(async () => {
       throw new Error('briefing escaped its read snapshot');
     });
+    const poolConnect = vi.fn(async () => client);
     const database = {
       pool: {
-        connect: vi.fn(async () => client),
+        connect: poolConnect,
         query: poolQuery,
       },
     } as unknown as DatabaseContext;
@@ -104,6 +105,7 @@ describe('handoff briefing read snapshot', () => {
       startedAt: '2026-08-13T07:50:00.000Z',
     });
     expect(poolQuery).not.toHaveBeenCalled();
+    expect(poolConnect).toHaveBeenCalledOnce();
     expect(statements[0]).toBe('begin isolation level repeatable read read only');
     expect(statements.at(-1)).toBe('commit');
     expect(client.release).toHaveBeenCalledOnce();
