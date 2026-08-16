@@ -86,4 +86,4 @@ Before changing the project, read:
 2. `docs/PLAN.md`
 3. the relevant spec/implementation plan under `docs/superpowers/`
 
-The family's real M2 care habits have been collected and encoded in the approved M2 design. M3 must build on those recorded facts rather than redefining M2 interaction assumptions. Guardian/JoyAI/Qwen integration remains outside M2 and requires its own later milestone/design.
+The family's real M2 care habits were preserved by the verified M3 Care Workspace rather than redefined. Guardian/JoyAI/Qwen integration remains outside verified M3 and requires its own later milestone/design.

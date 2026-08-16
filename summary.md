@@ -7,8 +7,10 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 
 ## 1. Current authoritative state
 
-- Current completed milestone: **M2 — Care Recording MVP**.
-- Current milestone: **M3 — Care Workspace**, implementation release candidate awaiting production Compose and exact-head five-job CI.
+- Current completed milestone: **M3 — Care Workspace**, verified complete.
+- M3 authoritative code candidate: `e551cecd6146dbb41cb146fae84bc4a5049b9392`.
+- M3 authoritative CI: `31954327509` — static / unit / PostgreSQL integration / production build / production Compose smoke 5/5 PASS.
+- M3 production Compose job: `95182508610` — all four required M3 markers emitted exactly once.
 - M1 authoritative baseline: `codex/m1-family-baby-foundation @ 76d578a464ec2ab1f8eb1f8f33d8e429caff10ba`.
 - M1 authoritative CI: `31707486985` — 5/5 PASS.
 - M2 authoritative implementation branch: `codex/m2-care-recording-implementation`.
@@ -19,7 +21,7 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 - M3 implementation branch: `codex/m3-care-workspace-implementation`.
 - M3 approved design: `docs/superpowers/specs/2026-08-15-m3-care-workspace-design.md`.
 - M3 implementation plan: `docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md`.
-- M3 verified head and CI run remain unset until one exact final head passes static, unit/contracts, PostgreSQL integration, production build, and production Compose smoke.
+- The later durable-state documentation head must receive a final CI run recorded in the Draft PR; do not rewrite the matched M3 code-head/run evidence to embed that closure run.
 
 Release-gate history:
 
@@ -29,7 +31,7 @@ Release-gate history:
 
 ## 2. M2 product behavior that is now fixed
 
-M2 is implemented and verified. Do not redesign these facts while starting M3:
+M2 is implemented and verified. Do not redesign these facts in later milestones:
 
 - Bottle volume means **actual consumed ml**.
 - Bottle capacity is optional metadata only. 90/150/200 ml capacities never become intake shortcuts and never enter milk totals.
@@ -55,7 +57,7 @@ The production-mode empty-DB Docker Compose flow already verifies the real stack
 
 Important invariant: bottle capacity 150 ml never contributes to intake total.
 
-## 4. M3 implemented release-candidate scope
+## 4. M3 verified scope
 
 M3 is **Care Workspace**, not Guardian integration.
 
@@ -68,7 +70,7 @@ The branch now implements these stable M3 capabilities while preserving the M2 f
 - caregiver-scoped optional on-screen reminders that do not create checkpoint facts;
 - per-browser/device auto/day/night display choice and no Web acknowledgement sound.
 
-The production smoke preserves M1/M2 and encodes the complete M3 flow, but Task 9 could not execute Docker locally because the Docker CLI is unavailable. Do not mark M3 complete until the controller records the four M3 smoke markers and all five CI jobs passing on one exact final head.
+Exact-head CI run `31954327509` verified all five jobs on `e551cecd6146dbb41cb146fae84bc4a5049b9392`. Production Compose job `95182508610` preserved M1/M2 and emitted `m3-handoff`, `m3-typed-timeline`, `m3-revision-conflict`, and `m3-care-workspace-release-flow` exactly once. M3 is verified complete.
 
 ## 5. Baby Guardian / baby-monitor-local boundary
 
@@ -82,7 +84,7 @@ The production smoke preserves M1/M2 and encodes the complete M3 flow, but Task 
 - Low-confidence machine conclusions become candidates for human confirmation.
 - Raw camera/video/audio should remain local by default; Baby Care should receive semantic events rather than continuous raw media.
 
-Guardian/JoyAI/Qwen integration, automated feeding recognition, medical diagnosis/dose recommendation, and cloud deployment are **not part of the current M3 scope unless a separate design explicitly changes the milestone boundary**.
+Guardian/JoyAI/Qwen integration, automated feeding recognition, medical diagnosis/dose recommendation, and cloud deployment were **not part of verified M3**. Any post-M3 integration requires a separately approved design.
 
 ## 6. Xiaomi MJSXJ17CM audio discovery — new handoff note
 
@@ -152,7 +154,7 @@ Required phased delivery in `baby-monitor-local`:
 - G3: feeding/care camera fusion and a versioned Baby Care contract simulator using synthetic/replay inputs;
 - G4: separate Baby Care Adapter/confirmation integration after its contract is approved.
 
-This remains separate from the current M3 Care Workspace implementation. The first code work belongs on a new `baby-monitor-local` feature branch based on its verified Guardian branch; Baby Care integration follows separately.
+This remains separate from verified M3 Care Workspace. The first code work belongs on a new `baby-monitor-local` feature branch based on its verified Guardian branch; Baby Care integration follows separately.
 
 ## 8. Autonomous development rules to preserve
 
@@ -168,18 +170,18 @@ This remains separate from the current M3 Care Workspace implementation. The fir
 
 ## 9. Fresh Work entry point
 
-The next Work should close the **M3 release gate**, not redesign or reimplement M2/M3 and not begin Guardian coding.
+The next Work should close the documentation-only branch gate, then select the next post-M3 milestone without redesigning M2/M3 or implicitly beginning Guardian coding.
 
 Recommended first sequence:
 
 1. Read the authoritative state files.
-2. Push the controller-approved Task 9 candidate without modifying `main`.
-3. Require static, unit/contracts, PostgreSQL integration, production build, and production Compose smoke on the same exact head.
-4. Confirm the four exact M3 smoke markers from the production Compose job.
-5. Record `m3_verified_head`, `m3_verified_ci_run`, and `m3_verification_result` only from that authoritative run.
-6. Keep Guardian/audio/AI outside M3 unless the user separately approves a scope change.
+2. Preserve the authoritative M3 pair `e551cecd6146dbb41cb146fae84bc4a5049b9392` / `31954327509`.
+3. Push the durable-state documentation closure without modifying `main`.
+4. Require final CI on that documentation-only head and record its run in the Draft PR, not in another commit.
+5. Continue with family acceptance and Birth Ready operational simulation.
+6. Select and approve a separate post-M3 milestone before new implementation; Guardian/audio/AI still requires its own design.
 
-## 10. Copy/paste prompt for the controller release gate
+## 10. Copy/paste prompt for documentation closure
 
 ```text
 你现在接管长期项目 `lpearf-pixel/baby-care`。
@@ -194,9 +196,9 @@ Recommended first sequence:
 - `docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md`
 - `.superpowers/sdd/2026-08-16-m3-care-workspace-implementation/task-9-report.md`
 
-当前 M3 候选分支是 `codex/m3-care-workspace-implementation`。Task 9 已准备完整 production smoke，但执行环境没有 Docker CLI，因此不得在得到 CI 证据前声称 M3 完成。不要重新实现 M2/M3，不要修改或合并 `main`。
+M3 已在 code candidate `e551cecd6146dbb41cb146fae84bc4a5049b9392`、CI `31954327509` 上通过 5/5，production Compose job `95182508610` 已输出全部四个 marker。不要重新实现 M2/M3，不要修改或合并 `main`。
 
-你的当前任务是 push controller 批准的最终候选，并要求同一 exact head 的 static、unit/contracts、PostgreSQL integration、production build、production Compose smoke 5/5 PASS。Compose 日志必须出现四个精确 marker：`m3-handoff`、`m3-typed-timeline`、`m3-revision-conflict`、`m3-care-workspace-release-flow`。
+你的当前任务是 push durable-state documentation closure，并要求该文档 HEAD 的 final CI。把 closure run 记录在 Draft PR，不要为了写入 run ID 再改仓库文件形成无限自引用。之后进入家庭验收/Birth Ready operational simulation，并先审批新的 post-M3 milestone 再开发。
 
 必须保留 M2 已确定的语义：奶瓶容量不等于摄入量；瓶喂实际 ml；母乳瓶喂与配方奶分开；亲喂只记录总时长、不做左右乳计时、不推算 ml；rolling 24h；warning 显式确认；edit 保留 revision；undo=void；actor/family/baby/source 由服务端认证上下文派生；药物只记录事实，不推荐/计算剂量。
 
@@ -205,9 +207,9 @@ Recommended first sequence:
 工作方式：普通可逆工作自动继续；使用 GitHub 公共 runner；失败自行诊断修复重跑；不要让我执行普通本地命令；只在重大产品方向、凭据/支付、破坏性/不可逆操作或必须真人硬件验收时找我。
 
 先给我：
-1. 最终 branch 和 exact HEAD；
-2. 五作业 CI run ID 与逐项结论；
-3. 四个 production Compose marker；
-4. 后补的 `m3_verified_head`、`m3_verified_ci_run`、`m3_verification_result`；
+1. documentation closure branch 和 exact HEAD；
+2. closure final CI run ID 与逐项结论；
+3. Draft PR 中记录 closure run 的确认；
+4. 下一 post-M3 milestone 的待审批选项；
 5. `main` 未修改/未合并的确认。
 ```

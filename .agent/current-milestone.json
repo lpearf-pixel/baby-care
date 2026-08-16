@@ -1,12 +1,13 @@
 {
   "schema_version": 1,
   "milestone": "M3 Care Workspace",
-  "status": "awaiting_production_compose_and_exact_head_ci",
+  "status": "verified_complete",
   "branch": "codex/m3-care-workspace-implementation",
   "completed_milestones": [
     "M0 Repository and delivery foundation",
     "M1 Family and baby foundation",
-    "M2 Care Recording MVP"
+    "M2 Care Recording MVP",
+    "M3 Care Workspace"
   ],
   "m1_state": "verified_complete",
   "m1_authoritative_branch": "codex/m1-family-baby-foundation",
@@ -26,15 +27,24 @@
   "m2_verified_head": "631805f8144d3ece6e2df90468fa4562e0431fc3",
   "m2_verified_ci_run": 31768708846,
   "m2_verification_result": "static/unit/postgresql-integration/build/production-compose-smoke 5/5 PASS",
-  "m3_state": "in_progress",
+  "m3_state": "verified_complete",
   "m3_approved_spec": "docs/superpowers/specs/2026-08-15-m3-care-workspace-design.md",
   "m3_implementation_branch": "codex/m3-care-workspace-implementation",
   "m3_implementation_plan": "docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md",
-  "m3_release_gate_state": "awaiting_production_compose_and_exact_head_ci",
+  "m3_release_gate_state": "verified_complete",
   "m3_local_compose_result": "not_run_docker_cli_unavailable",
-  "m3_verified_head": null,
-  "m3_verified_ci_run": null,
-  "m3_verification_result": "pending exact-head static/unit/postgresql-integration/build/production-compose-smoke 5/5 PASS",
+  "m3_verified_head": "e551cecd6146dbb41cb146fae84bc4a5049b9392",
+  "m3_verified_ci_run": 31954327509,
+  "m3_verification_result": "static/unit/postgresql-integration/build/production-compose-smoke 5/5 PASS",
+  "m3_production_compose_job": 95182508610,
+  "m3_production_compose_result": "verified_via_exact_head_ci",
+  "m3_production_compose_markers": [
+    "m3-handoff",
+    "m3-typed-timeline",
+    "m3-revision-conflict",
+    "m3-care-workspace-release-flow"
+  ],
+  "m3_documentation_closure_gate": "final CI required on the subsequent documentation-only head; record that run in the Draft PR without editing this matched code evidence",
   "completed_tasks": [
     "Task 1 Care Foundation Schema, Common Contracts, and Authorization",
     "Task 2 Deterministic Care Rules",
@@ -49,12 +59,10 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "care timeline comprehension",
-    "family handoff workflow",
-    "day/night operational UX",
-    "correction and history usability"
+    "family acceptance and Birth Ready operational simulation",
+    "select and approve the next post-M3 milestone before implementation"
   ],
-  "do_not_start_in_m3_without_separate_design": [
+  "requires_separate_post_m3_design": [
     "Guardian integration",
     "JoyAI/Qwen runtime",
     "automated feeding recognition",
