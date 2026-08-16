@@ -30,11 +30,21 @@ async function seedOwnership(context: DatabaseContext) {
   const userA = '50000000-0000-4000-8000-000000000005';
   const membershipA = '60000000-0000-4000-8000-000000000006';
   await context.pool.query(
-    `insert into families (id, name, timezone) values ($1, 'A', 'Asia/Shanghai'), ($2, 'B', 'Asia/Shanghai');
-     insert into babies (id, family_id, display_name) values ($3, $1, 'a'), ($4, $2, 'b');
-     insert into users (id, login_name, display_name, password_hash) values ($5, 'dad', 'Dad', 'hash');
-     insert into family_memberships (id, family_id, user_id, relationship, permission_level) values ($6, $1, $5, 'dad', 'family_admin');`,
-    [familyA, familyB, babyA, babyB, userA, membershipA],
+    `insert into families (id, name, timezone) values ($1, 'A', 'Asia/Shanghai'), ($2, 'B', 'Asia/Shanghai')`,
+    [familyA, familyB],
+  );
+  await context.pool.query(
+    `insert into babies (id, family_id, display_name) values ($1, $2, 'a'), ($3, $4, 'b')`,
+    [babyA, familyA, babyB, familyB],
+  );
+  await context.pool.query(
+    `insert into users (id, login_name, display_name, password_hash) values ($1, 'dad', 'Dad', 'hash')`,
+    [userA],
+  );
+  await context.pool.query(
+    `insert into family_memberships (id, family_id, user_id, relationship, permission_level)
+     values ($1, $2, $3, 'dad', 'family_admin')`,
+    [membershipA, familyA, userA],
   );
   return { familyA, familyB, babyA, babyB, userA, membershipA };
 }
