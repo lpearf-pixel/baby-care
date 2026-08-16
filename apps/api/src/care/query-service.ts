@@ -1,8 +1,15 @@
 import type {
   CareHomeSummaryDto,
+  CareSource,
+  CareTimelineItemDto,
+  CareTimelineResponse,
 } from '@baby-care/contracts';
+import { CareTimelineItemDtoSchema } from '@baby-care/contracts';
+import { isCareEventBackfilled } from '@baby-care/domain';
 import type { DatabaseContext } from '../db.js';
 import type { CareActorContext } from './care-auth.js';
+import type { CareEventRow } from './care-event-repository.js';
+import { loadCareSnapshot } from './revision-snapshot.js';
 
 interface EventTimeRow {
   id: string;
@@ -17,22 +24,78 @@ interface RollingRow {
   direct_breastfeeding_minutes: number;
 }
 
-interface LegacyCareTimelineItem {
+interface TimelineEventRow {
   id: string;
-  eventType: 'feeding' | 'diaper' | 'sleep' | 'burping' | 'spit_up' | 'crying' | 'bathing' | 'medication' | 'temperature' | 'weight';
-  occurredAt: string;
-  createdAt: string;
-  updatedAt: string;
-  status: 'active' | 'voided';
-  source: 'manual' | 'guardian' | 'device' | 'import' | 'ai';
-  actorUserId: string | null;
-  actorDisplayName: string | null;
+  family_id: string;
+  baby_id: string;
+  actor_user_id: string | null;
+  actor_membership_id: string | null;
+  source: CareSource;
+  event_type: CareEventRow['eventType'];
+  occurred_at: Date;
+  created_at: Date;
+  updated_at: Date;
+  status: CareEventRow['status'];
+  version: number;
+  client_request_id: string | null;
   note: string | null;
+  trace_id: string;
+  actor_display_name: string | null;
 }
 
-interface LegacyCareTimelineResponse {
-  items: LegacyCareTimelineItem[];
-  nextCursor: null;
+function eventFromTimelineRow(row: TimelineEventRow): CareEventRow {
+  return {
+    id: row.id,
+    familyId: row.family_id,
+    babyId: row.baby_id,
+    actorUserId: row.actor_user_id,
+    actorMembershipId: row.actor_membership_id,
+    source: row.source,
+    eventType: row.event_type,
+    occurredAt: row.occurred_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    status: row.status,
+    version: row.version,
+    clientRequestId: row.client_request_id,
+    note: row.note,
+    traceId: row.trace_id,
+  };
+}
+
+async function toTimelineItem(client: import('pg').PoolClient, row: TimelineEventRow): Promise<CareTimelineItemDto> {
+  const event = eventFromTimelineRow(row);
+  const snapshot = await loadCareSnapshot(client, event);
+  const payload = event.eventType === 'feeding'
+    ? { components: snapshot.components, relatedActions: snapshot.relatedActions }
+    : event.eventType === 'diaper'
+      ? {
+          kind: snapshot.kind,
+          stoolColor: snapshot.stoolColor ?? null,
+          stoolConsistency: snapshot.stoolConsistency ?? null,
+          stoolAmount: snapshot.stoolAmount ?? null,
+        }
+      : event.eventType === 'sleep'
+        ? { startedAt: snapshot.startedAt, endedAt: snapshot.endedAt }
+        : event.eventType === 'temperature' || event.eventType === 'weight'
+          ? { measurement: snapshot.measurement }
+          : { action: snapshot.action };
+
+  return CareTimelineItemDtoSchema.parse({
+    id: event.id,
+    eventType: event.eventType,
+    occurredAt: event.occurredAt.toISOString(),
+    createdAt: event.createdAt.toISOString(),
+    updatedAt: event.updatedAt.toISOString(),
+    status: event.status,
+    source: event.source,
+    actorUserId: event.actorUserId,
+    actorDisplayName: row.actor_display_name,
+    note: event.note,
+    version: event.version,
+    isBackfilled: isCareEventBackfilled(event.occurredAt, event.createdAt),
+    payload,
+  });
 }
 
 export function createQueryService(database: DatabaseContext) {
@@ -148,44 +211,28 @@ export function createQueryService(database: DatabaseContext) {
       };
     },
 
-    async timeline(actor: CareActorContext, before: Date, limit: number): Promise<LegacyCareTimelineResponse> {
-      const result = await database.pool.query<{
-        id: string;
-        event_type: LegacyCareTimelineItem['eventType'];
-        occurred_at: Date;
-        created_at: Date;
-        updated_at: Date;
-        status: LegacyCareTimelineItem['status'];
-        source: LegacyCareTimelineItem['source'];
-        actor_user_id: string | null;
-        actor_display_name: string | null;
-        note: string | null;
-      }>(
-        `select ce.id, ce.event_type, ce.occurred_at, ce.created_at, ce.updated_at,
-                ce.status, ce.source, ce.actor_user_id, u.display_name as actor_display_name, ce.note
+    async timeline(actor: CareActorContext, before: Date, limit: number): Promise<CareTimelineResponse> {
+      const client = await database.pool.connect();
+      try {
+        const result = await client.query<TimelineEventRow>(
+          `select ce.id, ce.family_id, ce.baby_id, ce.actor_user_id, ce.actor_membership_id,
+                  ce.source, ce.event_type, ce.occurred_at, ce.created_at, ce.updated_at,
+                  ce.status, ce.version, ce.client_request_id, ce.note, ce.trace_id,
+                  u.display_name as actor_display_name
            from care_events ce
            left join users u on u.id = ce.actor_user_id
           where ce.family_id = $1 and ce.baby_id = $2 and ce.status = 'active'
             and ce.occurred_at <= $3
           order by ce.occurred_at desc, ce.created_at desc, ce.id desc
           limit $4`,
-        [actor.familyId, actor.babyId, before, limit],
-      );
-      return {
-        items: result.rows.map((row) => ({
-          id: row.id,
-          eventType: row.event_type,
-          occurredAt: row.occurred_at.toISOString(),
-          createdAt: row.created_at.toISOString(),
-          updatedAt: row.updated_at.toISOString(),
-          status: row.status,
-          source: row.source,
-          actorUserId: row.actor_user_id,
-          actorDisplayName: row.actor_display_name,
-          note: row.note,
-        })),
-        nextCursor: null,
-      };
+          [actor.familyId, actor.babyId, before, limit],
+        );
+        const items: CareTimelineItemDto[] = [];
+        for (const row of result.rows) items.push(await toTimelineItem(client, row));
+        return { items, nextCursor: null };
+      } finally {
+        client.release();
+      }
     },
   };
 }
