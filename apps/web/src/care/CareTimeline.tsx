@@ -9,6 +9,14 @@ const categories: Array<{ value: CareTimelineCategory; label: string }> = [
   { value: 'other', label: '只看其他护理' },
 ];
 
+const categoryStatus: Record<CareTimelineCategory, string> = {
+  all: '当前显示全部护理记录',
+  feeding: '当前仅显示喂养记录',
+  diaper: '当前仅显示尿布记录',
+  sleep: '当前仅显示睡眠记录',
+  other: '当前仅显示其他护理记录',
+};
+
 export function CareTimeline({
   items,
   category,
@@ -71,7 +79,7 @@ export function CareTimeline({
           <p>当前固定窗口 {`${formatDateTime(window.from, familyTimeZone)} → ${formatDateTime(window.to, familyTimeZone)}`}</p>
           <button type="button" className="text-button" onClick={onShowAll}>退出固定窗口，查看全部记录</button>
         </div>
-      ) : <p className="muted">当前显示全部护理记录</p>}
+      ) : <p className="muted">{categoryStatus[category]}</p>}
 
       <p className="inline-message care-message" role="status" aria-live="polite">
         {message ?? (loading ? '正在加载护理时间线…' : '护理时间线已更新')}

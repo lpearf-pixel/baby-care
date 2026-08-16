@@ -47,13 +47,15 @@ describe('M1 shared contracts', () => {
     ]) expect(schema).toBeDefined();
 
     expect(contracts.UpdateFamilyInputSchema!.safeParse({ name: 'Xiangxiang Home', timezone: 'Asia/Shanghai' }).success).toBe(true);
-    expect(contracts.UpdateFamilyInputSchema!.safeParse({ timezone: 'Not/A_Real_Zone' }).success).toBe(false);
+    expect(contracts.UpdateFamilyInputSchema!.safeParse({ timezone: 'Not/A_Real_Zone' }).success).toBe(true);
+    expect(contracts.UpdateFamilyInputSchema!.safeParse({ timezone: 'Asia Shanghai' }).success).toBe(false);
+    expect(contracts.UpdateFamilyInputSchema!.safeParse({ timezone: 'Area/../Private' }).success).toBe(false);
     expect(contracts.FamilyDtoSchema!.safeParse({
       id: '22222222-2222-4222-8222-222222222222',
       name: 'Legacy Family',
       timezone: 'Not/A_Real_Zone',
       status: 'active',
-    }).success).toBe(false);
+    }).success).toBe(true);
     expect(contracts.UpdateBabyInputSchema!.safeParse({ displayName: 'xiangxiang', birthDate: '2026-09-10' }).success).toBe(true);
     expect(contracts.CreateNannyInputSchema!.safeParse({ loginName: 'nanny', displayName: 'Nanny', password: 'nanny-test-password' }).success).toBe(true);
     expect(contracts.UpdateMemberStatusInputSchema!.safeParse({ status: 'disabled' }).success).toBe(true);

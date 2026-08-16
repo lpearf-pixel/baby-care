@@ -1,33 +1,59 @@
-import { mkdir, open, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 
 const OUTPUT_DIR = resolve('diagnostics/latest');
-const MAX_SOURCE_BYTES = 8192;
 const MAX_EVIDENCE_CHARS = 2048;
 const REDACTED = '[REDACTED]';
-const ALLOWED_METADATA = [
-  ['event_id', '[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'],
-  ['event_type', '[A-Za-z][A-Za-z0-9_]{0,63}'],
-  ['status', '(?:[1-5][0-9]{2}|passed|failed|failure|success|error|cancelled|skipped|timed_out|active|voided)'],
-  ['trace_id', '[A-Za-z0-9][A-Za-z0-9._:-]{0,127}'],
-  ['duration_ms', '[0-9]+(?:\\.[0-9]+)?'],
-  ['elapsed_ms', '[0-9]+(?:\\.[0-9]+)?'],
-  ['timing_ms', '[0-9]+(?:\\.[0-9]+)?'],
-  ['code', '[A-Za-z][A-Za-z0-9_.-]{0,127}'],
-  ['error_code', '[A-Za-z][A-Za-z0-9_.-]{0,127}'],
-  ['event_code', '[A-Za-z][A-Za-z0-9_.-]{0,127}'],
-  ['sqlstate', '[A-Za-z0-9]{5}'],
-];
+const TOKEN = /^[A-Za-z][A-Za-z0-9_.-]{0,127}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const STATUS = new Set(['passed', 'failed', 'failure', 'success', 'error', 'cancelled', 'skipped', 'timed_out', 'active', 'voided']);
+const TRUSTED_FIELDS = new Set([
+  'schema_version', 'event_id', 'event_type', 'status', 'trace_id',
+  'duration_ms', 'elapsed_ms', 'timing_ms', 'code', 'error_code',
+  'event_code', 'sqlstate', 'constraint',
+]);
 
-function extractAllowlistedEvidence(value) {
-  const facts = new Set();
-  for (const [key, allowedValue] of ALLOWED_METADATA) {
-    const pattern = new RegExp(`(?:^|[\\s,{])(?:["']?${key}["']?)\\s*[:=]\\s*["']?(${allowedValue})(?=["'\\s,}]|$)`, 'gim');
-    for (const match of value.matchAll(pattern)) facts.add(`${key}=${match[1]}`);
+function safeDuration(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 86_400_000;
+}
+
+function parseTrustedMetadata(serialized) {
+  if (!serialized) return null;
+  let value;
+  try {
+    value = JSON.parse(serialized);
+  } catch {
+    return null;
   }
-  const constraintPattern = /(?:^|[\s,{])(?:["']?constraint["']?\s*[:=]\s*["']?|constraint\s+)([A-Za-z][A-Za-z0-9_]{0,127})(?=["'\s,}]|$)/gim;
-  for (const match of value.matchAll(constraintPattern)) facts.add(`constraint=${match[1]}`);
-  return [...facts, REDACTED].join('\n');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  if (Object.keys(value).some((key) => !TRUSTED_FIELDS.has(key))) return null;
+  if (value.schema_version !== 1) return null;
+  const validators = {
+    event_id: (entry) => typeof entry === 'string' && UUID.test(entry),
+    event_type: (entry) => typeof entry === 'string' && TOKEN.test(entry) && entry.length <= 64,
+    status: (entry) => (typeof entry === 'string' && STATUS.has(entry)) || (Number.isInteger(entry) && entry >= 100 && entry <= 599),
+    trace_id: (entry) => typeof entry === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(entry),
+    duration_ms: safeDuration,
+    elapsed_ms: safeDuration,
+    timing_ms: safeDuration,
+    code: (entry) => typeof entry === 'string' && TOKEN.test(entry),
+    error_code: (entry) => typeof entry === 'string' && TOKEN.test(entry),
+    event_code: (entry) => typeof entry === 'string' && TOKEN.test(entry),
+    sqlstate: (entry) => typeof entry === 'string' && /^[A-Za-z0-9]{5}$/.test(entry),
+    constraint: (entry) => typeof entry === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,127}$/.test(entry),
+  };
+  const metadata = { schema_version: 1 };
+  for (const [key, validator] of Object.entries(validators)) {
+    if (value[key] === undefined) continue;
+    if (!validator(value[key])) return null;
+    metadata[key] = value[key];
+  }
+  return Object.keys(metadata).length > 1 ? metadata : null;
+}
+
+function trustedEvidence(serialized) {
+  const metadata = parseTrustedMetadata(serialized);
+  return metadata ? `${REDACTED}\n${JSON.stringify(metadata)}` : REDACTED;
 }
 
 function truncateTail(value, maximum = MAX_EVIDENCE_CHARS) {
@@ -36,30 +62,12 @@ function truncateTail(value, maximum = MAX_EVIDENCE_CHARS) {
   return `${marker}${value.slice(-(maximum - marker.length))}`;
 }
 
-async function readTailBounded(path) {
-  if (!path) return '';
-  const handle = await open(path, 'r');
-  try {
-    const stat = await handle.stat();
-    const length = Math.min(stat.size, MAX_SOURCE_BYTES);
-    const buffer = Buffer.alloc(length);
-    await handle.read(buffer, 0, length, Math.max(0, stat.size - length));
-    return buffer.toString('utf8');
-  } finally {
-    await handle.close();
-  }
-}
-
 async function writeJson(path, value) {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
-const evidenceFromFile = await readTailBounded(process.env.DIAG_EVIDENCE_FILE);
-const rawEvidence = evidenceFromFile
-  || process.env.DIAG_EVIDENCE
-  || 'No bounded evidence was supplied; inspect the failed step annotation.';
-const evidence = truncateTail(extractAllowlistedEvidence(rawEvidence));
+const evidence = truncateTail(trustedEvidence(process.env.DIAG_TRUSTED_METADATA));
 
 const summary = {
   schema_version: 1,

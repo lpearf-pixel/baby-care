@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.js';
+import { BabyCareApiError } from '../src/api-client.js';
 
 const dadSession = {
   userId: '11111111-1111-4111-8111-111111111111',
@@ -57,7 +58,10 @@ function renderWithApi(api: ReturnType<typeof fakeApi>) {
   render(<App {...({ api } as unknown as Record<string, never>)} />);
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe('Baby Care family workspace', () => {
   it('shows first-run setup with xiangxiang default and a non-persistent secret field', async () => {
@@ -103,17 +107,49 @@ describe('Baby Care family workspace', () => {
     expect(screen.getByRole('button', { name: '保存宝宝资料' })).toBeInTheDocument();
   });
 
-  it('rejects an invalid IANA timezone before saving family settings', async () => {
+  it('blocks unsafe timezone syntax before saving family settings', async () => {
     const api = fakeApi();
     renderWithApi(api);
 
     const timezone = await screen.findByLabelText('时区');
-    fireEvent.change(timezone, { target: { value: 'Not/A_Real_Zone' } });
+    fireEvent.change(timezone, { target: { value: 'Asia Shanghai' } });
 
-    expect(screen.getByText('请输入有效的 IANA 时区（例如 Asia/Shanghai）')).toBeInTheDocument();
+    expect(screen.getByText('请输入安全的 IANA 时区标识（例如 Asia/Shanghai）')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '保存家庭资料' })).toBeDisabled();
     fireEvent.submit(timezone.closest('form')!);
     expect(api.updateFamily).not.toHaveBeenCalled();
+  });
+
+  it('submits a syntactically safe timezone even when the browser ICU does not support it', async () => {
+    const NativeDateTimeFormat = Intl.DateTimeFormat;
+    vi.spyOn(Intl, 'DateTimeFormat').mockImplementation((function DateTimeFormatMock(locales, options) {
+      if (options?.timeZone === 'Pacific/Kiritimati') throw new RangeError('browser ICU missing zone');
+      return new NativeDateTimeFormat(locales, options);
+    }) as typeof Intl.DateTimeFormat);
+    const api = fakeApi();
+    renderWithApi(api);
+
+    fireEvent.change(await screen.findByLabelText('时区'), { target: { value: 'Pacific/Kiritimati' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存家庭资料' }));
+
+    await waitFor(() => expect(api.updateFamily).toHaveBeenCalledWith({
+      name: 'Xiangxiang Family',
+      timezone: 'Pacific/Kiritimati',
+    }));
+  });
+
+  it('surfaces authoritative server timezone validation failure', async () => {
+    const api = fakeApi({
+      updateFamily: vi.fn(async () => {
+        throw new BabyCareApiError('validation_failed', 'unsupported timezone');
+      }),
+    });
+    renderWithApi(api);
+
+    fireEvent.change(await screen.findByLabelText('时区'), { target: { value: 'Not/A_Real_Zone' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存家庭资料' }));
+
+    expect(await screen.findByText('服务器不支持该 IANA 时区，请检查后重试')).toBeInTheDocument();
   });
 
   it('shows Nanny the shared care workspace and a read-only family view without admin actions', async () => {

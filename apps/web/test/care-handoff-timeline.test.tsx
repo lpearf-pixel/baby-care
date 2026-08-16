@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.js';
 import { BabyCareApiError } from '../src/api-client.js';
@@ -449,6 +449,38 @@ describe('M3 handoff briefing and typed timeline', () => {
     fireEvent.click(screen.getByRole('button', { name: '重试护理时间线' }));
 
     await waitFor(() => expect(getCareTimeline).toHaveBeenCalledTimes(2));
+  });
+
+  it('ignores an old load-more response after the timeline query changes', async () => {
+    let resolveOldPage!: (value: { items: typeof timelinePageTwo; nextCursor: null }) => void;
+    const oldPage = new Promise<{ items: typeof timelinePageTwo; nextCursor: null }>((resolve) => {
+      resolveOldPage = resolve;
+    });
+    const getCareTimeline = vi.fn()
+      .mockResolvedValueOnce({ items: [timelinePageOne[0]!], nextCursor: 'old-cursor' })
+      .mockReturnValueOnce(oldPage)
+      .mockResolvedValueOnce({ items: [timelinePageOne[1]!], nextCursor: 'new-cursor' })
+      .mockResolvedValueOnce({ items: [], nextCursor: null });
+    const api = makeApi({ getCareTimeline });
+    renderApp(api);
+
+    const timeline = await screen.findByRole('region', { name: '护理时间线' });
+    await within(timeline).findByText('配方奶 70ml · 亲喂 12min');
+    fireEvent.click(screen.getByRole('button', { name: '加载更多护理记录' }));
+    await waitFor(() => expect(getCareTimeline).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole('button', { name: '只看尿布' }));
+    expect(await within(timeline).findByText('尿布 · 尿+便')).toBeInTheDocument();
+    expect(within(timeline).getByText('当前仅显示尿布记录')).toBeInTheDocument();
+
+    await act(async () => resolveOldPage({ items: timelinePageTwo, nextCursor: null }));
+    expect(within(timeline).queryByText('母乳瓶喂 50ml')).not.toBeInTheDocument();
+    const loadMore = within(timeline).getByRole('button', { name: '加载更多护理记录' });
+    fireEvent.click(loadMore);
+    await waitFor(() => expect(getCareTimeline).toHaveBeenLastCalledWith({
+      category: 'diaper',
+      cursor: 'new-cursor',
+      limit: 20,
+    }));
   });
 
   it.each([

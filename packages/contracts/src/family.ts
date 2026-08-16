@@ -1,16 +1,11 @@
 import { z } from 'zod';
 
-export function isValidIanaTimeZone(value: string): boolean {
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: value }).format();
-    return true;
-  } catch {
-    return false;
-  }
+export function isSafeTimeZoneIdentifier(value: string): boolean {
+  return /^(?:UTC|[A-Za-z][A-Za-z0-9._+-]*(?:\/[A-Za-z0-9][A-Za-z0-9._+-]*)+)$/.test(value);
 }
 
-const IanaTimeZoneSchema = z.string().trim().min(1).max(80).refine(isValidIanaTimeZone, {
-  message: 'Timezone must be a valid IANA time zone.',
+const IanaTimeZoneSchema = z.string().trim().min(1).max(80).refine(isSafeTimeZoneIdentifier, {
+  message: 'Timezone must use safe IANA identifier syntax.',
 });
 
 export const FamilyDtoSchema = z

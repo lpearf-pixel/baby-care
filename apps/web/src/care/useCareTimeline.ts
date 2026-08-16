@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CareTimelineCategory, CareTimelineItemDto } from '@baby-care/contracts';
 import type { BabyCareApi } from '../api-client.js';
 
@@ -28,6 +28,11 @@ export function useCareTimeline(api: BabyCareApi) {
     limit: 20,
     ...(window ? { from: window.from, to: window.to } : {}),
   }), [category, window]);
+  const queryIdentity = useMemo(() => JSON.stringify({ baseQuery, reloadToken }), [baseQuery, reloadToken]);
+  const queryIdentityRef = useRef(queryIdentity);
+  const apiRef = useRef(api);
+  queryIdentityRef.current = queryIdentity;
+  apiRef.current = api;
 
   useEffect(() => {
     let active = true;
@@ -39,6 +44,7 @@ export function useCareTimeline(api: BabyCareApi) {
       return;
     }
     setLoading(true);
+    setLoadingMore(false);
     setMessage(null);
     void api.getCareTimeline(baseQuery)
       .then((response) => {
@@ -75,18 +81,22 @@ export function useCareTimeline(api: BabyCareApi) {
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore || !canReadTimeline(api)) return;
+    const requestQueryIdentity = queryIdentity;
+    const requestApi = api;
     setLoadingMore(true);
     try {
       const response = await api.getCareTimeline({ ...baseQuery, cursor: nextCursor });
+      if (queryIdentityRef.current !== requestQueryIdentity || apiRef.current !== requestApi) return;
       setItems((current) => [...current, ...response.items]);
       setNextCursor(response.nextCursor);
       setMessage(null);
     } catch {
+      if (queryIdentityRef.current !== requestQueryIdentity || apiRef.current !== requestApi) return;
       setMessage('护理时间线加载更多失败，可重试');
     } finally {
-      setLoadingMore(false);
+      if (queryIdentityRef.current === requestQueryIdentity && apiRef.current === requestApi) setLoadingMore(false);
     }
-  }, [api, baseQuery, loadingMore, nextCursor]);
+  }, [api, baseQuery, loadingMore, nextCursor, queryIdentity]);
 
   return {
     items,

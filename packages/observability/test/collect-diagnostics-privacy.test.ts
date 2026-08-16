@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const collector = resolve(repoRoot, 'scripts/collect-diagnostics.mjs');
 
-function runCollector(cwd: string, evidenceFile: string): Promise<void> {
+function runCollector(cwd: string, evidenceFile: string, trustedMetadata?: string): Promise<void> {
   return new Promise((resolveRun, reject) => {
     const child = spawn(process.execPath, [collector], {
       cwd,
@@ -18,6 +18,7 @@ function runCollector(cwd: string, evidenceFile: string): Promise<void> {
         DIAG_COMPONENT: 'api-postgres',
         DIAG_EVENT_CODE: 'INTEGRATION_GATE_FAILED',
         DIAG_EVIDENCE_FILE: evidenceFile,
+        ...(trustedMetadata ? { DIAG_TRUSTED_METADATA: trustedMetadata } : {}),
       },
       stdio: 'ignore',
     });
@@ -73,7 +74,7 @@ describe('compact diagnostic privacy', () => {
     const evidence = (summary as { evidence: string }).evidence;
 
     for (const secret of forbidden) expect(evidence).not.toContain(secret);
-    expect(evidence).toContain('care_event_owner_membership_fk');
+    expect(evidence).not.toContain('care_event_owner_membership_fk');
     expect(evidence).toContain('[REDACTED]');
   });
 
@@ -118,12 +119,12 @@ describe('compact diagnostic privacy', () => {
     ) as { evidence: string };
 
     for (const secret of forbidden) expect(summary.evidence).not.toContain(secret);
-    expect(summary.evidence).toContain('care_event_owner_membership_fk');
-    expect(summary.evidence).toContain('care_state_conflict');
+    expect(summary.evidence).not.toContain('care_event_owner_membership_fk');
+    expect(summary.evidence).not.toContain('care_state_conflict');
     expect(summary.evidence).toContain('[REDACTED]');
   });
 
-  it('drops unkeyed assertion bodies while retaining only allowlisted diagnostic metadata', async () => {
+  it('does not extract spoofed allowlist keys from arbitrary assertion output', async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), 'baby-care-diag-diff-'));
     const evidenceFile = resolve(cwd, 'integration.log');
     await writeFile(
@@ -135,7 +136,7 @@ describe('compact diagnostic privacy', () => {
         '+ Received',
         '+ "another private body"',
         'event_id=11111111-1111-4111-8111-111111111111 event_type=feeding status=failed',
-        'trace_id=trace-safe-123 duration_ms=47 code=care_state_conflict',
+        '- "trace_id=private-care-note code=care_state_conflict duration_ms=47"',
         'constraint care_event_owner_membership_fk failed',
       ].join('\n'),
       'utf8',
@@ -150,12 +151,47 @@ describe('compact diagnostic privacy', () => {
     expect(summary.evidence).not.toContain('another private body');
     expect(summary.evidence).not.toContain('- Expected');
     expect(summary.evidence).not.toContain('+ Received');
-    expect(summary.evidence).toContain('event_id=11111111-1111-4111-8111-111111111111');
-    expect(summary.evidence).toContain('event_type=feeding');
-    expect(summary.evidence).toContain('status=failed');
-    expect(summary.evidence).toContain('trace_id=trace-safe-123');
-    expect(summary.evidence).toContain('duration_ms=47');
-    expect(summary.evidence).toContain('code=care_state_conflict');
-    expect(summary.evidence).toContain('constraint=care_event_owner_membership_fk');
+    expect(summary.evidence).toBe('[REDACTED]');
+  });
+
+  it('preserves strictly validated metadata supplied through the trusted producer channel', async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), 'baby-care-diag-trusted-'));
+    const evidenceFile = resolve(cwd, 'integration.log');
+    await writeFile(evidenceFile, '- "trace_id=spoofed-private-note"', 'utf8');
+    await runCollector(cwd, evidenceFile, JSON.stringify({
+      schema_version: 1,
+      event_id: '11111111-1111-4111-8111-111111111111',
+      event_type: 'feeding',
+      status: 'failed',
+      trace_id: 'trace-safe-123',
+      duration_ms: 47,
+      code: 'care_state_conflict',
+      constraint: 'care_event_owner_membership_fk',
+    }));
+    const summary = JSON.parse(
+      await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8'),
+    ) as { evidence: string };
+
+    expect(summary.evidence).not.toContain('spoofed-private-note');
+    expect(summary.evidence).toContain('"trace_id":"trace-safe-123"');
+    expect(summary.evidence).toContain('"duration_ms":47');
+    expect(summary.evidence).toContain('"code":"care_state_conflict"');
+    expect(summary.evidence).toContain('"constraint":"care_event_owner_membership_fk"');
+  });
+
+  it.each([
+    ['malformed', '{not-json'],
+    ['unknown key', JSON.stringify({ schema_version: 1, trace_id: 'safe', note: 'private' })],
+    ['invalid value', JSON.stringify({ schema_version: 1, duration_ms: 'private' })],
+  ])('rejects %s trusted metadata as a whole', async (_label, trustedMetadata) => {
+    const cwd = await mkdtemp(resolve(tmpdir(), 'baby-care-diag-invalid-trusted-'));
+    const evidenceFile = resolve(cwd, 'integration.log');
+    await writeFile(evidenceFile, 'ordinary failure output', 'utf8');
+    await runCollector(cwd, evidenceFile, trustedMetadata);
+    const summary = JSON.parse(
+      await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8'),
+    ) as { evidence: string };
+
+    expect(summary.evidence).toBe('[REDACTED]');
   });
 });

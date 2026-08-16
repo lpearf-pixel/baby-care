@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { BabyDto, FamilyDto, MemberDto, SessionDto } from '@baby-care/contracts';
 import type { BabyCareApi } from '../api-client.js';
+import { BabyCareApiError } from '../api-client.js';
 import { CareWorkspace } from '../care/CareWorkspace.js';
 import { AdminFamilyPanel } from '../family/AdminFamilyPanel.js';
 import { NannyFamilyView } from '../family/NannyFamilyView.js';
@@ -46,15 +47,17 @@ export function AuthenticatedShell({
     };
   }, [reload]);
 
-  async function runMutation(action: () => Promise<unknown>, successMessage: string) {
+  async function runMutation(action: () => Promise<unknown>, successMessage: string, validationMessage?: string) {
     setBusy(true);
     setMessage(null);
     try {
       await action();
       await reload();
       setMessage(successMessage);
-    } catch {
-      setMessage('保存失败，请稍后重试');
+    } catch (error) {
+      setMessage(error instanceof BabyCareApiError && error.code === 'validation_failed' && validationMessage
+        ? validationMessage
+        : '保存失败，请稍后重试');
     } finally {
       setBusy(false);
     }
@@ -85,7 +88,11 @@ export function AuthenticatedShell({
           members={members}
           busy={busy}
           message={message}
-          onUpdateFamily={(input) => runMutation(() => api.updateFamily(input), '家庭资料已保存')}
+          onUpdateFamily={(input) => runMutation(
+            () => api.updateFamily(input),
+            '家庭资料已保存',
+            '服务器不支持该 IANA 时区，请检查后重试',
+          )}
           onUpdateBaby={(input) => runMutation(() => api.updateBaby(input), '宝宝资料已保存')}
           onCreateNanny={(input) => runMutation(() => api.createNanny(input), 'Nanny 账号已创建')}
           onSetNannyStatus={(membershipId, status) => runMutation(() => api.setNannyStatus(membershipId, status), status === 'active' ? 'Nanny 已启用' : 'Nanny 已停用')}
