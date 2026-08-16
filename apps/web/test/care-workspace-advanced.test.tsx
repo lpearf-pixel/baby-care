@@ -154,7 +154,88 @@ describe('M2 warnings, frequent care, and corrections', () => {
     expect(await screen.findByText('刚刚记录：配方奶 60ml')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '修改' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '撤销' }));
-    await waitFor(() => expect(api.undoCareEvent).toHaveBeenCalledWith('55555555-5555-4555-8555-555555555555'));
+    await waitFor(() => expect(api.undoCareEvent).toHaveBeenCalledWith(
+      '55555555-5555-4555-8555-555555555555',
+      { expectedVersion: 1 },
+    ));
     expect(screen.queryByText('刚刚记录：配方奶 60ml')).not.toBeInTheDocument();
+  });
+
+  it('uses the latest edit receipt version for a following undo', async () => {
+    const api = makeApi();
+    renderWithApi(api);
+    await openFormulaFeed();
+    fireEvent.change(screen.getByLabelText('实际喝了（ml）'), { target: { value: '60' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存瓶喂' }));
+    await screen.findByText('刚刚记录：配方奶 60ml');
+
+    fireEvent.click(screen.getByRole('button', { name: '修改' }));
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
+    await waitFor(() => expect(api.editCareEvent).toHaveBeenCalledWith(
+      '55555555-5555-4555-8555-555555555555',
+      expect.objectContaining({ expectedVersion: 1, event: expect.objectContaining({ eventType: 'feeding' }) }),
+    ));
+    await screen.findByText('刚刚记录：配方奶 60ml');
+
+    fireEvent.click(screen.getByRole('button', { name: '撤销' }));
+    await waitFor(() => expect(api.undoCareEvent).toHaveBeenCalledWith(
+      '55555555-5555-4555-8555-555555555555',
+      { expectedVersion: 2 },
+    ));
+  });
+
+  it('uses version 2 after completing an existing sleep interval', async () => {
+    const getCareSummary = vi.fn(async () => ({
+      ...emptySummary,
+      currentSleep: {
+        intervalId: '88888888-8888-4888-8888-888888888888',
+        startedAt: '2026-08-13T07:30:00.000Z',
+      },
+    }));
+    const wakeSleep = vi.fn(async () => ({
+      id: '88888888-8888-4888-8888-888888888888',
+      occurredAt: '2026-08-13T08:00:00.000Z',
+      status: 'active' as const,
+      startedAt: '2026-08-13T07:30:00.000Z',
+      endedAt: '2026-08-13T08:00:00.000Z',
+      note: null,
+    }));
+    const api = makeApi({ getCareSummary, wakeSleep });
+    renderWithApi(api);
+    await screen.findByRole('heading', { name: '护理状态' });
+    fireEvent.click(screen.getByRole('button', { name: '睡觉/醒来' }));
+    fireEvent.click(screen.getByRole('button', { name: '现在' }));
+    await screen.findByText('刚刚记录：醒来');
+
+    fireEvent.click(screen.getByRole('button', { name: '撤销' }));
+    await waitFor(() => expect(api.undoCareEvent).toHaveBeenCalledWith(
+      '88888888-8888-4888-8888-888888888888',
+      { expectedVersion: 2 },
+    ));
+  });
+
+  it('keeps the edit draft and shows the approved conflict message after a stale write', async () => {
+    const editCareEvent = vi.fn(async () => {
+      throw new BabyCareApiError('care_state_conflict', 'stale version');
+    });
+    const api = makeApi({ editCareEvent });
+    renderWithApi(api);
+    await openFormulaFeed();
+    fireEvent.change(screen.getByLabelText('实际喝了（ml）'), { target: { value: '60' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存瓶喂' }));
+    await screen.findByText('刚刚记录：配方奶 60ml');
+
+    fireEvent.click(screen.getByRole('button', { name: '修改' }));
+    const time = screen.getByLabelText('实际发生时间');
+    fireEvent.change(time, { target: { value: '2026-08-13T07:45' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存修改' }));
+
+    expect(await screen.findByText('记录已被其他照护者修改，请刷新后确认')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '修改最近护理记录' })).toBeInTheDocument();
+    expect(screen.getByLabelText('实际发生时间')).toHaveValue('2026-08-13T07:45');
+    expect(editCareEvent).toHaveBeenCalledWith(
+      '55555555-5555-4555-8555-555555555555',
+      expect.objectContaining({ expectedVersion: 1 }),
+    );
   });
 });

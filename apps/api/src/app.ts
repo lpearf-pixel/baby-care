@@ -10,6 +10,7 @@ import { createHandoffSummaryService } from './care/handoff-summary-service.js';
 import { createMeasurementService } from './care/measurement-service.js';
 import { createQueryService } from './care/query-service.js';
 import { createRevisionService } from './care/revision-service.js';
+import { createRevisionQueryService } from './care/revision-query-service.js';
 import { createSleepService } from './care/sleep-service.js';
 import type { DatabaseContext } from './db.js';
 import { createFamilyRepository } from './family/family-repository.js';
@@ -103,6 +104,7 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
     registerCareRevisionRoutes(app, {
       careAuth,
       revisionService: createRevisionService(dependencies.database, now),
+      revisionQueryService: createRevisionQueryService(dependencies.database),
     });
   }
 

@@ -159,6 +159,27 @@ export async function loadActiveCareEventForUpdate(
   return result.rows[0] ? toCareEventRow(result.rows[0]) : null;
 }
 
+export async function loadCareEventForUpdate(
+  client: pg.PoolClient,
+  actor: CareActorContext,
+  eventId: string,
+): Promise<CareEventRow | null> {
+  const result = await client.query<CareEventDbRow>(
+    `select ${CARE_EVENT_COLUMNS}
+       from care_events
+      where id = $1 and family_id = $2 and baby_id = $3
+      for update`,
+    [eventId, actor.familyId, actor.babyId],
+  );
+  return result.rows[0] ? toCareEventRow(result.rows[0]) : null;
+}
+
+export function assertExpectedCareEventVersion(event: CareEventRow, expectedVersion: number): void {
+  if (event.version !== expectedVersion) {
+    throw new CareStateConflictError('The care event has changed since it was loaded.');
+  }
+}
+
 export interface AppendCareRevisionInput {
   eventId: string;
   actor: CareActorContext;

@@ -8,6 +8,7 @@ import type {
   EditCareEventInput,
 } from '@baby-care/contracts';
 import type { BabyCareApi } from '../api-client.js';
+import { BabyCareApiError } from '../api-client.js';
 import { CareSummary } from './CareSummary.js';
 import { CareWarningDialog } from './CareWarningDialog.js';
 import { DiaperForm } from './DiaperForm.js';
@@ -104,6 +105,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
   const [active, setActive] = useState<CareQuickAction | null>(null);
   const [recent, setRecent] = useState<RecentState | null>(null);
   const [editing, setEditing] = useState(false);
+  const [revisionConflict, setRevisionConflict] = useState(false);
   const {
     summary,
     loading,
@@ -120,7 +122,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
     return save(
       (warnings) => api.createFeedingSession(mergeConfirmed(input, warnings)),
       (result) => {
-        setRecent({ id: result.id, label: feedingLabel(input), editInput: feedingEdit(input) });
+        setRecent({ id: result.id, label: feedingLabel(input), version: 1, editInput: feedingEdit(input) });
         setEditing(false);
         setActive(null);
       },
@@ -131,7 +133,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
     return save(
       (warnings) => api.createDiaper(mergeConfirmed(input, warnings)),
       (result) => {
-        setRecent({ id: result.id, label: diaperLabel(input), editInput: diaperEdit(input) });
+        setRecent({ id: result.id, label: diaperLabel(input), version: 1, editInput: diaperEdit(input) });
         setEditing(false);
         setActive(null);
       },
@@ -142,7 +144,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
     return save(
       (warnings) => api.createCareAction(mergeConfirmed(input, warnings)),
       (result) => {
-        setRecent({ id: result.id, label: actionLabel(input), editInput: actionEdit(input) });
+        setRecent({ id: result.id, label: actionLabel(input), version: 1, editInput: actionEdit(input) });
         setEditing(false);
         setActive(null);
       },
@@ -153,7 +155,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
     return save(
       (warnings) => api.createMeasurement(mergeConfirmed(input, warnings)),
       (result) => {
-        setRecent({ id: result.id, label: measurementLabel(input), editInput: measurementEdit(input) });
+        setRecent({ id: result.id, label: measurementLabel(input), version: 1, editInput: measurementEdit(input) });
         setEditing(false);
         setActive(null);
       },
@@ -162,10 +164,17 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
 
   async function editRecent(input: EditCareEventInput) {
     if (!recent) return;
+    setRevisionConflict(false);
     await save(
-      () => api.editCareEvent(recent.id, input),
-      () => {
-        setRecent({ ...recent, editInput: input });
+      () => api.editCareEvent(recent.id, { expectedVersion: recent.version, event: input })
+        .catch((error: unknown) => {
+          if (error instanceof BabyCareApiError && error.code === 'care_state_conflict') {
+            setRevisionConflict(true);
+          }
+          throw error;
+        }),
+      (receipt) => {
+        setRecent({ ...recent, version: receipt.version, editInput: input });
         setEditing(false);
       },
     );
@@ -173,8 +182,15 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
 
   async function undoRecent() {
     if (!recent) return;
+    setRevisionConflict(false);
     await save(
-      () => api.undoCareEvent(recent.id),
+      () => api.undoCareEvent(recent.id, { expectedVersion: recent.version })
+        .catch((error: unknown) => {
+          if (error instanceof BabyCareApiError && error.code === 'care_state_conflict') {
+            setRevisionConflict(true);
+          }
+          throw error;
+        }),
       () => {
         setRecent(null);
         setEditing(false);
@@ -210,6 +226,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
               setRecent({
                 id: result.id,
                 label: '开始睡觉',
+                version: 1,
                 editInput: {
                   eventType: 'sleep',
                   startedAt: result.startedAt,
@@ -226,6 +243,7 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
               setRecent({
                 id: result.id,
                 label: '醒来',
+                version: 2,
                 editInput: {
                   eventType: 'sleep',
                   startedAt: result.startedAt,
@@ -268,7 +286,9 @@ export function CareWorkspace({ api }: { api: BabyCareApi }) {
         />
       ) : null}
 
-      {message ? <p className="inline-message care-message" aria-live="polite">{message}</p> : null}
+      {revisionConflict ? (
+        <p className="inline-message care-message" aria-live="polite">记录已被其他照护者修改，请刷新后确认</p>
+      ) : message ? <p className="inline-message care-message" aria-live="polite">{message}</p> : null}
       <button type="button" className="text-button care-refresh" onClick={() => void reload()}>刷新护理状态</button>
     </section>
   );
