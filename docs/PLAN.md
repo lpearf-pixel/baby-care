@@ -9,7 +9,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 ## Current state
 
-Current milestone: **M3 — Care Workspace — ready for design**  
+Current milestone: **M3 — Care Workspace — implementation in progress**
 Completed milestone: **M2 — Care Recording MVP — implementation complete**  
 Previous milestone: **M1 — Family and baby foundation — verified complete**
 
@@ -25,6 +25,12 @@ M2 sources:
 - reviewed plan: `docs/superpowers/plans/2026-08-13-m2-care-recording-mvp-reviewed.md`
 - implementation branch: `codex/m2-care-recording-implementation`
 - release-gate branch: `codex/m2-task11-release-gate`
+
+M3 sources:
+
+- approved design: `docs/superpowers/specs/2026-08-15-m3-care-workspace-design.md`
+- implementation plan: `docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md`
+- implementation branch: `codex/m3-care-workspace-implementation`
 
 ## M2 delivered
 

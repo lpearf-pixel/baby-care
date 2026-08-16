@@ -37,6 +37,12 @@ function bottleSanity(amountMl: number, recentAmounts: readonly number[]): CareR
   return fn!(amountMl, recentAmounts);
 }
 
+function workspaceRule<T extends (...args: never[]) => unknown>(name: string): T {
+  const value = (Domain as unknown as Record<string, unknown>)[name];
+  expect(value, `${name} export is missing`).toBeDefined();
+  return value as T;
+}
+
 describe('M2 deterministic care rules', () => {
   it('ranks exact bottle amounts by frequency then newest use and returns at most three', () => {
     expect(rank([
@@ -91,5 +97,47 @@ describe('M2 deterministic care rules', () => {
     expect(bottleSanity(20, [60, 60, 70])).toMatchObject({ code: 'unusual_value' });
     expect(bottleSanity(120, [60, 60, 70])).toBeNull();
     expect(bottleSanity(600, [60, 70])).toBeNull();
+  });
+});
+
+describe('M3 care workspace rules', () => {
+  it('marks care as backfilled only after five minutes', () => {
+    const isBackfilled = workspaceRule<(occurredAt: Date, createdAt: Date) => boolean>('isCareEventBackfilled');
+
+    expect(isBackfilled(new Date('2026-08-16T08:00:00Z'), new Date('2026-08-16T08:05:00Z'))).toBe(false);
+    expect(isBackfilled(new Date('2026-08-16T08:00:00Z'), new Date('2026-08-16T08:05:01Z'))).toBe(true);
+  });
+
+  it('round-trips the Monday-through-Sunday weekday bitmask', () => {
+    const toMask = workspaceRule<(weekdays: readonly number[]) => number>('weekdaysToMask');
+    const toWeekdays = workspaceRule<(mask: number) => number[]>('maskToWeekdays');
+
+    expect(toMask([1, 3, 7])).toBe(69);
+    expect(toWeekdays(69)).toEqual([1, 3, 7]);
+  });
+
+  it('shows enabled reminders only when local weekday and minute match', () => {
+    const isVisible = workspaceRule<(input: {
+      localTime: string;
+      weekdayMask: number;
+      enabled: boolean;
+      familyTimeZone: string;
+      now: Date;
+    }) => boolean>('isHandoffReminderVisible');
+
+    expect(isVisible({
+      localTime: '08:30',
+      weekdayMask: 1,
+      enabled: true,
+      familyTimeZone: 'Asia/Shanghai',
+      now: new Date('2026-08-17T00:30:00Z'),
+    })).toBe(true);
+    expect(isVisible({
+      localTime: '08:30',
+      weekdayMask: 1,
+      enabled: false,
+      familyTimeZone: 'Asia/Shanghai',
+      now: new Date('2026-08-17T00:30:00Z'),
+    })).toBe(false);
   });
 });

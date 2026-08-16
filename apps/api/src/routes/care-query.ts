@@ -24,6 +24,10 @@ export function registerCareQueryRoutes(
     if (!parsed.success) {
       return reply.code(400).send({ code: 'validation_failed', message: 'Invalid timeline query.', traceId: request.id });
     }
-    return reply.send(await dependencies.queryService.timeline(actor, new Date(parsed.data.before), parsed.data.limit));
+    return reply.send(await dependencies.queryService.timeline(
+      actor,
+      new Date(parsed.data.before ?? new Date().toISOString()),
+      parsed.data.limit,
+    ));
   });
 }

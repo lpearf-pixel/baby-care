@@ -1,7 +1,5 @@
 import type {
   CareHomeSummaryDto,
-  CareTimelineItemDto,
-  CareTimelineResponse,
 } from '@baby-care/contracts';
 import type { DatabaseContext } from '../db.js';
 import type { CareActorContext } from './care-auth.js';
@@ -17,6 +15,24 @@ interface RollingRow {
   formula_ml: number;
   direct_breastfeeding_sessions: number;
   direct_breastfeeding_minutes: number;
+}
+
+interface LegacyCareTimelineItem {
+  id: string;
+  eventType: 'feeding' | 'diaper' | 'sleep' | 'burping' | 'spit_up' | 'crying' | 'bathing' | 'medication' | 'temperature' | 'weight';
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+  status: 'active' | 'voided';
+  source: 'manual' | 'guardian' | 'device' | 'import' | 'ai';
+  actorUserId: string | null;
+  actorDisplayName: string | null;
+  note: string | null;
+}
+
+interface LegacyCareTimelineResponse {
+  items: LegacyCareTimelineItem[];
+  nextCursor: null;
 }
 
 export function createQueryService(database: DatabaseContext) {
@@ -132,15 +148,15 @@ export function createQueryService(database: DatabaseContext) {
       };
     },
 
-    async timeline(actor: CareActorContext, before: Date, limit: number): Promise<CareTimelineResponse> {
+    async timeline(actor: CareActorContext, before: Date, limit: number): Promise<LegacyCareTimelineResponse> {
       const result = await database.pool.query<{
         id: string;
-        event_type: CareTimelineItemDto['eventType'];
+        event_type: LegacyCareTimelineItem['eventType'];
         occurred_at: Date;
         created_at: Date;
         updated_at: Date;
-        status: CareTimelineItemDto['status'];
-        source: CareTimelineItemDto['source'];
+        status: LegacyCareTimelineItem['status'];
+        source: LegacyCareTimelineItem['source'];
         actor_user_id: string | null;
         actor_display_name: string | null;
         note: string | null;
@@ -168,6 +184,7 @@ export function createQueryService(database: DatabaseContext) {
           actorDisplayName: row.actor_display_name,
           note: row.note,
         })),
+        nextCursor: null,
       };
     },
   };

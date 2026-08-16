@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   date,
   foreignKey,
@@ -347,4 +348,80 @@ export const careEventRevisions = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('care_event_revisions_event_idx').on(table.eventId, table.createdAt)],
+);
+
+export const careHandoffCheckpoints = pgTable(
+  'care_handoff_checkpoints',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    familyId: uuid('family_id')
+      .notNull()
+      .references(() => families.id, { onDelete: 'restrict' }),
+    babyId: uuid('baby_id').notNull(),
+    actorUserId: uuid('actor_user_id').references(() => users.id, { onDelete: 'restrict' }),
+    actorMembershipId: uuid('actor_membership_id'),
+    source: careSource('source').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    clientRequestId: uuid('client_request_id'),
+    traceId: text('trace_id').notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'care_handoff_checkpoints_family_baby_fk',
+      columns: [table.familyId, table.babyId],
+      foreignColumns: [babies.familyId, babies.id],
+    }),
+    foreignKey({
+      name: 'care_handoff_checkpoints_actor_membership_fk',
+      columns: [table.familyId, table.actorMembershipId, table.actorUserId],
+      foreignColumns: [familyMemberships.familyId, familyMemberships.id, familyMemberships.userId],
+    }),
+    uniqueIndex('care_handoff_checkpoints_idempotency_idx')
+      .on(table.familyId, table.actorUserId, table.clientRequestId)
+      .where(sql`${table.clientRequestId} is not null`),
+    index('care_handoff_checkpoints_family_baby_occurred_idx').on(table.familyId, table.babyId, table.occurredAt),
+    check(
+      'care_handoff_checkpoints_manual_actor_required',
+      sql`${table.source} <> 'manual' or (${table.actorUserId} is not null and ${table.actorMembershipId} is not null and ${table.clientRequestId} is not null)`,
+    ),
+  ],
+);
+
+export const careHandoffReminderRules = pgTable(
+  'care_handoff_reminder_rules',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    familyId: uuid('family_id')
+      .notNull()
+      .references(() => families.id, { onDelete: 'restrict' }),
+    babyId: uuid('baby_id').notNull(),
+    actorUserId: uuid('actor_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    actorMembershipId: uuid('actor_membership_id').notNull(),
+    localTime: text('local_time').notNull(),
+    weekdayMask: integer('weekday_mask').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      name: 'care_handoff_reminder_rules_family_baby_fk',
+      columns: [table.familyId, table.babyId],
+      foreignColumns: [babies.familyId, babies.id],
+    }),
+    foreignKey({
+      name: 'care_handoff_reminder_rules_actor_membership_fk',
+      columns: [table.familyId, table.actorMembershipId, table.actorUserId],
+      foreignColumns: [familyMemberships.familyId, familyMemberships.id, familyMemberships.userId],
+    }),
+    index('care_handoff_reminder_rules_owner_idx').on(table.familyId, table.babyId, table.actorMembershipId),
+    check('care_handoff_reminder_rules_weekday_mask_valid', sql`${table.weekdayMask} between 1 and 127`),
+    check(
+      'care_handoff_reminder_rules_local_time_valid',
+      sql`${table.localTime} ~ '^(?:[01][0-9]|2[0-3]):[0-5][0-9]$'`,
+    ),
+  ],
 );

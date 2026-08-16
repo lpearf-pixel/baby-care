@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "milestone": "M3 Care Workspace",
-  "status": "ready_for_design",
-  "branch": "codex/m2-care-recording-implementation",
+  "status": "in_progress",
+  "branch": "codex/m3-care-workspace-implementation",
   "completed_milestones": [
     "M0 Repository and delivery foundation",
     "M1 Family and baby foundation",
@@ -26,6 +26,10 @@
   "m2_verified_head": "631805f8144d3ece6e2df90468fa4562e0431fc3",
   "m2_verified_ci_run": 31768708846,
   "m2_verification_result": "static/unit/postgresql-integration/build/production-compose-smoke 5/5 PASS",
+  "m3_state": "in_progress",
+  "m3_approved_spec": "docs/superpowers/specs/2026-08-15-m3-care-workspace-design.md",
+  "m3_implementation_branch": "codex/m3-care-workspace-implementation",
+  "m3_implementation_plan": "docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md",
   "completed_tasks": [
     "Task 1 Care Foundation Schema, Common Contracts, and Authorization",
     "Task 2 Deterministic Care Rules",
