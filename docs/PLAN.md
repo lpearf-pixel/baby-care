@@ -9,7 +9,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 ## Current state
 
-Current milestone: **M4 — Birth Ready Operations and Data Safety — implementation plan written**
+Current milestone: **M4 — Birth Ready Operations and Data Safety — Task 1 complete**
 Completed milestone: **M3 — Care Workspace — verified complete**
 Previous milestone: **M2 — Care Recording MVP — verified complete**
 
@@ -93,9 +93,11 @@ Dad/Mom-only private family export, private atomic PostgreSQL backup, fail-close
 to an explicitly empty isolated database, and a synthetic Dad/Mom/Nanny operational
 simulation that proves the restored care timeline, revisions, handoffs and attribution.
 
-The design was approved on 2026-08-17. The task-level RED-GREEN implementation plan is
-now written and awaiting execution approval. M3 implementation scope must not be
-reopened implicitly.
+The design and task-level RED-GREEN plan were approved on 2026-08-17. Task 1 is complete
+at `5d204bd`: strict family-export v1 contracts, export capability/errors, deterministic
+ordering helpers, and the centralized 32 MiB startup bound are implemented and reviewed.
+The next executable slice is Task 2, the deterministic single-snapshot export service.
+M3 implementation scope must not be reopened implicitly.
 
 ## Hard scope boundaries
 

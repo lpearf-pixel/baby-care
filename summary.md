@@ -7,9 +7,8 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 
 ## 1. Current authoritative state
 
-- Current active milestone: **M4 — Birth Ready Operations and Data Safety**. The design
-  was approved on 2026-08-17; the detailed implementation plan is written and awaiting
-  execution approval.
+- Current active milestone: **M4 — Birth Ready Operations and Data Safety**. Task 1 is
+  complete at `5d204bd`; the next slice is Task 2, deterministic single-snapshot export.
 - Current completed milestone: **M3 — Care Workspace**, verified complete.
 - M3 authoritative final head: `52b042a66122464af338a2b4931315d92dff0965`.
 - M3 authoritative CI: `31959895049` — static / unit / PostgreSQL integration / production build / production Compose smoke 5/5 PASS.
@@ -30,6 +29,9 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   `docs/superpowers/specs/2026-08-17-m4-birth-ready-operations-data-safety-design.md`.
 - M4 implementation plan:
   `docs/superpowers/plans/2026-08-17-m4-birth-ready-operations-data-safety.md`.
+- M4 Task 1 implementation: `5d204bd` — strict family export v1 contracts, deterministic
+  ordering/filename helpers, Dad/Mom-only export capability, three closed export errors,
+  and a startup-validated default 32 MiB bound. Independent review found no issues.
 
 Release-gate history:
 
@@ -96,8 +98,8 @@ M4 closes the Birth Ready operational/data-safety loop independently of Guardian
 
 M4 does not add cloud/off-site backup, automatic deletion, in-place production restore,
 full offline synchronization, Guardian/voice integration, medical behavior, or `main`
-integration. The approved specification and detailed nine-task implementation plan are
-ready; business-code execution has not started.
+integration. Task 1 is implemented and reviewed; it deliberately adds no export route or
+database read yet. Task 2 owns the deterministic repeatable-read export service.
 
 ## 5. Baby Guardian / baby-monitor-local boundary
 
@@ -204,9 +206,8 @@ Recommended first sequence:
 
 1. Read the authoritative state files and the M4 design.
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
-3. Review/approve the written M4 implementation plan.
-4. Implement M4 on `codex/m4-birth-ready-operations` using bounded RED-GREEN segments.
-5. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary.
+3. Resume at Task 2 of the approved M4 implementation plan.
+4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary.
 
 ## 10. Copy/paste prompt for M4 implementation approval
 
@@ -219,7 +220,7 @@ Recommended first sequence:
 基线为 `codex/m4-birth-ready-operations`，来源是已通过 CI `31959895049`
 五项门禁的 M3 精确头 `52b042a66122464af338a2b4931315d92dff0965`。
 
-按已批准规格和正式计划执行 Task 1。严格 RED-GREEN，完成聚焦测试、回归、
+按已批准规格和正式计划执行 Task 2。严格 RED-GREEN，完成聚焦测试、回归、
 审查和本地提交后更新状态。普通实现问题和可恢复测试失败自行处理。
 
 不要开发 Guardian/语音、完整离线同步、云备份、医疗功能或 in-place restore；

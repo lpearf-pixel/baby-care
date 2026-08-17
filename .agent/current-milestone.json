@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "milestone": "M4 Birth Ready Operations and Data Safety",
-  "status": "implementation_plan_written",
+  "status": "implementation_in_progress",
   "branch": "codex/m4-birth-ready-operations",
   "completed_milestones": [
     "M0 Repository and delivery foundation",
@@ -45,11 +45,19 @@
     "m3-care-workspace-release-flow"
   ],
   "m3_documentation_closure_gate": "closed by final exact-head CI 31959895049 on 52b042a66122464af338a2b4931315d92dff0965",
-  "m4_state": "implementation_plan_written",
+  "m4_state": "implementation_in_progress",
   "m4_approved_spec": "docs/superpowers/specs/2026-08-17-m4-birth-ready-operations-data-safety-design.md",
   "m4_implementation_branch": "codex/m4-birth-ready-operations",
   "m4_implementation_plan": "docs/superpowers/plans/2026-08-17-m4-birth-ready-operations-data-safety.md",
   "m4_baseline_head": "52b042a66122464af338a2b4931315d92dff0965",
+  "m4_completed_tasks": [
+    {
+      "task": "Task 1 Export Contracts, Capability And Central Bounds",
+      "commit": "5d204bd",
+      "review": "approved_no_findings"
+    }
+  ],
+  "m4_current_task": "Task 2 Deterministic Single-Snapshot Family Export Service",
   "m4_scope": [
     "Dad/Mom-only private family data export",
     "atomic private PostgreSQL backup and integrity verification",
@@ -70,8 +78,8 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "approve the written M4 implementation plan",
-    "implement M4 in bounded RED-GREEN segments"
+    "execute M4 Task 2 deterministic single-snapshot family export service",
+    "continue M4 in bounded RED-GREEN segments"
   ],
   "requires_separate_post_m3_design": [
     "Guardian integration",

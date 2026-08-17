@@ -164,6 +164,8 @@ Any error before the final transition produces a closed code and no success mark
 
 ### Task 1: Export Contracts, Capability And Central Bounds
 
+**Status:** Complete at `5d204bd` (`feat: define M4 export safety contracts`); independent task review approved with no findings.
+
 **Files:**
 
 - Create: `packages/contracts/src/family-export.ts`
@@ -189,11 +191,11 @@ type ApiErrorCode = ExistingApiErrorCode
 
 **Steps:**
 
-- [ ] Add contract RED cases for one valid all-event export, exact unknown-field rejection at every top-level collection, invalid revision version edges, invalid actor/source/status/time, all three closed export error codes, and deliberate attempts to include `passwordHash`, `loginName`, `tokenHash`, `traceId`, `clientRequestId`, `databaseUrl`, evidence/media/model fields.
-- [ ] Add deterministic filename RED cases at UTC boundary and assert the result matches `^baby-care-export-\d{8}T\d{6}Z\.json$` and contains no supplied name/UUID.
-- [ ] Add domain RED cases proving Dad/Mom (`family_admin`) can `family.export` and caregiver/Nanny cannot.
-- [ ] Add config RED cases proving the default is exactly 32 MiB, a positive bounded integer override is accepted, and zero/negative/non-number/unsafe-large values fail startup. Use the key `FAMILY_EXPORT_MAX_BYTES` and cap configuration at 128 MiB.
-- [ ] Run and record RED:
+- [x] Add contract RED cases for one valid all-event export, exact unknown-field rejection at every top-level collection, invalid revision version edges, invalid actor/source/status/time, all three closed export error codes, and deliberate attempts to include `passwordHash`, `loginName`, `tokenHash`, `traceId`, `clientRequestId`, `databaseUrl`, evidence/media/model fields.
+- [x] Add deterministic filename RED cases at UTC boundary and assert the result matches `^baby-care-export-\d{8}T\d{6}Z\.json$` and contains no supplied name/UUID.
+- [x] Add domain RED cases proving Dad/Mom (`family_admin`) can `family.export` and caregiver/Nanny cannot.
+- [x] Add config RED cases proving the default is exactly 32 MiB, a positive bounded integer override is accepted, and zero/negative/non-number/unsafe-large values fail startup. Use the key `FAMILY_EXPORT_MAX_BYTES` and cap configuration at 128 MiB.
+- [x] Run and record RED:
 
   ```bash
   pnpm --filter @baby-care/contracts test -- family-export.test.ts
@@ -201,10 +203,10 @@ type ApiErrorCode = ExistingApiErrorCode
   pnpm --filter @baby-care/api test -- config.test.ts startup.test.ts
   ```
 
-- [ ] Implement strict schemas. Reuse existing care payload schemas; if an existing payload schema is private to `care/query.ts`, export that schema rather than copying a divergent shape.
-- [ ] Encode explicit deterministic sort requirements in exported helper comparators: members by relationship then membership ID; events by occurred time, created time, ID; revisions by event ID, from version, ID; checkpoints by occurred time, created time, ID; reminder rules by actor membership, local time, weekday mask, ID.
-- [ ] Add `family.export` without changing existing caregiver capabilities. Wire `FAMILY_EXPORT_MAX_BYTES` through `startServer` to `buildApp`; do not yet register a route.
-- [ ] Run GREEN and workspace type checks:
+- [x] Implement strict schemas. Reuse existing care payload schemas; if an existing payload schema is private to `care/query.ts`, export that schema rather than copying a divergent shape.
+- [x] Encode explicit deterministic sort requirements in exported helper comparators: members by relationship then membership ID; events by occurred time, created time, ID; revisions by event ID, from version, ID; checkpoints by occurred time, created time, ID; reminder rules by actor membership, local time, weekday mask, ID.
+- [x] Add `family.export` without changing existing caregiver capabilities. Wire `FAMILY_EXPORT_MAX_BYTES` through `startServer` to `buildApp`; do not yet register a route.
+- [x] Run GREEN and workspace type checks:
 
   ```bash
   pnpm --filter @baby-care/contracts test -- family-export.test.ts
@@ -216,8 +218,8 @@ type ApiErrorCode = ExistingApiErrorCode
   git diff --check
   ```
 
-- [ ] Review that the DTO has no credential/session/trace/client-request/diagnostic/media path and that all ten care kinds remain discriminated and typed.
-- [ ] Commit locally:
+- [x] Review that the DTO has no credential/session/trace/client-request/diagnostic/media path and that all ten care kinds remain discriminated and typed.
+- [x] Commit locally:
 
   ```bash
   git add packages/contracts packages/domain apps/api/src/config.ts apps/api/src/startup.ts apps/api/src/app.ts apps/api/test/config.test.ts apps/api/test/startup.test.ts
