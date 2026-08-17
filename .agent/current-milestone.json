@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "milestone": "M3 Care Workspace",
-  "status": "verified_complete",
-  "branch": "codex/m3-care-workspace-implementation",
+  "milestone": "M4 Birth Ready Operations and Data Safety",
+  "status": "design_approved",
+  "branch": "codex/m4-birth-ready-operations",
   "completed_milestones": [
     "M0 Repository and delivery foundation",
     "M1 Family and baby foundation",
@@ -33,10 +33,10 @@
   "m3_implementation_plan": "docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md",
   "m3_release_gate_state": "verified_complete",
   "m3_local_compose_result": "not_run_docker_cli_unavailable",
-  "m3_verified_head": "e551cecd6146dbb41cb146fae84bc4a5049b9392",
-  "m3_verified_ci_run": 31954327509,
+  "m3_verified_head": "52b042a66122464af338a2b4931315d92dff0965",
+  "m3_verified_ci_run": 31959895049,
   "m3_verification_result": "static/unit/postgresql-integration/build/production-compose-smoke 5/5 PASS",
-  "m3_production_compose_job": 95182508610,
+  "m3_production_compose_job": 95196165456,
   "m3_production_compose_result": "verified_via_exact_head_ci",
   "m3_production_compose_markers": [
     "m3-handoff",
@@ -44,7 +44,18 @@
     "m3-revision-conflict",
     "m3-care-workspace-release-flow"
   ],
-  "m3_documentation_closure_gate": "final CI required on the subsequent documentation-only head; record that run in the Draft PR without editing this matched code evidence",
+  "m3_documentation_closure_gate": "closed by final exact-head CI 31959895049 on 52b042a66122464af338a2b4931315d92dff0965",
+  "m4_state": "design_approved",
+  "m4_approved_spec": "docs/superpowers/specs/2026-08-17-m4-birth-ready-operations-data-safety-design.md",
+  "m4_implementation_branch": "codex/m4-birth-ready-operations",
+  "m4_implementation_plan": null,
+  "m4_baseline_head": "52b042a66122464af338a2b4931315d92dff0965",
+  "m4_scope": [
+    "Dad/Mom-only private family data export",
+    "atomic private PostgreSQL backup and integrity verification",
+    "fail-closed restore into an explicitly empty isolated database",
+    "synthetic Dad/Mom/Nanny Birth Ready operational simulation"
+  ],
   "completed_tasks": [
     "Task 1 Care Foundation Schema, Common Contracts, and Authorization",
     "Task 2 Deterministic Care Rules",
@@ -59,8 +70,9 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "family acceptance and Birth Ready operational simulation",
-    "select and approve the next post-M3 milestone before implementation"
+    "final user review of the written M4 specification",
+    "write and approve the M4 implementation plan",
+    "implement M4 in bounded RED-GREEN segments"
   ],
   "requires_separate_post_m3_design": [
     "Guardian integration",
