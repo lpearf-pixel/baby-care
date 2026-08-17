@@ -55,10 +55,32 @@ describe('production API startup', () => {
       appOrigin: 'http://127.0.0.1:8080',
       setupToken: 'local-development-setup-token-change-me',
       sessionSecure: false,
+      familyExportMaxBytes: 33_554_432,
     });
 
     await closeHook!();
     expect(events.at(-1)).toBe('close');
+  });
+
+  it('injects the validated export bound into the application without registering an export route', async () => {
+    let capturedDependencies: Record<string, unknown> | undefined;
+    await startServer({
+      environment: { ...environment, FAMILY_EXPORT_MAX_BYTES: '1048576' },
+      createDatabase: () => ({
+        migrate: async () => {},
+        checkDatabase: async () => true,
+        close: async () => {},
+      }),
+      buildApp: (dependencies) => {
+        capturedDependencies = dependencies;
+        return {
+          addHook: () => {},
+          listen: async () => {},
+        };
+      },
+    });
+
+    expect(capturedDependencies).toMatchObject({ familyExportMaxBytes: 1_048_576 });
   });
 
   it('does not build or listen when migration fails and closes the database', async () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as domainModule from '../src/index.js';
+import type { Capability as DomainCapability } from '../src/identity.js';
 
 type PermissionLevel = 'family_admin' | 'caregiver';
 type Capability =
@@ -9,10 +10,12 @@ type Capability =
   | 'baby.update'
   | 'members.read'
   | 'members.manage'
-  | 'credentials.reset_nanny';
+  | 'credentials.reset_nanny'
+  | 'family.export';
 type Can = (permission: PermissionLevel, capability: Capability) => boolean;
 
 const domain = domainModule as unknown as { can?: Can };
+const familyExportCapability: DomainCapability = 'family.export';
 
 function requireCan(): Can {
   expect(domain.can).toBeTypeOf('function');
@@ -44,5 +47,13 @@ describe('M1 permission policy', () => {
     expect(can('caregiver', 'baby.update')).toBe(false);
     expect(can('caregiver', 'members.manage')).toBe(false);
     expect(can('caregiver', 'credentials.reset_nanny')).toBe(false);
+  });
+});
+
+describe('M4 family export policy', () => {
+  it('allows family admins to export without granting caregivers the export capability', () => {
+    const can = requireCan();
+    expect(can('family_admin', familyExportCapability)).toBe(true);
+    expect(can('caregiver', familyExportCapability)).toBe(false);
   });
 });

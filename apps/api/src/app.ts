@@ -36,6 +36,7 @@ export interface AppDependencies {
   appOrigin?: string;
   setupToken?: string;
   sessionSecure?: boolean;
+  familyExportMaxBytes?: number;
 }
 
 export function buildApp(dependencies: AppDependencies): FastifyInstance {

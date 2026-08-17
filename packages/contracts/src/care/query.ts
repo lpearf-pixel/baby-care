@@ -67,33 +67,33 @@ const CareTimelineItemBaseSchema = z.object({
   isBackfilled: z.boolean(),
 });
 
-const FeedingTimelinePayloadSchema = z.object({
+export const FeedingTimelinePayloadSchema = z.object({
   components: z.array(FeedingComponentInputSchema).min(1),
   relatedActions: z.array(FeedingRelatedActionInputSchema),
 }).strict();
-const DiaperTimelinePayloadSchema = z.object({
+export const DiaperTimelinePayloadSchema = z.object({
   kind: DiaperKindSchema,
   stoolColor: z.string().nullable(),
   stoolConsistency: z.string().nullable(),
   stoolAmount: z.string().nullable(),
 }).strict();
-const SleepTimelinePayloadSchema = z.object({
+export const SleepTimelinePayloadSchema = z.object({
   startedAt: OffsetDateTimeSchema,
   endedAt: OffsetDateTimeSchema.nullable(),
 }).strict();
-const BurpingTimelinePayloadSchema = z.object({
+export const BurpingTimelinePayloadSchema = z.object({
   action: z.object({ kind: z.literal('burping') }).strict(),
 }).strict();
-const SpitUpTimelinePayloadSchema = z.object({
+export const SpitUpTimelinePayloadSchema = z.object({
   action: z.object({ kind: z.literal('spit_up'), amount: z.enum(['small', 'medium', 'large']) }).strict(),
 }).strict();
-const CryingTimelinePayloadSchema = z.object({
+export const CryingTimelinePayloadSchema = z.object({
   action: z.object({ kind: z.literal('crying'), durationMinutes: z.number().int().positive().optional() }).strict(),
 }).strict();
-const BathingTimelinePayloadSchema = z.object({
+export const BathingTimelinePayloadSchema = z.object({
   action: z.object({ kind: z.literal('bathing') }).strict(),
 }).strict();
-const MedicationTimelinePayloadSchema = z.object({
+export const MedicationTimelinePayloadSchema = z.object({
   action: z.object({
     kind: z.literal('medication'),
     medicationName: z.string().trim().min(1).max(160),
@@ -101,14 +101,14 @@ const MedicationTimelinePayloadSchema = z.object({
     doseUnit: z.string().trim().min(1).max(40),
   }).strict(),
 }).strict();
-const TemperatureTimelinePayloadSchema = z.object({
+export const TemperatureTimelinePayloadSchema = z.object({
   measurement: z.object({
     kind: z.literal('temperature'),
     valueCelsius: z.number().positive(),
     method: z.string().trim().min(1).max(80).optional(),
   }).strict(),
 }).strict();
-const WeightTimelinePayloadSchema = z.object({
+export const WeightTimelinePayloadSchema = z.object({
   measurement: z.object({ kind: z.literal('weight'), valueKg: z.number().positive() }).strict(),
 }).strict();
 
