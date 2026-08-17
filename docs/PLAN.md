@@ -9,7 +9,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 ## Current state
 
-Current milestone: **M4 — Birth Ready Operations and Data Safety — Task 1 complete**
+Current milestone: **M4 — Birth Ready Operations and Data Safety — Task 2 complete**
 Completed milestone: **M3 — Care Workspace — verified complete**
 Previous milestone: **M2 — Care Recording MVP — verified complete**
 
@@ -96,7 +96,13 @@ simulation that proves the restored care timeline, revisions, handoffs and attri
 The design and task-level RED-GREEN plan were approved on 2026-08-17. Task 1 is complete
 at `5d204bd`: strict family-export v1 contracts, export capability/errors, deterministic
 ordering helpers, and the centralized 32 MiB startup bound are implemented and reviewed.
-The next executable slice is Task 2, the deterministic single-snapshot export service.
+Task 2 is complete at `6d5a166`: a family-scoped export buffer is assembled through one
+`REPEATABLE READ READ ONLY` client with ten fixed set-oriented reads, strict typed and
+revision-causality validation, deterministic UTF-8 serialization, and a closed byte
+limit. Independent review approved with no findings. The two PostgreSQL integration
+cases remain enabled but were skipped locally because `TEST_DATABASE_URL` is absent.
+The next executable slice is Task 3, the authenticated export route, audit, and
+per-actor concurrency gate.
 M3 implementation scope must not be reopened implicitly.
 
 ## Hard scope boundaries

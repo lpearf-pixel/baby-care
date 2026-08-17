@@ -55,9 +55,14 @@
       "task": "Task 1 Export Contracts, Capability And Central Bounds",
       "commit": "5d204bd",
       "review": "approved_no_findings"
+    },
+    {
+      "task": "Task 2 Deterministic Single-Snapshot Family Export Service",
+      "commit": "6d5a166",
+      "review": "approved_no_findings"
     }
   ],
-  "m4_current_task": "Task 2 Deterministic Single-Snapshot Family Export Service",
+  "m4_current_task": "Task 3 Secure Export Route, Audit And Concurrency Gate",
   "m4_scope": [
     "Dad/Mom-only private family data export",
     "atomic private PostgreSQL backup and integrity verification",
@@ -78,7 +83,7 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "execute M4 Task 2 deterministic single-snapshot family export service",
+    "execute M4 Task 3 secure export route, audit and per-actor concurrency gate",
     "continue M4 in bounded RED-GREEN segments"
   ],
   "requires_separate_post_m3_design": [

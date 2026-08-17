@@ -232,6 +232,8 @@ type ApiErrorCode = ExistingApiErrorCode
 
 ### Task 2: Deterministic Single-Snapshot Family Export Service
 
+**Status:** Complete at `6d5a166` (`feat: build consistent family export snapshots`); independent review approved with no findings after revision-causality and feeding-undo closure hardening.
+
 **Files:**
 
 - Create: `apps/api/src/family/family-export-repository.ts`
@@ -259,12 +261,12 @@ export function createFamilyExportService(
 
 **Steps:**
 
-- [ ] Write service RED tests with a recording fake client: exact `begin isolation level repeatable read read only`, every repository read receives that client, `commit` after successful validation/serialization, `rollback` on query/schema/serialization/size failures, and one `release` in all paths. Make `database.pool.query` throw to prove no pool escape.
-- [ ] Add RED cases for UTF-8 byte length (not JavaScript character count), exact-bound acceptance, one-byte-over rejection, no truncated buffer, stable serialization across shuffled repository rows, and `generatedAt` supplied once by the caller.
-- [ ] Add PostgreSQL RED fixtures covering Dad/Mom/Nanny membership states, all ten care kinds, mixed feeding components, bottle capacity, active and voided rows, notes, revision edit/void edges, handoffs, reminder ownership, and machine provenance rows. Assert excluded columns never appear recursively.
-- [ ] Add a bounded query-count assertion. The repository must use a fixed set of set-oriented queries independent of event count; expected ceiling is 10 application queries inside the snapshot, excluding `BEGIN`/`COMMIT`.
-- [ ] Add a concurrency RED test: pause after the family/event envelope read, commit an edit from a second connection, resume export, and assert the document is wholly pre-edit. A `READ COMMITTED` mutation of the transaction must fail this test.
-- [ ] Run RED:
+- [x] Write service RED tests with a recording fake client: exact `begin isolation level repeatable read read only`, every repository read receives that client, `commit` after successful validation/serialization, `rollback` on query/schema/serialization/size failures, and one `release` in all paths. Make `database.pool.query` throw to prove no pool escape.
+- [x] Add RED cases for UTF-8 byte length (not JavaScript character count), exact-bound acceptance, one-byte-over rejection, no truncated buffer, stable serialization across shuffled repository rows, and `generatedAt` supplied once by the caller.
+- [x] Add PostgreSQL RED fixtures covering Dad/Mom/Nanny membership states, all ten care kinds, mixed feeding components, bottle capacity, active and voided rows, notes, revision edit/void edges, handoffs, reminder ownership, and machine provenance rows. Assert excluded columns never appear recursively.
+- [x] Add a bounded query-count assertion. The repository must use a fixed set of set-oriented queries independent of event count; expected ceiling is 10 application queries inside the snapshot, excluding `BEGIN`/`COMMIT`.
+- [x] Add a concurrency RED test: pause after the family/event envelope read, commit an edit from a second connection, resume export, and assert the document is wholly pre-edit. A `READ COMMITTED` mutation of the transaction must fail this test.
+- [x] Run RED:
 
   ```bash
   pnpm --filter @baby-care/api test -- family-export-service.test.ts family-export.integration.test.ts
@@ -272,10 +274,10 @@ export function createFamilyExportService(
 
   If `TEST_DATABASE_URL` is absent, the unit RED must execute and the PostgreSQL cases must remain enabled/skipped only by the repository's established DB-test harness.
 
-- [ ] Implement repository reads using the injected `PoolClient` only. Fetch envelopes and typed child rows in batches; never perform one query per event. Join actor display identity without exporting login names.
-- [ ] Assemble exactly one active family and baby. Treat missing/multiple authoritative rows, orphan typed detail, mismatched event/payload kind, invalid revision edge, or unknown database enum as a closed validation error rather than omitting data.
-- [ ] Sort every array with the contract comparators, parse through `FamilyExportSchemaV1`, serialize once with `JSON.stringify`, convert to `Buffer`, enforce `maxBytes`, then commit.
-- [ ] Run GREEN and regression:
+- [x] Implement repository reads using the injected `PoolClient` only. Fetch envelopes and typed child rows in batches; never perform one query per event. Join actor display identity without exporting login names.
+- [x] Assemble exactly one active family and baby. Treat missing/multiple authoritative rows, orphan typed detail, mismatched event/payload kind, invalid revision edge, or unknown database enum as a closed validation error rather than omitting data.
+- [x] Sort every array with the contract comparators, parse through `FamilyExportSchemaV1`, serialize once with `JSON.stringify`, convert to `Buffer`, enforce `maxBytes`, then commit.
+- [x] Run GREEN and regression:
 
   ```bash
   pnpm --filter @baby-care/api test -- family-export-service.test.ts family-export.integration.test.ts care-workspace-system.integration.test.ts
@@ -284,8 +286,8 @@ export function createFamilyExportService(
   git diff --check
   ```
 
-- [ ] Review transaction boundaries, query count, typed coverage, excluded fields and deterministic ordering. Do not add an audit write to the read-only transaction.
-- [ ] Commit locally:
+- [x] Review transaction boundaries, query count, typed coverage, excluded fields and deterministic ordering. Do not add an audit write to the read-only transaction.
+- [x] Commit locally:
 
   ```bash
   git add apps/api/src/family apps/api/test/family-export-service.test.ts apps/api/test/family-export.integration.test.ts
