@@ -1,6 +1,6 @@
 # M4 Birth Ready Operations And Data Safety Design
 
-Status: approved in conversation on 2026-08-17; written for final review
+Status: approved on 2026-08-17
 
 Milestone: M4 — Birth Ready Operations and Data Safety
 

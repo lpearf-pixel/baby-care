@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "milestone": "M4 Birth Ready Operations and Data Safety",
-  "status": "design_approved",
+  "status": "implementation_plan_written",
   "branch": "codex/m4-birth-ready-operations",
   "completed_milestones": [
     "M0 Repository and delivery foundation",
@@ -45,10 +45,10 @@
     "m3-care-workspace-release-flow"
   ],
   "m3_documentation_closure_gate": "closed by final exact-head CI 31959895049 on 52b042a66122464af338a2b4931315d92dff0965",
-  "m4_state": "design_approved",
+  "m4_state": "implementation_plan_written",
   "m4_approved_spec": "docs/superpowers/specs/2026-08-17-m4-birth-ready-operations-data-safety-design.md",
   "m4_implementation_branch": "codex/m4-birth-ready-operations",
-  "m4_implementation_plan": null,
+  "m4_implementation_plan": "docs/superpowers/plans/2026-08-17-m4-birth-ready-operations-data-safety.md",
   "m4_baseline_head": "52b042a66122464af338a2b4931315d92dff0965",
   "m4_scope": [
     "Dad/Mom-only private family data export",
@@ -70,8 +70,7 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "final user review of the written M4 specification",
-    "write and approve the M4 implementation plan",
+    "approve the written M4 implementation plan",
     "implement M4 in bounded RED-GREEN segments"
   ],
   "requires_separate_post_m3_design": [

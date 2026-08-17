@@ -9,7 +9,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 ## Current state
 
-Current milestone: **M4 — Birth Ready Operations and Data Safety — design approved**
+Current milestone: **M4 — Birth Ready Operations and Data Safety — implementation plan written**
 Completed milestone: **M3 — Care Workspace — verified complete**
 Previous milestone: **M2 — Care Recording MVP — verified complete**
 
@@ -36,7 +36,7 @@ M4 sources:
 
 - approved design: `docs/superpowers/specs/2026-08-17-m4-birth-ready-operations-data-safety-design.md`
 - design/implementation branch: `codex/m4-birth-ready-operations`
-- implementation plan: pending specification review and plan approval
+- implementation plan: `docs/superpowers/plans/2026-08-17-m4-birth-ready-operations-data-safety.md`
 
 ## M2 delivered
 
@@ -93,9 +93,9 @@ Dad/Mom-only private family export, private atomic PostgreSQL backup, fail-close
 to an explicitly empty isolated database, and a synthetic Dad/Mom/Nanny operational
 simulation that proves the restored care timeline, revisions, handoffs and attribution.
 
-The design was approved on 2026-08-17. The next step is final review of the written
-specification followed by a task-level implementation plan. M3 implementation scope
-must not be reopened implicitly.
+The design was approved on 2026-08-17. The task-level RED-GREEN implementation plan is
+now written and awaiting execution approval. M3 implementation scope must not be
+reopened implicitly.
 
 ## Hard scope boundaries
 
