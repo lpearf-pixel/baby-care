@@ -102,9 +102,9 @@ export function registerFamilyExportRoute(
   dependencies: FamilyExportRouteDependencies,
 ): void {
   app.post('/api/family/export', async (request, reply) => {
-    const context = await requireExportAuth(request, reply, dependencies);
-    if (!context) return;
     try {
+      const context = await requireExportAuth(request, reply, dependencies);
+      if (!context) return;
       await dependencies.coordinator.run(context.userId, async () => {
         const generatedAt = dependencies.now();
         const result = await dependencies.exportService.exportFamily(context, generatedAt);

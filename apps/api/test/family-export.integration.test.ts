@@ -347,10 +347,11 @@ describeDatabase('family export PostgreSQL snapshot', () => {
         target_id: string;
         source: string;
         trace_id: string;
+        occurred_at: Date;
         metadata_json: unknown;
       }>(
         `select family_id, actor_user_id, actor_membership_id, action, target_type,
-                target_id, source, trace_id, metadata_json
+        target_id, source, trace_id, occurred_at, metadata_json
            from audit_events where action = 'family.export'`,
       );
       expect(audits.rows).toHaveLength(1);
@@ -364,6 +365,7 @@ describeDatabase('family export PostgreSQL snapshot', () => {
         source: 'web',
         metadata_json: null,
       });
+      expect(audits.rows[0]?.occurred_at.toISOString()).toBe('2026-08-13T08:00:00.000Z');
       expect(audits.rows[0]?.trace_id).toBeTruthy();
     } finally {
       await fixture.app.close();

@@ -47,11 +47,52 @@ function appWith(service: Partial<FamilyExportService> = {}) {
   return app;
 }
 
+function noAttachment(response: { headers: Record<string, unknown>; body: string }): void {
+  expect(response.headers['content-disposition']).toBeUndefined();
+  expect(response.headers['cache-control']).not.toBe('no-store');
+  expect(response.body).not.toContain('schemaVersion');
+}
+
 describe('family export route', () => {
   it('requires an origin and authenticated family-admin session', async () => {
     const app = appWith();
     await expect((await app.inject({ method: 'POST', url: '/api/family/export' })).statusCode).toBe(403);
     await expect((await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin } })).statusCode).toBe(401);
+    await app.close();
+  });
+
+  it('keeps exact stable shapes for wrong origin, invalid cookie, auth failure, and nanny', async () => {
+    const app = appWith();
+    const cases = [
+      [{ origin: 'http://evil.test', cookie: 'baby_care_session=valid' }, 403, 'origin_not_allowed'],
+      [{ origin, cookie: 'baby_care_session=invalid' }, 401, 'unauthenticated'],
+      [{ origin, cookie: 'baby_care_session=nanny' }, 403, 'forbidden'],
+    ] as const;
+    for (const [headers, statusCode, code] of cases) {
+      const response = await app.inject({ method: 'POST', url: '/api/family/export', headers });
+      expect(response.statusCode).toBe(statusCode);
+      expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
+      expect(response.json().code).toBe(code);
+      noAttachment(response);
+    }
+    await app.close();
+  });
+
+  it('maps unexpected authentication errors to a closed export_failed response', async () => {
+    const app = Fastify({ logger: false });
+    registerFamilyExportRoute(app, {
+      authService: { authenticate: vi.fn(async () => { throw new Error('database password'); }) } as unknown as AuthService,
+      appOrigin: origin,
+      exportService: {} as FamilyExportService,
+      coordinator: new StableExportCoordinator(),
+      database: {} as never,
+      now: () => new Date('2026-08-17T12:00:00.000Z'),
+    });
+    const response = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toMatchObject({ code: 'export_failed' });
+    expect(response.body).not.toContain('database password');
+    noAttachment(response);
     await app.close();
   });
 
@@ -115,6 +156,68 @@ describe('family export route', () => {
     expect(response.body).not.toContain('database detail');
     await app.close();
   });
+
+  it.each([
+    ['too large', async () => { const { FamilyExportTooLargeError } = await import('../src/family/family-export-service.js'); throw new FamilyExportTooLargeError(); }],
+    ['non-buffer', async () => ({ document: {}, serialized: 'not-a-buffer' } as never)],
+  ])('closes %s before response headers', async (_label, exportFamily) => {
+    const app = appWith({ exportFamily: exportFamily as FamilyExportService['exportFamily'] });
+    const response = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
+    expect(response.statusCode).toBe(_label === 'too large' ? 413 : 500);
+    noAttachment(response);
+    await app.close();
+  });
+
+  it('returns 409 without a body when the actor slot is occupied', async () => {
+    const coordinator = new StableExportCoordinator();
+    let release!: () => void;
+    const held = coordinator.run(context.userId, () => new Promise<void>((resolve) => { release = resolve; }));
+    const app = Fastify({ logger: false });
+    registerFamilyExportRoute(app, {
+      authService: fakeAuth(), appOrigin: origin, exportService: {} as FamilyExportService,
+      coordinator, database: {} as never, now: () => new Date('2026-08-17T12:00:00.000Z'),
+    });
+    const response = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
+    expect(response.statusCode).toBe(409);
+    noAttachment(response);
+    release();
+    await held;
+    await app.close();
+  });
+
+  it('releases the actor slot after audit failure for immediate retry', async () => {
+    const database = { pool: { connect: vi.fn(async () => ({ query: vi.fn(async () => { throw new Error('audit down'); }), release: vi.fn() })) } } as never;
+    const app = Fastify({ logger: false });
+    registerFamilyExportRoute(app, { authService: fakeAuth(), appOrigin: origin, exportService: {
+      exportFamily: vi.fn(async () => ({ document: {}, serialized: Buffer.from('{}') })),
+    } as unknown as FamilyExportService, coordinator: new StableExportCoordinator(), database, now: () => new Date('2026-08-17T12:00:00.000Z') });
+    const first = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
+    const second = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
+    expect(first.statusCode).toBe(500);
+    expect(second.statusCode).toBe(500);
+    noAttachment(first); noAttachment(second);
+    await app.close();
+  });
+
+  it.each(['begin', 'write', 'commit'] as const)('closes audit %s failure without a success response', async (failure) => {
+    let calls = 0;
+    const client = {
+      query: vi.fn(async () => {
+        calls += 1;
+        if ((failure === 'begin' && calls === 1) || (failure === 'write' && calls === 2) || (failure === 'commit' && calls === 3)) throw new Error('audit internals');
+        return { rows: [] };
+      }),
+      release: vi.fn(),
+    };
+    const app = Fastify({ logger: false });
+    registerFamilyExportRoute(app, { authService: fakeAuth(), appOrigin: origin, exportService: {
+      exportFamily: vi.fn(async () => ({ document: {}, serialized: Buffer.from('{"schemaVersion":1}') })),
+    } as unknown as FamilyExportService, coordinator: new StableExportCoordinator(), database: { pool: { connect: vi.fn(async () => client) } } as never, now: () => new Date('2026-08-17T12:00:00.000Z') });
+    const response = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
+    expect(response.statusCode).toBe(500);
+    noAttachment(response);
+    await app.close();
+  });
 });
 
 describe('stable export coordinator', () => {
@@ -130,5 +233,17 @@ describe('stable export coordinator', () => {
     await expect(coordinator.run('other', async () => undefined)).resolves.toBeUndefined();
     await expect(coordinator.run('actor', async () => { throw new Error('failed'); })).rejects.toThrow('failed');
     await expect(coordinator.run('actor', async () => undefined)).resolves.toBeUndefined();
+  });
+
+  it('admits different actors simultaneously and releases after rejection', async () => {
+    const coordinator = new StableExportCoordinator();
+    let release!: () => void;
+    const first = coordinator.run('one', () => new Promise<void>((resolve) => { release = resolve; }));
+    const second = coordinator.run('two', async () => 'second');
+    await expect(second).resolves.toBe('second');
+    release();
+    await first;
+    await expect(coordinator.run('one', async () => { throw new Error('abort'); })).rejects.toThrow('abort');
+    await expect(coordinator.run('one', async () => 'retry')).resolves.toBe('retry');
   });
 });
