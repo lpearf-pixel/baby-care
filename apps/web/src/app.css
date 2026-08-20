@@ -173,6 +173,16 @@ input:focus-visible, button:focus-visible { outline: 2px solid currentColor; out
 
 .nested-form { margin-top: 18px; }
 .nanny-admin { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: end; }
+.family-data-export { display: grid; gap: 12px; }
+.family-data-export-warning {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--care-warning-border);
+  border-radius: 12px;
+  background: var(--care-warning-surface);
+  color: var(--care-warning-text);
+  line-height: 1.55;
+}
 
 .care-workspace {
   display: grid;

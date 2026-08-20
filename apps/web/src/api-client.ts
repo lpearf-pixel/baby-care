@@ -40,6 +40,11 @@ export interface HandoffReminderState {
   shouldPrompt: boolean;
 }
 
+export interface FamilyExportDownload {
+  blob: Blob;
+  filename: string;
+}
+
 export interface CareRevisionHistoryItemDto {
   id: string;
   eventId: string;
@@ -92,6 +97,29 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+const FAMILY_EXPORT_FILENAME = /^baby-care-export-\d{8}T\d{6}Z\.json$/;
+
+function fallbackFamilyExportFilename(now = new Date()): string {
+  return `baby-care-export-${now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}.json`;
+}
+
+function exportFilename(contentDisposition: string | null): string | null {
+  const match = /^attachment; filename="([^"]+)"$/i.exec(contentDisposition ?? '');
+  const filename = match?.[1];
+  return filename && FAMILY_EXPORT_FILENAME.test(filename) ? filename : null;
+}
+
+async function exportFamilyData(): Promise<FamilyExportDownload> {
+  const response = await fetch('/api/family/export', { method: 'POST', credentials: 'include' });
+  if (!response.ok || response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json') {
+    throw new BabyCareApiError('export_failed', '下载失败，请稍后重试');
+  }
+  return {
+    blob: await response.blob(),
+    filename: exportFilename(response.headers.get('content-disposition')) ?? fallbackFamilyExportFilename(),
+  };
+}
+
 export interface BabyCareApi {
   getSetupStatus(): Promise<{ required: boolean }>;
   setupFamily(input: SetupInput, setupToken: string): Promise<{ status: 'created' }>;
@@ -106,6 +134,7 @@ export interface BabyCareApi {
   createNanny(input: CreateNannyInput): Promise<MemberDto>;
   setNannyStatus(membershipId: string, status: 'active' | 'disabled'): Promise<MemberDto>;
   resetNannyPassword(membershipId: string, newPassword: string): Promise<void>;
+  exportFamilyData(): Promise<FamilyExportDownload>;
   getCareSummary(at: string): Promise<CareHomeSummaryDto>;
   getLatestCareHandoff(): Promise<CareHandoffBriefingDto | null>;
   getCareHandoffSummary(handoffId: string): Promise<CareHandoffBriefingDto>;
@@ -158,6 +187,7 @@ export const babyCareApi: BabyCareApi = {
       method: 'POST',
       body: JSON.stringify({ newPassword }),
     }),
+  exportFamilyData,
   getCareSummary: (at) => request(`/api/care/summary?at=${encodeURIComponent(at)}`),
   getLatestCareHandoff: () => request('/api/care/handoffs/latest'),
   getCareHandoffSummary: (handoffId) => request(`/api/care/handoffs/${handoffId}/summary`),

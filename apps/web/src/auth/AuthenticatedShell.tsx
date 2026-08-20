@@ -4,6 +4,7 @@ import type { BabyCareApi } from '../api-client.js';
 import { BabyCareApiError } from '../api-client.js';
 import { CareWorkspace } from '../care/CareWorkspace.js';
 import { AdminFamilyPanel } from '../family/AdminFamilyPanel.js';
+import { FamilyDataExport } from '../family/FamilyDataExport.js';
 import { NannyFamilyView } from '../family/NannyFamilyView.js';
 
 export function AuthenticatedShell({
@@ -97,7 +98,9 @@ export function AuthenticatedShell({
           onCreateNanny={(input) => runMutation(() => api.createNanny(input), 'Nanny 账号已创建')}
           onSetNannyStatus={(membershipId, status) => runMutation(() => api.setNannyStatus(membershipId, status), status === 'active' ? 'Nanny 已启用' : 'Nanny 已停用')}
           onResetNannyPassword={(membershipId, newPassword) => runMutation(() => api.resetNannyPassword(membershipId, newPassword), 'Nanny 密码已重置，旧会话已失效')}
-        />
+        >
+          <FamilyDataExport api={api} />
+        </AdminFamilyPanel>
       ) : null}
 
       {!loading && family && baby && session.permissionLevel === 'caregiver' ? (
