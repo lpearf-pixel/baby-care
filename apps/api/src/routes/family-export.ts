@@ -66,8 +66,10 @@ async function recordExportAudit(
   occurredAt: Date,
 ): Promise<void> {
   const client = await database.pool.connect();
+  let transactionStarted = false;
   try {
     await client.query('begin');
+    transactionStarted = true;
     await writeAudit(client, {
       familyId: context.familyId,
       actorUserId: context.userId,
@@ -82,10 +84,12 @@ async function recordExportAudit(
     });
     await client.query('commit');
   } catch (error) {
-    try {
-      await client.query('rollback');
-    } catch {
-      // Preserve the closed audit failure.
+    if (transactionStarted) {
+      try {
+        await client.query('rollback');
+      } catch {
+        // Preserve the closed audit failure.
+      }
     }
     throw error;
   } finally {

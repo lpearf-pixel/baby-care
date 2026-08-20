@@ -30,6 +30,7 @@ function fakeAuth(): AuthService {
 function appWith(service: Partial<FamilyExportService> = {}) {
   const app = Fastify({ logger: false });
   const client = { query: vi.fn(async () => ({ rows: [] })), release: vi.fn() };
+  const connect = vi.fn(async () => client);
   registerFamilyExportRoute(app, {
     authService: fakeAuth(),
     appOrigin: origin,
@@ -41,23 +42,29 @@ function appWith(service: Partial<FamilyExportService> = {}) {
       ...service,
     } as FamilyExportService,
     coordinator: new StableExportCoordinator(),
-    database: { pool: { connect: vi.fn(async () => client) } } as never,
+    database: { pool: { connect } } as never,
     now: () => new Date('2026-08-17T12:00:00.000Z'),
   });
+  (app as unknown as { auditConnect: typeof connect }).auditConnect = connect;
   return app;
 }
 
 function noAttachment(response: { headers: Record<string, unknown>; body: string }): void {
   expect(response.headers['content-disposition']).toBeUndefined();
-  expect(response.headers['cache-control']).not.toBe('no-store');
+  expect(response.headers['cache-control']).toBeUndefined();
+  expect(response.headers['x-content-type-options']).toBeUndefined();
   expect(response.body).not.toContain('schemaVersion');
 }
 
 describe('family export route', () => {
   it('requires an origin and authenticated family-admin session', async () => {
     const app = appWith();
-    await expect((await app.inject({ method: 'POST', url: '/api/family/export' })).statusCode).toBe(403);
-    await expect((await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin } })).statusCode).toBe(401);
+    const wrongOrigin = await app.inject({ method: 'POST', url: '/api/family/export' });
+    const missingCookie = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin } });
+    expect(wrongOrigin.statusCode).toBe(403);
+    expect(missingCookie.statusCode).toBe(401);
+    noAttachment(wrongOrigin);
+    noAttachment(missingCookie);
     await app.close();
   });
 
@@ -75,6 +82,7 @@ describe('family export route', () => {
       expect(response.json().code).toBe(code);
       noAttachment(response);
     }
+    expect((app as unknown as { auditConnect: ReturnType<typeof vi.fn> }).auditConnect).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -91,6 +99,8 @@ describe('family export route', () => {
     const response = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
     expect(response.statusCode).toBe(500);
     expect(response.json()).toMatchObject({ code: 'export_failed' });
+    expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
+    expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
     expect(response.body).not.toContain('database password');
     noAttachment(response);
     await app.close();
@@ -105,6 +115,9 @@ describe('family export route', () => {
     });
     expect(response.statusCode).toBe(403);
     expect(response.json()).toMatchObject({ code: 'forbidden' });
+    expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
+    noAttachment(response);
+    expect((app as unknown as { auditConnect: ReturnType<typeof vi.fn> }).auditConnect).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -140,6 +153,10 @@ describe('family export route', () => {
       headers: { origin, cookie: 'baby_care_session=mom' },
     });
     expect(momResponse.statusCode).toBe(200);
+    expect(momResponse.headers['content-type']).toContain('application/json');
+    expect(momResponse.headers['cache-control']).toBe('no-store');
+    expect(momResponse.headers['x-content-type-options']).toBe('nosniff');
+    expect(momResponse.headers['content-disposition']).toMatch(/^attachment; filename="baby-care-export-20260817T120000Z\.json"$/);
     await app.close();
   });
 
@@ -152,7 +169,10 @@ describe('family export route', () => {
     });
     expect(response.statusCode).toBe(500);
     expect(response.json()).toMatchObject({ code: 'export_failed' });
-    expect(response.headers['content-disposition']).toBeUndefined();
+    expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
+    expect(response.json().code).toBe('export_failed');
+    noAttachment(response);
+    expect((app as unknown as { auditConnect: ReturnType<typeof vi.fn> }).auditConnect).not.toHaveBeenCalled();
     expect(response.body).not.toContain('database detail');
     await app.close();
   });
@@ -164,7 +184,10 @@ describe('family export route', () => {
     const app = appWith({ exportFamily: exportFamily as FamilyExportService['exportFamily'] });
     const response = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
     expect(response.statusCode).toBe(_label === 'too large' ? 413 : 500);
+    expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
+    expect(response.json().code).toBe(_label === 'too large' ? 'export_too_large' : 'export_failed');
     noAttachment(response);
+    expect((app as unknown as { auditConnect: ReturnType<typeof vi.fn> }).auditConnect).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -179,6 +202,8 @@ describe('family export route', () => {
     });
     const response = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
     expect(response.statusCode).toBe(409);
+    expect(response.json().code).toBe('export_in_progress');
+    expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
     noAttachment(response);
     release();
     await held;
@@ -195,6 +220,8 @@ describe('family export route', () => {
     const second = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
     expect(first.statusCode).toBe(500);
     expect(second.statusCode).toBe(500);
+    expect(first.json().code).toBe('export_failed');
+    expect(second.json().code).toBe('export_failed');
     noAttachment(first); noAttachment(second);
     await app.close();
   });
@@ -215,7 +242,12 @@ describe('family export route', () => {
     } as unknown as FamilyExportService, coordinator: new StableExportCoordinator(), database: { pool: { connect: vi.fn(async () => client) } } as never, now: () => new Date('2026-08-17T12:00:00.000Z') });
     const response = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
     expect(response.statusCode).toBe(500);
+    expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
     noAttachment(response);
+    expect(client.release).toHaveBeenCalledOnce();
+    if (failure === 'begin') expect(calls).toBe(1);
+    else if (failure === 'write') expect(calls).toBe(3);
+    else expect(calls).toBe(4);
     await app.close();
   });
 });
