@@ -322,6 +322,55 @@ function collectKeys(value: unknown, keys = new Set<string>()): Set<string> {
 }
 
 describeDatabase('family export PostgreSQL snapshot', () => {
+  it('serves one audited private attachment from the authenticated family scope', async () => {
+    const fixture = await createM2TestApp(testDatabaseUrl!);
+    try {
+      const seed = await seedCompleteExport(fixture.database);
+      const response = await fixture.app.inject({
+        method: 'POST',
+        url: '/api/family/export',
+        headers: { origin: M2_TEST_ORIGIN, cookie: fixture.cookie },
+        payload: { familyId: 'foreign', babyId: 'foreign' },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['cache-control']).toBe('no-store');
+      expect(response.headers['x-content-type-options']).toBe('nosniff');
+      expect(response.headers['content-disposition']).toMatch(/^attachment; filename="baby-care-export-[0-9TZ]+\.json"$/);
+      expect(response.json().family.id).toBe(seed.familyId);
+
+      const audits = await fixture.database.pool.query<{
+        family_id: string;
+        actor_user_id: string;
+        actor_membership_id: string;
+        action: string;
+        target_type: string;
+        target_id: string;
+        source: string;
+        trace_id: string;
+        metadata_json: unknown;
+      }>(
+        `select family_id, actor_user_id, actor_membership_id, action, target_type,
+                target_id, source, trace_id, metadata_json
+           from audit_events where action = 'family.export'`,
+      );
+      expect(audits.rows).toHaveLength(1);
+      expect(audits.rows[0]).toMatchObject({
+        family_id: seed.familyId,
+        actor_user_id: seed.dadUserId,
+        actor_membership_id: seed.dadMembershipId,
+        action: 'family.export',
+        target_type: 'family',
+        target_id: seed.familyId,
+        source: 'web',
+        metadata_json: null,
+      });
+      expect(audits.rows[0]?.trace_id).toBeTruthy();
+    } finally {
+      await fixture.app.close();
+      await fixture.database.close();
+    }
+  });
+
   it('exports complete typed family data with fixed set-oriented reads and no private internals', async () => {
     const fixture = await createM2TestApp(testDatabaseUrl!);
     try {

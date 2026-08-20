@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { DEFAULT_FAMILY_EXPORT_MAX_BYTES } from '@baby-care/contracts';
 import { resolveTraceId } from '@baby-care/observability';
 import { createAuthService } from './auth/auth-service.js';
 import { createActionService } from './care/action-service.js';
@@ -14,6 +15,9 @@ import { createRevisionQueryService } from './care/revision-query-service.js';
 import { createSleepService } from './care/sleep-service.js';
 import type { DatabaseContext } from './db.js';
 import { createFamilyRepository } from './family/family-repository.js';
+import { createFamilyExportRepository } from './family/family-export-repository.js';
+import { createFamilyExportService } from './family/family-export-service.js';
+import { StableExportCoordinator } from './family/export-coordinator.js';
 import { createFamilyService } from './family/family-service.js';
 import { createSetupService } from './family/setup-service.js';
 import { registerAuthRoutes } from './routes/auth.js';
@@ -26,6 +30,7 @@ import { registerCareQueryRoutes } from './routes/care-query.js';
 import { registerCareRevisionRoutes } from './routes/care-revisions.js';
 import { registerSleepRoutes } from './routes/care-sleep.js';
 import { registerFamilyRoutes } from './routes/family.js';
+import { registerFamilyExportRoute } from './routes/family-export.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerSetupRoutes } from './routes/setup.js';
 
@@ -72,6 +77,18 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
       authService,
       familyService: createFamilyService(dependencies.database),
       appOrigin: dependencies.appOrigin,
+    });
+    registerFamilyExportRoute(app, {
+      authService,
+      appOrigin: dependencies.appOrigin,
+      database: dependencies.database,
+      coordinator: new StableExportCoordinator(),
+      exportService: createFamilyExportService(
+        dependencies.database,
+        createFamilyExportRepository(),
+        dependencies.familyExportMaxBytes ?? DEFAULT_FAMILY_EXPORT_MAX_BYTES,
+      ),
+      now,
     });
     registerFeedingRoutes(app, {
       careAuth,
