@@ -220,6 +220,8 @@ describe('family export route', () => {
     const second = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
     expect(first.statusCode).toBe(500);
     expect(second.statusCode).toBe(500);
+    expect(Object.keys(first.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
+    expect(Object.keys(second.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
     expect(first.json().code).toBe('export_failed');
     expect(second.json().code).toBe('export_failed');
     noAttachment(first); noAttachment(second);
@@ -227,18 +229,16 @@ describe('family export route', () => {
   });
 
   it.each(['begin', 'write', 'commit'] as const)('closes audit %s failure without a success response', async (failure) => {
-    let calls = 0;
     const statements: string[] = [];
     const client = {
-      query: vi.fn(async () => {
-        calls += 1;
-        statements.push(
-          calls === 1 ? 'begin' :
-            calls === 2 ? 'insert' :
-              failure === 'write' ? 'rollback' :
-                calls === 3 ? 'commit' : 'rollback',
-        );
-        if ((failure === 'begin' && calls === 1) || (failure === 'write' && calls === 2) || (failure === 'commit' && calls === 3)) throw new Error('audit internals');
+      query: vi.fn(async (statement: string) => {
+        const normalized = statement.replace(/\s+/g, ' ').trim().toLowerCase();
+        statements.push(normalized);
+        if (
+          (failure === 'begin' && normalized === 'begin')
+          || (failure === 'write' && normalized.startsWith('insert into audit_events'))
+          || (failure === 'commit' && normalized === 'commit')
+        ) throw new Error('audit internals');
         return { rows: [] };
       }),
       release: vi.fn(),
@@ -250,11 +250,21 @@ describe('family export route', () => {
     const response = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
     expect(response.statusCode).toBe(500);
     expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
+    expect(response.json().code).toBe('export_failed');
     noAttachment(response);
     expect(client.release).toHaveBeenCalledOnce();
     if (failure === 'begin') expect(statements).toEqual(['begin']);
-    else if (failure === 'write') expect(statements).toEqual(['begin', 'insert', 'rollback']);
-    else expect(statements).toEqual(['begin', 'insert', 'commit', 'rollback']);
+    else if (failure === 'write') expect(statements).toEqual([
+      'begin',
+      'insert into audit_events ( family_id, actor_user_id, actor_membership_id, action, target_type, target_id, source, trace_id, metadata_json, occurred_at ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      'rollback',
+    ]);
+    else expect(statements).toEqual([
+      'begin',
+      'insert into audit_events ( family_id, actor_user_id, actor_membership_id, action, target_type, target_id, source, trace_id, metadata_json, occurred_at ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      'commit',
+      'rollback',
+    ]);
     await app.close();
   });
 });
