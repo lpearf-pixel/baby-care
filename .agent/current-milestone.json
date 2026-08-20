@@ -60,9 +60,14 @@
       "task": "Task 2 Deterministic Single-Snapshot Family Export Service",
       "commit": "6d5a166",
       "review": "approved_no_findings"
+    },
+    {
+      "task": "Task 3 Secure Export Route, Audit And Concurrency Gate",
+      "commit": "98de9fc",
+      "review": "approved_after_fix_round_4"
     }
   ],
-  "m4_current_task": "Task 3 Secure Export Route, Audit And Concurrency Gate",
+  "m4_current_task": "Task 4 Family-Admin Web Download Surface",
   "m4_scope": [
     "Dad/Mom-only private family data export",
     "atomic private PostgreSQL backup and integrity verification",
@@ -83,7 +88,7 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "execute M4 Task 3 secure export route, audit and per-actor concurrency gate",
+    "execute M4 Task 4 Dad/Mom-only private Web download surface",
     "continue M4 in bounded RED-GREEN segments"
   ],
   "requires_separate_post_m3_design": [

@@ -300,6 +300,9 @@ export function createFamilyExportService(
 
 ### Task 3: Secure Export Route, Audit And Concurrency Gate
 
+**Status:** Complete through `98de9fc` (`test: prove family export audit rollback
+sequences`); independent review approved after four bounded fix rounds.
+
 **Files:**
 
 - Create: `apps/api/src/family/export-coordinator.ts`
@@ -325,20 +328,20 @@ POST /api/family/export
 
 **Steps:**
 
-- [ ] Add route RED tests for missing/invalid cookie, wrong origin, Nanny, Dad, Mom, and a forged body containing foreign family/baby IDs. The route accepts no request body and derives scope from the authenticated session.
-- [ ] Add RED header tests for `application/json`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and a generic UTC `Content-Disposition` filename. Assert headers are absent from an injected pre-serialization service failure.
-- [ ] Add RED coordinator tests: two simultaneous exports by the same actor produce one running operation and one `409 export_in_progress`; different actors may run concurrently; success, throw, abort/disconnect simulation, and audit failure all release the actor slot.
-- [ ] Add audit RED tests proving exactly one successful `family.export` event contains only family/actor/membership/action/target/source/trace/time, with `metadata_json is null`; denial, overflow and failed response preparation create no success audit.
-- [ ] Resolve the route's atomicity deliberately: produce/validate the buffer first, then write the allow-listed audit in its own short transaction, then set attachment headers and send. If audit fails, send a closed API failure and never emit the export body.
-- [ ] Run RED:
+- [x] Add route RED tests for missing/invalid cookie, wrong origin, Nanny, Dad, Mom, and a forged body containing foreign family/baby IDs. The route accepts no request body and derives scope from the authenticated session.
+- [x] Add RED header tests for `application/json`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, and a generic UTC `Content-Disposition` filename. Assert headers are absent from an injected pre-serialization service failure.
+- [x] Add RED coordinator tests: two simultaneous exports by the same actor produce one running operation and one `409 export_in_progress`; different actors may run concurrently; success, throw, abort/disconnect simulation, and audit failure all release the actor slot.
+- [x] Add audit RED tests proving exactly one successful `family.export` event contains only family/actor/membership/action/target/source/trace/time, with `metadata_json is null`; denial, overflow and failed response preparation create no success audit.
+- [x] Resolve the route's atomicity deliberately: produce/validate the buffer first, then write the allow-listed audit in its own short transaction, then set attachment headers and send. If audit fails, send a closed API failure and never emit the export body.
+- [x] Run RED:
 
   ```bash
   pnpm --filter @baby-care/api test -- family-export-route.test.ts family-export.integration.test.ts
   ```
 
-- [ ] Implement origin guard, session authentication, `can(permissionLevel, 'family.export')`, actor slot, service call, audit transaction and headers. Use status 413 for `export_too_large`, 409 for `export_in_progress`, and a generic 500 `export_failed` for query/schema/serialization/audit failures; do not expose configured limits, computed bytes, database details or raw errors.
-- [ ] Register the service/coordinator/route in `buildApp` with `familyExportMaxBytes` supplied from startup. Preserve existing health-only and setup-only test construction.
-- [ ] Run GREEN and full API regression:
+- [x] Implement origin guard, session authentication, `can(permissionLevel, 'family.export')`, actor slot, service call, audit transaction and headers. Use status 413 for `export_too_large`, 409 for `export_in_progress`, and a generic 500 `export_failed` for query/schema/serialization/audit failures; do not expose configured limits, computed bytes, database details or raw errors.
+- [x] Register the service/coordinator/route in `buildApp` with `familyExportMaxBytes` supplied from startup. Preserve existing health-only and setup-only test construction.
+- [x] Run GREEN and full API regression:
 
   ```bash
   pnpm --filter @baby-care/api test -- family-export-route.test.ts family-export.integration.test.ts
@@ -348,8 +351,8 @@ POST /api/family/export
   git diff --check
   ```
 
-- [ ] Review for cross-family lookup, error-shape disclosure, slot leaks, payload/audit leakage, header timing and Fastify buffer handling.
-- [ ] Commit locally:
+- [x] Review for cross-family lookup, error-shape disclosure, slot leaks, payload/audit leakage, header timing and Fastify buffer handling.
+- [x] Commit locally:
 
   ```bash
   git add apps/api/src apps/api/test/family-export-route.test.ts apps/api/test/family-export.integration.test.ts

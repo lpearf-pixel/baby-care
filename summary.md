@@ -1,15 +1,15 @@
 # Baby Care Work Handoff Summary
 
-Updated: 2026-08-17
+Updated: 2026-08-21
 Repository: `lpearf-pixel/baby-care`
 
 This file is the short handoff for a fresh Work/chat. Read it together with `agent.md`, `docs/PLAN.md`, and `.agent/current-milestone.json` before planning or coding.
 
 ## 1. Current authoritative state
 
-- Current active milestone: **M4 — Birth Ready Operations and Data Safety**. Tasks 1–2
-  are complete; Task 2 is at `6d5a166`. The next slice is Task 3, the secure export
-  route, audit, and per-actor concurrency gate.
+- Current active milestone: **M4 — Birth Ready Operations and Data Safety**. Tasks 1–3
+  are complete; Task 3 closes at `98de9fc`. The next slice is Task 4, the Dad/Mom-only
+  private Web download surface.
 - Current completed milestone: **M3 — Care Workspace**, verified complete.
 - M3 authoritative final head: `52b042a66122464af338a2b4931315d92dff0965`.
 - M3 authoritative CI: `31959895049` — static / unit / PostgreSQL integration / production build / production Compose smoke 5/5 PASS.
@@ -38,6 +38,12 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   revision/relation causality checks, deterministic UTF-8 serialization, and closed
   byte-limit enforcement. Independent review approved with no findings; local API tests
   passed while two enabled PostgreSQL cases await an environment with `TEST_DATABASE_URL`.
+- M4 Task 3 implementation: `3ebb95e` through `98de9fc` — authenticated Dad/Mom-only
+  family export route, per-actor concurrency gate, private attachment headers and a
+  fail-closed allow-listed audit transaction. Independent review approved after bounded
+  hardening of authentication, error-shape and rollback evidence. Fresh local API
+  regression passed 71 tests with 72 PostgreSQL-dependent tests explicitly skipped
+  because `TEST_DATABASE_URL` is not configured.
 
 Release-gate history:
 
@@ -104,9 +110,9 @@ M4 closes the Birth Ready operational/data-safety loop independently of Guardian
 
 M4 does not add cloud/off-site backup, automatic deletion, in-place production restore,
 full offline synchronization, Guardian/voice integration, medical behavior, or `main`
-integration. Tasks 1 and 2 are implemented and reviewed: contracts and bounds are fixed,
-and the deterministic repeatable-read export service exists. No export route or audit
-write exists yet; Task 3 owns those behaviors.
+integration. Tasks 1–3 are implemented and reviewed: contracts and bounds are fixed,
+the deterministic repeatable-read export service exists, and Dad/Mom can request the
+private audited attachment. Task 4 owns the Web download surface.
 
 ## 5. Baby Guardian / baby-monitor-local boundary
 
@@ -213,7 +219,7 @@ Recommended first sequence:
 
 1. Read the authoritative state files and the M4 design.
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
-3. Resume at Task 3 of the approved M4 implementation plan.
+3. Resume at Task 4 of the approved M4 implementation plan.
 4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary.
 
 ## 10. Copy/paste prompt for M4 implementation approval
