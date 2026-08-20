@@ -65,6 +65,7 @@ describe('family export route', () => {
     expect(missingCookie.statusCode).toBe(401);
     noAttachment(wrongOrigin);
     noAttachment(missingCookie);
+    expect((app as unknown as { auditConnect: ReturnType<typeof vi.fn> }).auditConnect).not.toHaveBeenCalled();
     await app.close();
   });
 
@@ -99,7 +100,6 @@ describe('family export route', () => {
     const response = await app.inject({ method: 'POST', url: '/api/family/export', headers: { origin, cookie: 'baby_care_session=valid' } });
     expect(response.statusCode).toBe(500);
     expect(response.json()).toMatchObject({ code: 'export_failed' });
-    expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
     expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
     expect(response.body).not.toContain('database password');
     noAttachment(response);
@@ -228,9 +228,16 @@ describe('family export route', () => {
 
   it.each(['begin', 'write', 'commit'] as const)('closes audit %s failure without a success response', async (failure) => {
     let calls = 0;
+    const statements: string[] = [];
     const client = {
       query: vi.fn(async () => {
         calls += 1;
+        statements.push(
+          calls === 1 ? 'begin' :
+            calls === 2 ? 'insert' :
+              failure === 'write' ? 'rollback' :
+                calls === 3 ? 'commit' : 'rollback',
+        );
         if ((failure === 'begin' && calls === 1) || (failure === 'write' && calls === 2) || (failure === 'commit' && calls === 3)) throw new Error('audit internals');
         return { rows: [] };
       }),
@@ -245,9 +252,9 @@ describe('family export route', () => {
     expect(Object.keys(response.json()).sort()).toEqual(['code', 'message', 'traceId'].sort());
     noAttachment(response);
     expect(client.release).toHaveBeenCalledOnce();
-    if (failure === 'begin') expect(calls).toBe(1);
-    else if (failure === 'write') expect(calls).toBe(3);
-    else expect(calls).toBe(4);
+    if (failure === 'begin') expect(statements).toEqual(['begin']);
+    else if (failure === 'write') expect(statements).toEqual(['begin', 'insert', 'rollback']);
+    else expect(statements).toEqual(['begin', 'insert', 'commit', 'rollback']);
     await app.close();
   });
 });
