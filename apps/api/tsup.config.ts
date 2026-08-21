@@ -1,7 +1,7 @@
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  entry: ['src/server.ts'],
+  entry: ['src/server.ts', 'src/operations/verify-restored-database.ts'],
   format: ['esm'],
   outDir: 'dist',
   clean: true,

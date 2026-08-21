@@ -37,6 +37,23 @@ export const MigrationHistoryFactSchema = z
 
 export type MigrationHistoryFact = z.infer<typeof MigrationHistoryFactSchema>;
 
+export const RestoreInvariantReportSchema = z
+  .object({
+    migrationsMatch: z.literal(true),
+    singleActiveFamily: z.literal(true),
+    singleActiveBaby: z.literal(true),
+    ownershipValid: z.literal(true),
+    typedDetailsValid: z.literal(true),
+    revisionEdgesValid: z.literal(true),
+    handoffsValid: z.literal(true),
+    remindersValid: z.literal(true),
+    summaryExecutable: z.literal(true),
+    timelineExecutable: z.literal(true),
+  })
+  .strict();
+
+export type RestoreInvariantReport = z.infer<typeof RestoreInvariantReportSchema>;
+
 export class BackupError extends Error {
   constructor(readonly code: string) {
     super(code);

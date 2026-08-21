@@ -2,7 +2,7 @@ import { createHash, type Hash } from 'node:crypto';
 import type { FileHandle } from 'node:fs/promises';
 import { chmod, lstat, mkdtemp, readdir } from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { Writable } from 'node:stream';
+import { Readable, Writable } from 'node:stream';
 import { finished } from 'node:stream/promises';
 
 import {
@@ -162,7 +162,16 @@ async function listPrivateDump(
 ): Promise<DumpCatalogueFacts> {
   const handle = await openPrivateFileForRead(path);
   try {
-    const source = handle.createReadStream({ autoClose: false });
+    const source = Readable.from((async function* readOpenFile() {
+      let position = 0;
+      const buffer = Buffer.alloc(64 * 1024);
+      while (true) {
+        const result = await handle.read(buffer, 0, buffer.byteLength, position);
+        if (result.bytesRead === 0) return;
+        position += result.bytesRead;
+        yield Buffer.from(buffer.subarray(0, result.bytesRead));
+      }
+    })());
     const facts = await postgresTools.listDump(source);
     source.destroy();
     await assertOpenFileIdentity(handle, path);
