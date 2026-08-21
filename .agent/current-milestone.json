@@ -70,9 +70,14 @@
       "task": "Task 4 Family-Admin Web Download Surface",
       "commit": "40aa49a",
       "review": "approved_after_fix_round_1"
+    },
+    {
+      "task": "Task 5 Private Atomic Backup Creation And Verification",
+      "commit": "df43b93",
+      "review": "approved_after_fix_round_5"
     }
   ],
-  "m4_current_task": "Task 5 Private Atomic Backup Creation And Verification",
+  "m4_current_task": "Task 6 Fail-Closed Restore, Invariants And Session Sanitation",
   "m4_scope": [
     "Dad/Mom-only private family data export",
     "atomic private PostgreSQL backup and integrity verification",
@@ -93,7 +98,7 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "execute M4 Task 5 private atomic backup creation and verification",
+    "execute M4 Task 6 fail-closed isolated restore, invariants and session sanitation",
     "continue M4 in bounded RED-GREEN segments"
   ],
   "requires_separate_post_m3_design": [

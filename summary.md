@@ -7,9 +7,9 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 
 ## 1. Current authoritative state
 
-- Current active milestone: **M4 — Birth Ready Operations and Data Safety**. Tasks 1–4
-  are complete; Task 4 closes at `40aa49a`. The next slice is Task 5, private atomic
-  backup creation and verification.
+- Current active milestone: **M4 — Birth Ready Operations and Data Safety**. Tasks 1–5
+  are complete; Task 5 closes at `df43b93`. The next slice is Task 6, fail-closed
+  isolated restore, invariants and restored-session sanitation.
 - Current completed milestone: **M3 — Care Workspace**, verified complete.
 - M3 authoritative final head: `52b042a66122464af338a2b4931315d92dff0965`.
 - M3 authoritative CI: `31959895049` — static / unit / PostgreSQL integration / production build / production Compose smoke 5/5 PASS.
@@ -51,6 +51,14 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   reject-then-retry and anchor-removal coverage. Fresh Web evidence is 87 passed with
   typecheck, production build and repository lint passing. Real-family download remains
   a human gate and was not exercised.
+- M4 Task 5 implementation: `fd1d014` through `df43b93` — strict manifest v1,
+  streamed private custom-format dump, bounded catalogue checks, PG16/migration gates,
+  owner-private storage and kernel-enforced no-replace publication are implemented.
+  Preservation-first native failure handling never deletes ambiguous temp state; wrong
+  publication is quarantined under a non-final name. Independent review approved after
+  five bounded hardening rounds. Fresh Node 24 evidence is 67 operations tests plus root
+  typecheck, lint, production build and offline frozen-lock PASS. Real PostgreSQL 16
+  dump/list and Linux-native execution remain Task 7/8 and exact-head CI gates.
 
 Release-gate history:
 
@@ -117,10 +125,10 @@ M4 closes the Birth Ready operational/data-safety loop independently of Guardian
 
 M4 does not add cloud/off-site backup, automatic deletion, in-place production restore,
 full offline synchronization, Guardian/voice integration, medical behavior, or `main`
-integration. Tasks 1–4 are implemented and reviewed: contracts and bounds are fixed,
+integration. Tasks 1–5 are implemented and reviewed: contracts and bounds are fixed,
 the deterministic repeatable-read export service exists, and Dad/Mom can request the
-private audited attachment through the bounded Web download surface. Task 5 owns
-private atomic backup creation and verification.
+private audited attachment through the bounded Web download surface. The private atomic
+backup library now exists; Task 6 owns fail-closed isolated restore and session sanitation.
 
 ## 5. Baby Guardian / baby-monitor-local boundary
 
@@ -227,7 +235,7 @@ Recommended first sequence:
 
 1. Read the authoritative state files and the M4 design.
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
-3. Resume at Task 5 of the approved M4 implementation plan.
+3. Resume at Task 6 of the approved M4 implementation plan.
 4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary.
 
 ## 10. Copy/paste prompt for M4 implementation approval
