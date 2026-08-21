@@ -114,6 +114,19 @@ jobs:
           --health-interval 3s
           --health-timeout 3s
           --health-retries 20
+      postgres_restore:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: babycare_restore_test
+          POSTGRES_USER: babycare
+          POSTGRES_PASSWORD: babycare
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U babycare -d babycare_restore_test"
+          --health-interval 3s
+          --health-timeout 3s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -131,9 +144,12 @@ jobs:
         shell: bash
         env:
           TEST_DATABASE_URL: postgres://babycare:babycare@127.0.0.1:5432/babycare_test
+          TEST_RESTORE_DATABASE_URL: postgres://babycare:babycare@127.0.0.1:5433/babycare_restore_test
+          BABY_CARE_PG16_INTEGRATION: "1"
         run: |
           set -o pipefail
           pnpm --filter @baby-care/api test 2>&1 | tee /tmp/integration.log
+          pnpm --filter @baby-care/operations test -- restore.integration.test.ts 2>&1 | tee -a /tmp/integration.log
       - name: Collect compact diagnostics
         if: failure()
         env:
@@ -189,25 +205,49 @@ jobs:
 
   compose-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.17.1
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Build and start stack
         shell: bash
         run: |
           set -o pipefail
-          docker compose up -d --build 2>&1 | tee /tmp/compose.log
+          docker compose --project-name baby-care up -d --build 2>&1 | tee /tmp/compose.log
       - name: Probe Web and API through Web
         shell: bash
         run: |
           set -o pipefail
           node scripts/compose-smoke.mjs 2>&1 | tee -a /tmp/compose.log
+      - name: Reset to a new empty M4 source volume
+        shell: bash
+        run: |
+          set -o pipefail
+          docker compose --project-name baby-care down -v --remove-orphans 2>&1 | tee -a /tmp/compose.log
+          docker compose --profile operations --project-name baby-care --file compose.yaml --file infra/backup/compose.operations.yaml up -d --build postgres api web 2>&1 | tee -a /tmp/compose.log
+      - name: Build fixed operations CLI
+        run: pnpm --filter @baby-care/operations build
+      - name: Exercise M4 export backup and isolated restore
+        shell: bash
+        run: |
+          set -o pipefail
+          pnpm --filter @baby-care/api exec tsx ../../scripts/m4-birth-ready-operations.mjs 2>&1 | tee -a /tmp/compose.log
       - name: Capture bounded service state
         if: failure()
         shell: bash
         run: |
-          docker compose ps 2>&1 | tee -a /tmp/compose.log
-          docker compose logs --no-color --tail=80 api 2>&1 | tee -a /tmp/compose.log
+          docker compose --project-name baby-care ps 2>&1 | tee -a /tmp/compose.log
+          docker compose --profile operations --project-name baby-care-restore --file compose.yaml --file infra/backup/compose.operations.yaml ps 2>&1 | tee -a /tmp/compose.log
       - name: Collect compact diagnostics
         if: failure()
         env:
@@ -225,4 +265,11 @@ jobs:
           retention-days: 3
       - name: Tear down disposable stack
         if: always()
-        run: docker compose down -v --remove-orphans
+        shell: bash
+        run: |
+          restore_status=0
+          source_status=0
+          docker compose --profile operations --project-name baby-care-restore --file compose.yaml --file infra/backup/compose.operations.yaml down -v --remove-orphans --timeout 10 || restore_status=$?
+          docker compose --project-name baby-care down -v --remove-orphans --timeout 10 || source_status=$?
+          test "$restore_status" -eq 0
+          test "$source_status" -eq 0

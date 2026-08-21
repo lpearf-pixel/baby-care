@@ -9,7 +9,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 ## Current state
 
-Current milestone: **M4 — Birth Ready Operations and Data Safety — Task 7 complete**
+Current milestone: **M4 — Birth Ready Operations and Data Safety — Task 8 implemented locally; exact-head CI pending**
 Completed milestone: **M3 — Care Workspace — verified complete**
 Previous milestone: **M2 — Care Recording MVP — verified complete**
 
@@ -117,8 +117,16 @@ build and independent review with no Critical/Important findings. Task 7 is comp
 `5b92477`: four guarded operator commands, fixed PostgreSQL 16 Compose adapters, bounded
 subprocess cleanup and disposable isolated restore practice passed 130 focused tests,
 one real generated-data Compose flow, full lint/typecheck/build/privacy gates and an
-independent review with no Critical/Important findings. The next executable slice is
-Task 8, synthetic Birth Ready operations simulation and privacy gate.
+independent review with no Critical/Important findings.
+Task 8 is now implemented locally on the current Task 8 commit: its static contract went
+from 5/5 RED to initial 5/5 GREEN and is now 6/6 after an ownership self-review regression;
+compact diagnostics discard untrusted export/dump/manifest/path text, and the generated
+production Compose flow preserved all M1–M3 markers before
+emitting each of the four fixed M4 markers exactly once. Dad/Mom export, Nanny denial,
+private backup verification, isolated restore, old-session rejection, fresh Dad login and
+stable read-model digests all passed with owned source/restore volumes removed afterward.
+M4 remains `implementation_complete_awaiting_ci`; Task 9 exact-head five-job CI and the
+separate supervised family acceptance checklist are still pending.
 M3 implementation scope must not be reopened implicitly.
 
 ## Hard scope boundaries

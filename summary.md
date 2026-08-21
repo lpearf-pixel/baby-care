@@ -7,9 +7,10 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 
 ## 1. Current authoritative state
 
-- Current active milestone: **M4 — Birth Ready Operations and Data Safety**. Tasks 1–7
-  are complete; Task 7 closes at `5b92477`. The next slice is Task 8, the synthetic
-  Birth Ready operations simulation and privacy gate.
+- Current active milestone: **M4 — Birth Ready Operations and Data Safety**. Tasks 1–8
+  are implemented locally; Task 8 is the current local commit and M4 remains
+  `implementation_complete_awaiting_ci`. The next slice is Task 9 exact-head release
+  evidence and human handoff.
 - Current completed milestone: **M3 — Care Workspace**, verified complete.
 - M3 authoritative final head: `52b042a66122464af338a2b4931315d92dff0965`.
 - M3 authoritative CI: `31959895049` — static / unit / PostgreSQL integration / production build / production Compose smoke 5/5 PASS.
@@ -59,7 +60,7 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   five bounded hardening rounds. Fresh Node 24 evidence is 67 operations tests plus root
   typecheck, lint, production build and offline frozen-lock PASS. Real PostgreSQL 16
   dump/list and Linux-native execution are now exercised through the Task 7 production
-  adapter; exact-head Linux CI remains a Task 8/9 gate.
+  adapter; exact-head Linux CI remains a Task 9 gate.
 - M4 Task 6 implementation: `de09494` — verified private bundles restore only to a
   distinct empty PostgreSQL 16 target. Fixed repeatable-read invariants precede a
   separate restored-session revocation transaction; the existing API summary/timeline,
@@ -78,6 +79,16 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   121.817 seconds, full lint/typecheck/build/help/privacy gates passed, and independent
   review found no Critical/Important findings. Real-family backup usability remains a
   human gate.
+- M4 Task 8 implementation: current local Task 8 commit — a generated Dad/Mom/Nanny
+  production simulation now covers the family-local-midnight care flow, both admin
+  exports, stable Nanny denial, warning/revision/handoff/reminder behavior, private
+  backup integrity, isolated PostgreSQL 16 restore, revoked old sessions, fresh Dad
+  login and stable read-model digest/count/version comparison. All prior M1–M3 markers
+  and the four fixed M4 markers passed locally exactly once; both owned disposable
+  volumes were removed. Initial static RED was 5/5 and current GREEN is 6/6 after an
+  ownership self-review regression; the fresh workspace gate passed 359 tests with 76
+  opt-in database/Docker cases skipped. Exact-head CI and
+  supervised real-family acceptance remain pending.
 
 Release-gate history:
 
@@ -147,9 +158,10 @@ full offline synchronization, Guardian/voice integration, medical behavior, or `
 integration. Tasks 1–7 are implemented and reviewed: contracts and bounds are fixed,
 the deterministic repeatable-read export service exists, and Dad/Mom can request the
 private audited attachment through the bounded Web download surface. Private atomic backup
-and fail-closed isolated restore libraries now exist; the guarded operator CLI and
-disposable PostgreSQL 16 practice path are complete. Task 8 owns the full synthetic
-production-mode operations simulation and privacy gate.
+and fail-closed isolated restore libraries now exist; the guarded operator CLI,
+disposable PostgreSQL 16 practice path, and Task 8 synthetic production-mode operations
+simulation are complete locally. Task 9 owns exact-head CI and human handoff; M4 is not
+verified complete until that gate passes.
 
 ## 5. Baby Guardian / baby-monitor-local boundary
 
@@ -256,10 +268,11 @@ Recommended first sequence:
 
 1. Read the authoritative state files and the M4 design.
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
-3. Resume at Task 8 of the approved M4 implementation plan.
+3. Resume at Task 9 of the approved M4 implementation plan; do not claim verified M4
+   completion before exact-head five-job CI passes.
 4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary.
 
-## 10. Copy/paste prompt for M4 implementation approval
+## 10. Copy/paste prompt for M4 exact-head closure
 
 ```text
 读取 `agent.md`、`summary.md`、`docs/PLAN.md`、
@@ -270,9 +283,11 @@ Recommended first sequence:
 基线为 `codex/m4-birth-ready-operations`，来源是已通过 CI `31959895049`
 五项门禁的 M3 精确头 `52b042a66122464af338a2b4931315d92dff0965`。
 
-按已批准规格和正式计划执行 Task 8。严格 RED-GREEN，完成聚焦测试、回归、
-审查和本地提交后更新状态。普通实现问题和可恢复测试失败自行处理。
+以当前 Task 8 提交为精确基线，按已批准规格和正式计划仅执行 Task 9。
+先取得明确 push 授权，再运行精确头五项 CI；只有五项全部 PASS 且 M1-M4
+marker 数量和顺序正确后，才把 M4 标记为 verified complete。另行准备受监督的
+家庭验收清单，不在自动化中使用私人家庭数据。
 
 不要开发 Guardian/语音、完整离线同步、云备份、医疗功能或 in-place restore；
-不要修改/合并 main，不 push，直到另行批准。baby-monitor-local 当前训练不阻塞本项目。
+不要修改/合并 main，未经明确批准不得 push。baby-monitor-local 当前训练不阻塞本项目。
 ```

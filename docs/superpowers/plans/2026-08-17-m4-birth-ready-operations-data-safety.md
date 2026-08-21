@@ -652,9 +652,9 @@ SMOKE_OK component=m4-birth-ready-operations
 
 **Steps:**
 
-- [ ] Write a static smoke-contract RED test before changing the script. It must require all four markers exactly once and in order, all M4 route/backup/restore calls, both admin exports, Nanny denial, old-cookie denial, fresh login, and the stable typed comparison fields. It must reject any log statement containing response bodies, dump/manifest content, credentials, paths or care fixture values.
-- [ ] Extend/add production-mode simulation with new synthetic identities and a new empty source volume. Do not reuse a developer or household database. Preserve the existing M1–M3 smoke flow or invoke it first unchanged.
-- [ ] Implement exact flow assertions without printing values:
+- [x] Write a static smoke-contract RED test before changing the script. It must require all four markers exactly once and in order, all M4 route/backup/restore calls, both admin exports, Nanny denial, old-cookie denial, fresh login, and the stable typed comparison fields. It must reject any log statement containing response bodies, dump/manifest content, credentials, paths or care fixture values.
+- [x] Extend/add production-mode simulation with new synthetic identities and a new empty source volume. Do not reuse a developer or household database. Preserve the existing M1–M3 smoke flow or invoke it first unchanged.
+- [x] Implement exact flow assertions without printing values:
   1. setup one family/baby; Dad and Mom login; create/login Nanny;
   2. record mixed feeding, diaper/stool, sleep/wake, burping, spit-up, bathing, temperature, weight and administered medication across all three actors;
   3. cross family-local midnight and prove rolling 24h;
@@ -665,10 +665,10 @@ SMOKE_OK component=m4-birth-ready-operations
   8. compute in-memory stable pre-restore digest/count/version facts, discard export buffers;
   9. create and verify private backup in a temporary `0700` directory outside the repository;
   10. restore to isolated PG16, reject old cookie, fresh Dad login, and compare timeline/summary/revision/handoff/actor/status digests.
-- [ ] Emit each marker only after its entire preceding gate is complete. Do not emit a partial success marker in catch/finally.
-- [ ] Update the PostgreSQL integration job with a second disposable PostgreSQL 16 target and `TEST_RESTORE_DATABASE_URL`, then run both API and operations integration suites. Update Compose CI to install the workspace dependencies, run the existing smoke, build the operations CLI, and run the M4 operations script with the operations overlay. Teardown both source and restore volumes with `if: always()`. Do not upload the backup root or operation logs containing raw tool output.
-- [ ] Add/extend privacy tests for the diagnostic collector: raw export/dump/manifest/path-looking text supplied as untrusted evidence is ignored/redacted; only the existing strict trusted metadata schema may survive. Do not add live M4 artifacts to test fixtures.
-- [ ] Run focused GREEN:
+- [x] Emit each marker only after its entire preceding gate is complete. Do not emit a partial success marker in catch/finally.
+- [x] Update the PostgreSQL integration job with a second disposable PostgreSQL 16 target and `TEST_RESTORE_DATABASE_URL`, then run both API and operations integration suites. Update Compose CI to install the workspace dependencies, run the existing smoke, build the operations CLI, and run the M4 operations script with the operations overlay. Teardown both source and restore volumes with `if: always()`. Do not upload the backup root or operation logs containing raw tool output.
+- [x] Add/extend privacy tests for the diagnostic collector: raw export/dump/manifest/path-looking text supplied as untrusted evidence is ignored/redacted; only the existing strict trusted metadata schema may survive. Do not add live M4 artifacts to test fixtures.
+- [x] Run focused GREEN:
 
   ```bash
   pnpm --filter @baby-care/api test -- m4-compose-smoke-contract.test.ts
@@ -677,7 +677,7 @@ SMOKE_OK component=m4-birth-ready-operations
   git diff --check
   ```
 
-- [ ] Run the full non-Compose gate sequentially to avoid resource-starvation false failures:
+- [x] Run the full non-Compose gate sequentially to avoid resource-starvation false failures:
 
   ```bash
   pnpm lint
@@ -687,16 +687,16 @@ SMOKE_OK component=m4-birth-ready-operations
   git diff --check
   ```
 
-- [ ] Run scope and secret scans over tracked changes, excluding generated dependencies/build output. Search for real-looking cookies/tokens/passwords, database URLs, export/dump filenames, absolute backup paths and private care fixture values.
-- [ ] If Docker is available, run production Compose and assert every M1/M2/M3 marker plus all four M4 markers exactly once. Otherwise record `docker_cli_unavailable` and leave M4 `awaiting_exact_head_ci`.
-- [ ] Update durable state accurately:
+- [x] Run scope and secret scans over tracked changes, excluding generated dependencies/build output. Search for real-looking cookies/tokens/passwords, database URLs, export/dump filenames, absolute backup paths and private care fixture values.
+- [x] If Docker is available, run production Compose and assert every M1/M2/M3 marker plus all four M4 markers exactly once. Otherwise record `docker_cli_unavailable` and leave M4 `awaiting_exact_head_ci`.
+- [x] Update durable state accurately:
   - implementation complete locally, not verified complete until exact-head CI;
   - authoritative M3 head/CI unchanged;
   - M4 plan/spec/branch and local implementation head recorded;
   - human family acceptance remains pending;
   - Guardian/audio and `baby-monitor-local` remain independent and non-blocking.
-- [ ] Review the complete M4 diff against every spec section and resolve all Critical/Important findings before commit.
-- [ ] Commit locally:
+- [x] Review the complete M4 diff against every spec section and resolve all Critical/Important findings before commit.
+- [x] Commit locally:
 
   ```bash
   git add scripts/m4-birth-ready-operations.mjs apps/api/test/m4-compose-smoke-contract.test.ts .github/workflows/ci.yml compose.yaml README.md docs/PLAN.md summary.md .agent/current-milestone.json packages/observability

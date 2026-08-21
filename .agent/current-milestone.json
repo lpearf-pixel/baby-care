@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "milestone": "M4 Birth Ready Operations and Data Safety",
-  "status": "implementation_in_progress",
+  "status": "implementation_complete_awaiting_ci",
   "branch": "codex/m4-birth-ready-operations",
   "completed_milestones": [
     "M0 Repository and delivery foundation",
@@ -45,7 +45,7 @@
     "m3-care-workspace-release-flow"
   ],
   "m3_documentation_closure_gate": "closed by final exact-head CI 31959895049 on 52b042a66122464af338a2b4931315d92dff0965",
-  "m4_state": "implementation_in_progress",
+  "m4_state": "implementation_complete_awaiting_ci",
   "m4_approved_spec": "docs/superpowers/specs/2026-08-17-m4-birth-ready-operations-data-safety-design.md",
   "m4_implementation_branch": "codex/m4-birth-ready-operations",
   "m4_implementation_plan": "docs/superpowers/plans/2026-08-17-m4-birth-ready-operations-data-safety.md",
@@ -85,9 +85,17 @@
       "task": "Task 7 Operator CLI And Disposable PostgreSQL 16 Restore Practice",
       "commit": "5b92477",
       "review": "approved_no_findings"
+    },
+    {
+      "task": "Task 8 Synthetic Birth Ready Operations Simulation And Privacy Gate",
+      "commit": "current_task_8_commit",
+      "review": "self_reviewed_no_critical_or_important"
     }
   ],
-  "m4_current_task": "Task 8 Synthetic Birth Ready Operations Simulation And Privacy Gate",
+  "m4_current_task": "Task 9 Exact-Head Release Evidence And Human Handoff",
+  "m4_local_compose_result": "m1_m2_m3_and_four_m4_markers_passed_exactly_once",
+  "m4_exact_head_ci": "pending",
+  "m4_human_family_acceptance": "pending",
   "m4_scope": [
     "Dad/Mom-only private family data export",
     "atomic private PostgreSQL backup and integrity verification",
@@ -108,8 +116,8 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "execute M4 Task 8 synthetic Birth Ready operations simulation and privacy gate",
-    "continue M4 in bounded RED-GREEN segments"
+    "execute M4 Task 9 exact-head five-job CI only with explicit push authorization",
+    "prepare the separate supervised human family acceptance checklist without using private data"
   ],
   "requires_separate_post_m3_design": [
     "Guardian integration",

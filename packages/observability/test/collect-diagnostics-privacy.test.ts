@@ -154,6 +154,39 @@ describe('compact diagnostic privacy', () => {
     expect(summary.evidence).toBe('[REDACTED]');
   });
 
+  it('discards untrusted export, backup bundle, manifest, dump, and absolute-path text', async () => {
+    const cwd = await mkdtemp(resolve(tmpdir(), 'baby-care-diag-operations-'));
+    const evidenceFile = resolve(cwd, 'operations.log');
+    const forbidden = [
+      'private-export-member-name',
+      'private-export-note',
+      'baby-care-backup-20260821T120000Z',
+      'private-manifest-digest',
+      'private-dump-row',
+      '/private/household/backup/location',
+      '/home/family/private-export.json',
+    ];
+    await writeFile(
+      evidenceFile,
+      [
+        'family export={"displayName":"private-export-member-name","note":"private-export-note"}',
+        'bundle=baby-care-backup-20260821T120000Z manifestSha256=private-manifest-digest',
+        'dump contents="private-dump-row"',
+        'backupPath=/private/household/backup/location',
+        'exportFile=/home/family/private-export.json',
+      ].join('\n'),
+      'utf8',
+    );
+
+    await runCollector(cwd, evidenceFile);
+    const summary = JSON.parse(
+      await readFile(resolve(cwd, 'diagnostics/latest/summary.json'), 'utf8'),
+    ) as { evidence: string };
+
+    for (const value of forbidden) expect(summary.evidence).not.toContain(value);
+    expect(summary.evidence).toBe('[REDACTED]');
+  });
+
   it('preserves strictly validated metadata supplied through the trusted producer channel', async () => {
     const cwd = await mkdtemp(resolve(tmpdir(), 'baby-care-diag-trusted-'));
     const evidenceFile = resolve(cwd, 'integration.log');

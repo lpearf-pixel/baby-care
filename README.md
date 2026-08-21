@@ -74,6 +74,21 @@ The M3 workspace adds operational handoff and history tools without changing tho
 
 The production-mode Docker Compose smoke starts from an empty PostgreSQL volume and preserves the M1/M2 flow, then exercises Dad/Nanny takeover, fallback and checkpoint briefings, consumed-amount recomputation, typed cursor timeline/detail, version-aware correction, stale-undo conflict, revision history, and reminder/checkpoint separation through the real Web/API container route.
 
+## Birth Ready data safety
+
+Dad and Mom can download the family export through the authenticated Web surface. Nanny
+cannot access that operation. Export files and PostgreSQL backup bundles contain private
+family data: keep them only on owner-controlled local storage outside this repository and
+never attach them to CI artifacts, diagnostics, logs, issues, or support messages.
+
+The four fixed backup/restore commands and their required environment are documented in
+`infra/backup/README.md`. Routine restore practice always uses a new isolated PostgreSQL
+16 target; restoring into the live source database is forbidden. The Task 8 production
+simulation uses generated identities and disposable volumes to prove export authorization,
+backup integrity, isolated restore, restored-session revocation, fresh login, and stable
+timeline/summary/revision/handoff attribution. This local software evidence still awaits
+Task 9 exact-head CI and does not replace the pending supervised family acceptance gate.
+
 ## Privacy and diagnostics
 
 Care audit metadata is intentionally bounded. CI compact diagnostics redact care values and session/setup secrets before storing bounded failure evidence. Raw session tokens are not stored in PostgreSQL; only session token hashes are persisted.
