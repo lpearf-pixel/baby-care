@@ -27,6 +27,12 @@ const testHelperPath = fileURLToPath(new URL('../.native/safe-bundle-test', impo
 const buildScriptPath = fileURLToPath(
   new URL('../scripts/build-native-helper.mjs', import.meta.url),
 );
+const installerSourcePath = fileURLToPath(
+  new URL('../native/install-helper.c', import.meta.url),
+);
+const installerPreservationHarnessPath = fileURLToPath(
+  new URL('./install-helper-preservation-harness.c', import.meta.url),
+);
 const nativeSourceDirectory = fileURLToPath(new URL('../native/', import.meta.url));
 const roots: string[] = [];
 const finalName = 'baby-care-backup-20260817T123456Z';
@@ -58,6 +64,53 @@ async function copyNativeBuildPackage(packageRoot: string): Promise<void> {
   for (const name of await readdir(nativeSourceDirectory)) {
     await copyFile(join(nativeSourceDirectory, name), join(native, name));
   }
+}
+
+function compileInstaller(sourcePath: string, outputPath: string): void {
+  const result = spawnSync(
+    '/usr/bin/cc',
+    [
+      '-std=c11',
+      '-O2',
+      '-Wall',
+      '-Wextra',
+      '-Werror',
+      '-Wpedantic',
+      '-Wconversion',
+      '-Wsign-conversion',
+      '-Wformat=2',
+      '-Wshadow',
+      '-Wstrict-prototypes',
+      '-fstack-protector-strong',
+      sourcePath,
+      '-o',
+      outputPath,
+    ],
+    {
+      env: {
+        LANG: 'C',
+        LC_ALL: 'C',
+        PATH: '/usr/bin:/bin',
+        TMPDIR: tmpdir(),
+      },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
+  expect(result.status, result.stderr).toBe(0);
+}
+
+function runInstaller(
+  installerPath: string,
+  operation: 'install-production' | 'install-testing',
+  directoryFd: number,
+  artifactFd: number,
+) {
+  return spawnSync(installerPath, [operation], {
+    env: {},
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe', directoryFd, artifactFd],
+  });
 }
 
 afterEach(async () => {
@@ -143,7 +196,7 @@ describe('native helper build boundary', () => {
     expect(await readdir(outside)).toEqual([]);
   });
 
-  test('publishes through the held directory after a mid-build .native symlink swap', async () => {
+  test('rejects directory-swap mutation arguments without changing .native', async () => {
     const root = await privateRoot();
     const packageRoot = join(root, 'package');
     const outside = join(packageRoot, '.native-build-swap-external');
@@ -166,10 +219,85 @@ describe('native helper build boundary', () => {
     expect(result.stderr).toBe('');
     expect(await readFile(join(outside, 'safe-bundle'), 'utf8')).toBe('outside-original');
     expect(await readdir(outside)).toEqual(['safe-bundle']);
+    await expect(lstat(join(packageRoot, '.native'))).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(lstat(displaced)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  test('installer publishes through a held directory after its .native pathname is replaced', async () => {
+    const root = await privateRoot();
+    const native = join(root, '.native');
+    const displaced = join(root, '.native-original');
+    const outside = join(root, 'outside');
+    const installer = join(root, 'native-installer');
+    await mkdir(native, { mode: 0o700 });
+    await mkdir(outside, { mode: 0o700 });
+    await writeFile(join(outside, 'safe-bundle'), 'outside-original', { mode: 0o700 });
+    compileInstaller(installerSourcePath, installer);
+    const directoryFd = openSync(native, constants.O_RDONLY);
+    const artifactFd = openSync(helperPath, constants.O_RDONLY);
+    try {
+      await rename(native, displaced);
+      await symlink(outside, native, 'dir');
+      const result = runInstaller(installer, 'install-production', directoryFd, artifactFd);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe('native_installer_v1:installed\n');
+      expect(result.stderr).toBe('');
+    } finally {
+      closeSync(artifactFd);
+      closeSync(directoryFd);
+    }
+    expect(await readFile(join(outside, 'safe-bundle'), 'utf8')).toBe('outside-original');
+    expect(await readdir(outside)).toEqual(['safe-bundle']);
     await expect(readFile(join(displaced, 'safe-bundle'))).resolves.not.toHaveLength(0);
-    const installed = await lstat(join(displaced, 'safe-bundle'));
-    expect(installed.isFile()).toBe(true);
-    expect(installed.mode & 0o777).toBe(0o700);
+  });
+
+  test('installer randomizes its private temporary basename', async () => {
+    const root = await privateRoot();
+    const native = join(root, '.native');
+    const installer = join(root, 'native-installer');
+    const fixedTemporary = join(native, '.safe-bundle-install-production');
+    await mkdir(native, { mode: 0o700 });
+    await writeFile(fixedTemporary, 'pre-existing', { mode: 0o700 });
+    compileInstaller(installerSourcePath, installer);
+    const directoryFd = openSync(native, constants.O_RDONLY);
+    const artifactFd = openSync(helperPath, constants.O_RDONLY);
+    try {
+      const result = runInstaller(installer, 'install-production', directoryFd, artifactFd);
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe('native_installer_v1:installed\n');
+      expect(result.stderr).toBe('');
+    } finally {
+      closeSync(artifactFd);
+      closeSync(directoryFd);
+    }
+    expect(await readFile(fixedTemporary, 'utf8')).toBe('pre-existing');
+    await expect(readFile(join(native, 'safe-bundle'))).resolves.not.toHaveLength(0);
+  });
+
+  test('installer preserves a replacement at its private temp basename after failure', async () => {
+    const root = await privateRoot();
+    const native = join(root, '.native');
+    const installer = join(root, 'native-installer-preservation-test');
+    await mkdir(native, { mode: 0o700 });
+    compileInstaller(installerPreservationHarnessPath, installer);
+    const directoryFd = openSync(native, constants.O_RDONLY);
+    const artifactFd = openSync(helperPath, constants.O_RDONLY);
+    try {
+      const result = runInstaller(installer, 'install-production', directoryFd, artifactFd);
+      expect(result.status).toBe(70);
+      expect(result.stdout).toBe('native_installer_v1:operation_failed\n');
+      expect(result.stderr).toBe('');
+    } finally {
+      closeSync(artifactFd);
+      closeSync(directoryFd);
+    }
+    const entries = (await readdir(native)).sort();
+    expect(entries).toContain('.safe-bundle-installer-test-original');
+    const retainedReplacement = entries.filter((entry) =>
+      /^\.safe-bundle-install-[a-f0-9]{32}$/.test(entry),
+    );
+    expect(retainedReplacement).toHaveLength(1);
+    expect(await readFile(join(native, retainedReplacement[0]!), 'utf8')).toBe('replacement');
   });
 });
 

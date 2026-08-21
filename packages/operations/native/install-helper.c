@@ -11,11 +11,15 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#if defined(__linux__)
+#include <sys/random.h>
+#endif
 #include <unistd.h>
 
 #define BUILD_DIRECTORY_FD 3
 #define ARTIFACT_FD 4
 #define MAX_ARTIFACT_BYTES (1024U * 1024U)
+#define RANDOM_NAME_BYTES 16U
 
 enum installer_status {
   STATUS_OK = 0,
@@ -126,8 +130,72 @@ static int write_all(int descriptor, const unsigned char *buffer, size_t length)
   return 1;
 }
 
-static enum install_result install_artifact(const char *target_name,
-                                            const char *temporary_name) {
+static int random_bytes(unsigned char *buffer, size_t length) {
+#if defined(__APPLE__)
+  arc4random_buf(buffer, length);
+  return 1;
+#elif defined(__linux__)
+  size_t offset = 0U;
+  while (offset < length) {
+    ssize_t received = getrandom(buffer + offset, length - offset, 0U);
+    if (received < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      return 0;
+    }
+    if (received == 0) {
+      return 0;
+    }
+    offset += (size_t)received;
+  }
+  return 1;
+#else
+  (void)buffer;
+  (void)length;
+  return 0;
+#endif
+}
+
+static int random_temporary_name(char *name, size_t size) {
+  static const char prefix[] = ".safe-bundle-install-";
+  static const char hexadecimal[] = "0123456789abcdef";
+  unsigned char random[RANDOM_NAME_BYTES];
+  size_t prefix_length = sizeof(prefix) - 1U;
+  size_t encoded_length = sizeof(random) * 2U;
+  if (size < prefix_length + encoded_length + 1U ||
+      !random_bytes(random, sizeof(random))) {
+    return 0;
+  }
+  (void)memcpy(name, prefix, prefix_length);
+  for (size_t index = 0U; index < sizeof(random); index += 1U) {
+    name[prefix_length + (index * 2U)] = hexadecimal[random[index] >> 4U];
+    name[prefix_length + (index * 2U) + 1U] =
+        hexadecimal[random[index] & 0x0fU];
+  }
+  name[prefix_length + encoded_length] = '\0';
+  return 1;
+}
+
+static int open_private_temporary(char *name, size_t size) {
+  for (int attempt = 0; attempt < 16; attempt += 1) {
+    if (!random_temporary_name(name, size)) {
+      return -1;
+    }
+    int descriptor = openat(BUILD_DIRECTORY_FD, name,
+                            O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+                            (mode_t)0700);
+    if (descriptor >= 0) {
+      return descriptor;
+    }
+    if (errno != EEXIST) {
+      return -1;
+    }
+  }
+  return -1;
+}
+
+static enum install_result install_artifact(const char *target_name) {
   struct stat build_directory;
   struct stat source;
   if (fstat(BUILD_DIRECTORY_FD, &build_directory) != 0 ||
@@ -139,10 +207,13 @@ static enum install_result install_artifact(const char *target_name,
     return RESULT_OPERATION;
   }
 
-  int temporary_fd = openat(BUILD_DIRECTORY_FD, temporary_name,
-                            O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
-                            (mode_t)0700);
+  char temporary_name[64];
+  int temporary_fd = open_private_temporary(temporary_name, sizeof(temporary_name));
   if (temporary_fd < 0) {
+    return RESULT_OPERATION;
+  }
+  if (fchmod(temporary_fd, (mode_t)0700) != 0) {
+    (void)close(temporary_fd);
     return RESULT_OPERATION;
   }
 
@@ -190,7 +261,6 @@ static enum install_result install_artifact(const char *target_name,
   if (renameat(BUILD_DIRECTORY_FD, temporary_name, BUILD_DIRECTORY_FD, target_name) != 0) {
     goto cleanup;
   }
-  temporary_name = NULL;
   if (fsync(BUILD_DIRECTORY_FD) != 0) {
     return RESULT_DURABILITY;
   }
@@ -220,9 +290,6 @@ cleanup:
   if (temporary_fd >= 0) {
     (void)close(temporary_fd);
   }
-  if (temporary_name != NULL) {
-    (void)unlinkat(BUILD_DIRECTORY_FD, temporary_name, 0);
-  }
   return result;
 }
 
@@ -231,17 +298,14 @@ int main(int argc, char **argv) {
     return stable_result("native_installer_v1:protocol_error\n", STATUS_PROTOCOL);
   }
   const char *target_name = NULL;
-  const char *temporary_name = NULL;
   if (strcmp(argv[1], "install-production") == 0) {
     target_name = "safe-bundle";
-    temporary_name = ".safe-bundle-install-production";
   } else if (strcmp(argv[1], "install-testing") == 0) {
     target_name = "safe-bundle-test";
-    temporary_name = ".safe-bundle-install-testing";
   } else {
     return stable_result("native_installer_v1:protocol_error\n", STATUS_PROTOCOL);
   }
-  enum install_result result = install_artifact(target_name, temporary_name);
+  enum install_result result = install_artifact(target_name);
   if (result == RESULT_OK) {
     return stable_result("native_installer_v1:installed\n", STATUS_OK);
   }

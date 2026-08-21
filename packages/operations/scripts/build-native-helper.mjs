@@ -6,9 +6,7 @@ import {
   mkdtemp,
   open,
   realpath,
-  rename,
   rmdir,
-  symlink,
   unlink,
 } from 'node:fs/promises';
 import { dirname, join, parse, resolve, sep } from 'node:path';
@@ -22,9 +20,7 @@ const installerSourcePath = resolve(packageRoot, 'native', 'install-helper.c');
 const outputDirectory = resolve(packageRoot, '.native');
 const compiler = '/usr/bin/cc';
 const buildTests = process.argv.length === 3 && process.argv[2] === '--test';
-const testDirectorySwap =
-  process.argv.length === 3 && process.argv[2] === '--test-directory-swap';
-const validArguments = process.argv.length === 2 || buildTests || testDirectorySwap;
+const validArguments = process.argv.length === 2 || buildTests;
 
 function ownedByCurrentUser(uid) {
   return typeof process.getuid !== 'function' || uid === process.getuid();
@@ -176,28 +172,11 @@ function runInstaller(installerPath, operation, directoryHandle, artifactHandle)
   }
 }
 
-async function injectBuildDirectorySwap() {
-  const external = resolve(packageRoot, '.native-build-swap-external');
-  const displaced = resolve(packageRoot, '.native-build-swap-original');
-  const externalStat = await lstat(external);
-  if (
-    !externalStat.isDirectory() ||
-    externalStat.isSymbolicLink() ||
-    !ownedByCurrentUser(externalStat.uid) ||
-    (externalStat.mode & 0o777) !== 0o700
-  ) {
-    throw new Error('unsafe');
-  }
-  await rename(outputDirectory, displaced);
-  await symlink('.native-build-swap-external', outputDirectory, 'dir');
-}
-
 async function installCompiledArtifact(
   installerPath,
   compiledPath,
   operation,
   directoryHandle,
-  injectSwap,
 ) {
   const artifactHandle = await open(
     compiledPath,
@@ -206,7 +185,6 @@ async function installCompiledArtifact(
   try {
     await assertCompiledArtifact(artifactHandle);
     await assertBuildDirectoryIdentity(directoryHandle);
-    if (injectSwap) await injectBuildDirectorySwap();
     runInstaller(installerPath, operation, directoryHandle, artifactHandle);
     await directoryHandle.sync();
     await assertBuildDirectoryIdentity(directoryHandle);
@@ -241,7 +219,6 @@ async function compileAndInstall(
       productionPath,
       'install-production',
       directoryHandle,
-      testDirectorySwap,
     );
     if (buildTests) {
       compileSource(sourceHandle, testingPath, true);
@@ -250,7 +227,6 @@ async function compileAndInstall(
         testingPath,
         'install-testing',
         directoryHandle,
-        false,
       );
     }
   } finally {
