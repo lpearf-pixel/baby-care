@@ -209,6 +209,14 @@ manifest validation, digest verification, file/directory `fsync`, and atomic ren
 If any durability operation is unavailable or fails, the run fails closed. A failed run
 leaves no valid-looking final bundle.
 
+On macOS, final directory publication and owned temporary-bundle cleanup use a minimal
+repository-native helper because Node's path-based `rename`/recursive removal APIs do not
+provide the required kernel-enforced no-replace and descriptor-relative operations. The
+helper accepts only fixed bundle operations, inherited validated directory descriptors and
+validated basenames; it accepts no absolute path, database coordinate, credential, SQL or
+caller-supplied filesystem flag. An unavailable or unsupported helper fails closed without a
+path-based fallback.
+
 Database credentials are consumed from the existing protected environment/runtime
 boundary. They must not be copied into command arguments, output, manifests, diagnostics,
 or process titles constructed by repository code.

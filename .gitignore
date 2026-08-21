@@ -5,4 +5,5 @@ coverage/
 .env.*
 !.env.example
 diagnostics/latest/
+packages/operations/.native/
 .DS_Store

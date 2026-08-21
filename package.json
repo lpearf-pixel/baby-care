@@ -9,6 +9,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
+    "test:operations": "pnpm --filter @baby-care/operations test",
     "build": "pnpm -r --if-present build"
   },
   "devDependencies": {

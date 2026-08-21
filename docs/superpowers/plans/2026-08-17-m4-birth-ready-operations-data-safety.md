@@ -6,7 +6,7 @@
 
 **Architecture:** Keep Baby Care API and PostgreSQL authoritative. Build the family export from one bounded `REPEATABLE READ READ ONLY` snapshot, add only a family-admin Web download surface, and keep backup/restore outside HTTP in a new `@baby-care/operations` package plus fixed operator CLI. The host CLI invokes PostgreSQL tools only inside named PostgreSQL 16 Compose services through a narrow subprocess adapter; restore targets a separately identified empty cluster and is verified by fixed SQL plus the existing API read models. Production Compose supplies disposable source/restore services for the final closed-loop proof.
 
-**Tech Stack:** Node 24+, TypeScript, pnpm 10.17.1, Fastify, PostgreSQL 16, `pg_dump`/`pg_restore`/`psql`, Drizzle ORM/Kit, Zod, React/Vite PWA, Vitest, Testing Library, Docker Compose, GitHub Actions public runners.
+**Tech Stack:** Node 24+, TypeScript, pnpm 10.17.1, a minimal audited C helper for safe host-filesystem publication/cleanup, Fastify, PostgreSQL 16, `pg_dump`/`pg_restore`/`psql`, Drizzle ORM/Kit, Zod, React/Vite PWA, Vitest, Testing Library, Docker Compose, GitHub Actions public runners.
 
 ## Global Constraints
 
@@ -21,6 +21,7 @@
 - Export queries use one PostgreSQL client and one `REPEATABLE READ READ ONLY` transaction. No pool query may occur inside the snapshot.
 - Export payloads are validated and size-checked before response headers/body are sent. Default limit is exactly `33_554_432` bytes; overflow returns `export_too_large` without truncation.
 - Backup output must be a real owner-private directory. Reject symlink ancestors, non-regular files, partial bundles, and non-atomic finalization.
+- Host-filesystem publication must be kernel-enforced no-replace. The native helper is a fixed protocol, not a generic filesystem broker: it consumes inherited validated directory descriptors and validated basenames only, accepts no absolute path or caller flags, and has no path-based fallback when unavailable.
 - Restore never uses `--clean`, `--create`, role changes, arbitrary operator SQL, or an in-place/source target. It requires a different PostgreSQL cluster identity and an empty destination.
 - Restored sessions are revoked transactionally before a restored target is usable. No care, revision, handoff, reminder, user, or audit history is rewritten during sanitation.
 - CLI output and compact diagnostics contain stable codes/aggregate markers only: no care values, names, notes, medication facts, paths, filenames, database coordinates, connection strings, hashes from live artifacts, raw commands, catalogues, SQL output, or raw errors.
@@ -133,6 +134,7 @@ Any error before the final transition produces a closed code and no success mark
 - Create `packages/operations/package.json`, `tsconfig.json`, `tsup.config.ts`.
 - Create `packages/operations/src/contracts.ts` — strict manifest/config/result schemas.
 - Create `packages/operations/src/private-files.ts` — realpath/type/mode/fsync/atomic bundle primitives.
+- Create `packages/operations/src/native-helper.ts`, `packages/operations/native/safe-bundle.c` and `packages/operations/scripts/build-native-helper.mjs` — closed TypeScript/native bridge, fixed descriptor-relative publish/cleanup protocol and reproducible local build.
 - Create `packages/operations/src/postgres-tools.ts` — narrow fixed subprocess abstraction and closed errors.
 - Create `packages/operations/src/backup.ts` — create and verify bundle workflows.
 - Create `packages/operations/src/restore.ts` — source/target/empty checks, restore, invariants and session sanitation.
@@ -151,6 +153,7 @@ Any error before the final transition produces a closed code and no success mark
 - Create `apps/api/test/family-export.integration.test.ts`.
 - Create `apps/web/test/family-data-export.test.tsx`.
 - Create `packages/operations/test/private-files.test.ts`.
+- Create `packages/operations/test/native-helper.test.ts`.
 - Create `packages/operations/test/backup.test.ts`.
 - Create `packages/operations/test/restore.test.ts`.
 - Create `packages/operations/test/restore.integration.test.ts`.
@@ -430,8 +433,9 @@ BabyCareApi.exportFamilyData(): Promise<FamilyExportDownload>;
 
 - Create: `packages/operations/package.json`, `tsconfig.json`, `tsup.config.ts`
 - Create: `packages/operations/src/contracts.ts`, `private-files.ts`, `postgres-tools.ts`, `backup.ts`, `index.ts`
-- Create: `packages/operations/test/private-files.test.ts`, `backup.test.ts`
-- Modify: `package.json`, `pnpm-lock.yaml`
+- Create: `packages/operations/src/native-helper.ts`, `packages/operations/native/safe-bundle.c`, `packages/operations/scripts/build-native-helper.mjs`
+- Create: `packages/operations/test/private-files.test.ts`, `native-helper.test.ts`, `backup.test.ts`
+- Modify: `packages/operations/package.json`, `.gitignore`, `package.json`, `pnpm-lock.yaml`
 
 **Interfaces produced:**
 
@@ -458,15 +462,17 @@ verifyBackup(config, postgresTools): Promise<{ code: 'backup_verified' }>;
 - [ ] Add manifest RED cases for exact schema, unknown key, wrong version/PG major/format, non-hex digest, zero/negative bytes, and forbidden database/family/path/content keys.
 - [ ] Add filesystem RED cases using `mkdtemp`: parent must already exist, be a real directory owned by current uid and inaccessible to group/other; reject symlink at each ancestor/bundle/file, FIFO/socket/directory where a regular file is required, pre-existing final bundle, and mode drift.
 - [ ] Add bundle-name RED cases requiring `baby-care-backup-YYYYMMDDTHHMMSSZ` with no family/database/path fragment. Add atomicity RED cases with injected failures at temp creation, dump stream, file fsync, manifest write, digest self-check, directory fsync and rename. Assert no final-looking bundle and cleanup of owned temp state only.
+- [ ] Add native-helper RED cases proving the protocol rejects absolute paths, separators, unknown operations, unexpected descriptors and arbitrary flags; publication uses an inherited private parent/temp directory identity and fails with `backup_exists` when a final directory appears concurrently. Add cleanup substitution cases proving a replaced top-level temp path and non-contract child entries are preserved and return a closed cleanup failure.
 - [ ] Add backup RED cases proving the PostgreSQL adapter receives only fixed PG16 Compose-service actions: custom format, `--no-owner`, `--no-privileges`, no table/schema filters; no credential/URL/operator flag appears in arguments/results/errors. Require catalogue facts for the complete Baby Care schema, including users, sessions, audit, all typed care tables, revisions, handoffs and reminders. Migration fingerprint canonicalizes ordered migration ID/hash/time facts.
 - [ ] Add verify RED cases for corrupt/truncated dump, byte mismatch, digest mismatch, manifest mismatch, unsupported version, missing `drizzle.__drizzle_migrations` catalogue facts, oversized/unbounded catalogue output and raw subprocess error redaction. Prove `backup:verify` invokes no database write or restore action.
 - [ ] Run RED:
 
   ```bash
-  pnpm --filter @baby-care/operations test -- private-files.test.ts backup.test.ts
+  pnpm --filter @baby-care/operations test -- private-files.test.ts native-helper.test.ts backup.test.ts
   ```
 
-- [ ] Implement the package with Node built-ins (`fs`, `crypto`, `stream`, `child_process`) and Zod. Production code uses `lstat`/`realpath`, `O_NOFOLLOW` where available plus post-open identity checks, temp directory `0700`, files `0600`, same-parent temp creation, file and directory `fsync`, and same-filesystem rename.
+- [ ] Implement the package with Node built-ins (`fs`, `crypto`, `stream`, `child_process`), Zod and one minimal audited native helper. Production code uses `lstat`/`realpath`, `O_NOFOLLOW` where available plus post-open identity checks, temp directory `0700`, files `0600`, same-parent temp creation, file and directory `fsync`, and inherited directory descriptors. The helper alone performs fixed descriptor-relative cleanup and kernel-enforced no-replace publication: `renameatx_np(..., RENAME_EXCL)` on macOS and `renameat2(..., RENAME_NOREPLACE)` on Linux CI. It accepts validated basenames only, emits stable codes only and has no plain-rename or recursive path fallback.
+- [ ] Build the helper from tracked C source into an ignored package-local artifact. Fail closed on unsupported platform, compiler/build absence at installation, helper identity/protocol mismatch, non-private descriptor identity, wrong owner/mode/device/inode, unexpected directory entry, or durability failure. Do not commit the compiled binary.
 - [ ] Stream `pg_dump` directly into `database.dump`; never buffer the dump in memory. Hash/count while streaming, write the strict manifest, then call the same verifier before final rename.
 - [ ] Implement `pg_restore --list` with a byte/time bound and reduce it immediately to boolean catalogue facts; never return/print catalogue lines.
 - [ ] Run GREEN and package gates:

@@ -1,0 +1,22 @@
+{
+  "name": "@baby-care/operations",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "pnpm build:native && tsup",
+    "build:native": "node scripts/build-native-helper.mjs",
+    "install": "node scripts/build-native-helper.mjs",
+    "pretest": "pnpm build:native",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "tsup": "latest"
+  }
+}
