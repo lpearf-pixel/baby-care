@@ -15,7 +15,16 @@ const dadSession = {
   babyDisplayName: 'xiangxiang',
 } as const;
 
+const momSession = {
+  ...dadSession,
+  userId: '66666666-6666-4666-8666-666666666666',
+  displayName: 'Mom',
+  relationship: 'mom',
+} as const;
+
 const nannySession = { ...dadSession, displayName: 'Nanny', relationship: 'nanny', permissionLevel: 'caregiver' } as const;
+const exportPrivateMarker = 'private-export-marker-4f0978';
+const exportSerializedJson = JSON.stringify({ private: exportPrivateMarker, care: 'data' });
 
 const emptyCareSummary = {
   asOf: '2026-08-13T08:00:00.000Z',
@@ -51,7 +60,7 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
     resetNannyPassword: vi.fn(),
     getCareSummary: vi.fn(async () => emptyCareSummary),
     exportFamilyData: vi.fn(async () => ({
-      blob: new Blob(['{"private":"care data"}'], { type: 'application/json' }),
+      blob: new Blob([exportSerializedJson], { type: 'application/json' }),
       filename: 'baby-care-export-20260817T120000Z.json',
     })),
     ...overrides,
@@ -60,6 +69,11 @@ function fakeApi(overrides: Record<string, unknown> = {}) {
 
 function renderWithApi(api: ReturnType<typeof fakeApi>) {
   render(<App {...({ api } as unknown as Record<string, never>)} />);
+}
+
+function expectExportPayloadAbsent(): void {
+  expect(document.body.textContent).not.toContain(exportSerializedJson);
+  expect(document.body.textContent).not.toContain(exportPrivateMarker);
 }
 
 function jsonResponse(
@@ -86,7 +100,16 @@ describe('family data export download surface', () => {
     expect(await screen.findByRole('heading', { name: '导出家庭数据' })).toBeInTheDocument();
     expect(screen.getByText('导出文件包含家庭和宝宝的私密护理资料。仅在受信任的设备上下载和保存。')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '下载家庭数据' })).toBeEnabled();
-    expect(screen.queryByText('care data')).not.toBeInTheDocument();
+    expectExportPayloadAbsent();
+  });
+
+  it('shows the same private export action to a Mom family admin', async () => {
+    renderWithApi(fakeApi({ getSession: vi.fn(async () => momSession) }));
+
+    expect(await screen.findByRole('heading', { name: '导出家庭数据' })).toBeInTheDocument();
+    expect(screen.getByText('导出文件包含家庭和宝宝的私密护理资料。仅在受信任的设备上下载和保存。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '下载家庭数据' })).toBeEnabled();
+    expectExportPayloadAbsent();
   });
 
   it('keeps the download action out of the Nanny DOM', async () => {
@@ -114,9 +137,11 @@ describe('family data export download surface', () => {
   it('downloads the generic filename, clicks an object URL, and revokes it without rendering export JSON', async () => {
     const createObjectURL = vi.fn(() => 'blob:family-export');
     const revokeObjectURL = vi.fn();
+    const remove = vi.spyOn(HTMLAnchorElement.prototype, 'remove');
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
       expect(this.download).toBe('baby-care-export-20260817T120000Z.json');
       expect(this.href).toBe('blob:family-export');
+      expect(this.isConnected).toBe(true);
     });
     vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
     renderWithApi(fakeApi());
@@ -125,9 +150,41 @@ describe('family data export download surface', () => {
 
     await waitFor(() => expect(createObjectURL).toHaveBeenCalledTimes(1));
     expect(click).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('care data')).not.toBeInTheDocument();
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('a[download]')).toBeNull();
+    expectExportPayloadAbsent();
 
     await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:family-export'));
+  });
+
+  it('allows a failed export to retry successfully without previewing private JSON', async () => {
+    const exportFamilyData = vi
+      .fn()
+      .mockRejectedValueOnce(new BabyCareApiError('forbidden', exportPrivateMarker))
+      .mockResolvedValueOnce({
+        blob: new Blob([exportSerializedJson], { type: 'application/json' }),
+        filename: 'baby-care-export-20260817T120000Z.json',
+      });
+    const createObjectURL = vi.fn(() => 'blob:family-export-retry');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    renderWithApi(fakeApi({ exportFamilyData }));
+
+    const download = await screen.findByRole('button', { name: '下载家庭数据' });
+    fireEvent.click(download);
+
+    expect(await screen.findByText('下载失败，请稍后重试')).toBeInTheDocument();
+    expect(download).toBeEnabled();
+    expectExportPayloadAbsent();
+
+    fireEvent.click(download);
+
+    expect(await screen.findByText('下载已开始，请在浏览器下载中查看')).toBeInTheDocument();
+    expect(exportFamilyData).toHaveBeenCalledTimes(2);
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expectExportPayloadAbsent();
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:family-export-retry'));
   });
 
   it('keeps the warning visible, enables retry, and redacts API error details', async () => {
