@@ -8,8 +8,9 @@
   "scripts": {
     "build": "pnpm build:native && tsup",
     "build:native": "node scripts/build-native-helper.mjs",
+    "build:native:test": "node scripts/build-native-helper.mjs --test",
     "install": "node scripts/build-native-helper.mjs",
-    "pretest": "pnpm build:native",
+    "pretest": "pnpm build:native:test",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

@@ -17,6 +17,7 @@
 #include <stdio.h>
 #elif defined(__linux__)
 #include <linux/fs.h>
+#include <sys/random.h>
 #include <sys/syscall.h>
 #endif
 
@@ -29,9 +30,10 @@ enum helper_status {
   STATUS_UNSAFE = 65,
   STATUS_EXISTS = 66,
   STATUS_DURABILITY = 67,
-  STATUS_CLEANUP_REFUSED = 68,
   STATUS_UNAVAILABLE = 69,
-  STATUS_OPERATION = 70
+  STATUS_OPERATION = 70,
+  STATUS_QUARANTINED = 71,
+  STATUS_QUARANTINE_FAILED = 72
 };
 
 enum operation_result {
@@ -39,9 +41,10 @@ enum operation_result {
   RESULT_UNSAFE,
   RESULT_EXISTS,
   RESULT_DURABILITY,
-  RESULT_CLEANUP_REFUSED,
   RESULT_UNAVAILABLE,
-  RESULT_OPERATION
+  RESULT_OPERATION,
+  RESULT_QUARANTINED,
+  RESULT_QUARANTINE_FAILED
 };
 
 static int stable_result(const char *message, int status) {
@@ -251,8 +254,104 @@ static int unsupported_errno(int value) {
   return value == ENOSYS || value == EOPNOTSUPP || value == ENOTSUP;
 }
 
+static int fill_random(unsigned char *buffer, size_t length) {
+#if defined(__APPLE__)
+  arc4random_buf(buffer, length);
+  return 1;
+#elif defined(__linux__)
+  size_t offset = 0U;
+  while (offset < length) {
+    ssize_t received = getrandom(buffer + offset, length - offset, 0U);
+    if (received < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      return 0;
+    }
+    if (received == 0) {
+      return 0;
+    }
+    offset += (size_t)received;
+  }
+  return 1;
+#else
+  (void)buffer;
+  (void)length;
+  return 0;
+#endif
+}
+
+static int quarantine_name(char *name, size_t size) {
+  static const char prefix[] = ".baby-care-backup-quarantine-";
+  static const char hexadecimal[] = "0123456789abcdef";
+  unsigned char random[16];
+  size_t prefix_length = sizeof(prefix) - 1U;
+  if (size < prefix_length + sizeof(random) * 2U + 1U ||
+      !fill_random(random, sizeof(random))) {
+    return 0;
+  }
+  memcpy(name, prefix, prefix_length);
+  for (size_t index = 0U; index < sizeof(random); index += 1U) {
+    name[prefix_length + index * 2U] = hexadecimal[random[index] >> 4U];
+    name[prefix_length + index * 2U + 1U] = hexadecimal[random[index] & 0x0fU];
+  }
+  name[prefix_length + sizeof(random) * 2U] = '\0';
+  return 1;
+}
+
+static int final_entry_absent(const char *final_name) {
+  struct stat ignored;
+  if (fstatat(PARENT_FD, final_name, &ignored, AT_SYMLINK_NOFOLLOW) == 0) {
+    return 0;
+  }
+  return errno == ENOENT;
+}
+
+static int quarantine_final_entry(const char *final_name) {
+  for (int attempt = 0; attempt < 16; attempt += 1) {
+    char retained_name[96];
+    if (!quarantine_name(retained_name, sizeof(retained_name))) {
+      return 0;
+    }
+    if (exclusive_rename(PARENT_FD, final_name, PARENT_FD, retained_name) == 0) {
+      if (!final_entry_absent(final_name)) {
+        return 0;
+      }
+      (void)fsync(PARENT_FD);
+      return 1;
+    }
+    if (errno == EEXIST || errno == ENOTEMPTY) {
+      continue;
+    }
+    if (errno == ENOENT && final_entry_absent(final_name)) {
+      (void)fsync(PARENT_FD);
+      return 1;
+    }
+    return 0;
+  }
+  return 0;
+}
+
+#if defined(SAFE_BUNDLE_TESTING)
+static int inject_source_swap(const char *temporary_name) {
+  static const char original_name[] = ".baby-care-helper-test-original";
+  static const char replacement_name[] = ".baby-care-helper-test-replacement";
+  if (mkdirat(PARENT_FD, replacement_name, (mode_t)0700) != 0) {
+    return 0;
+  }
+  if (exclusive_rename(PARENT_FD, temporary_name, PARENT_FD, original_name) != 0) {
+    return 0;
+  }
+  if (exclusive_rename(PARENT_FD, replacement_name, PARENT_FD, temporary_name) != 0) {
+    return 0;
+  }
+  return 1;
+}
+#endif
+
 static enum operation_result publish_bundle(const char *temporary_name,
-                                             const char *final_name) {
+                                             const char *final_name,
+                                             int inject_swap) {
   struct contract_entries entries;
   if (!validate_directory_identity(temporary_name) ||
       !inspect_contract_entries(1, &entries) ||
@@ -262,6 +361,13 @@ static enum operation_result publish_bundle(const char *temporary_name,
   if (fsync(TEMPORARY_FD) != 0 || fsync(PARENT_FD) != 0) {
     return RESULT_DURABILITY;
   }
+#if defined(SAFE_BUNDLE_TESTING)
+  if (inject_swap != 0 && !inject_source_swap(temporary_name)) {
+    return RESULT_OPERATION;
+  }
+#else
+  (void)inject_swap;
+#endif
   if (exclusive_rename(PARENT_FD, temporary_name, PARENT_FD, final_name) != 0) {
     int saved_errno = errno;
     if (saved_errno == EEXIST || saved_errno == ENOTEMPTY) {
@@ -277,38 +383,10 @@ static enum operation_result publish_bundle(const char *temporary_name,
   if (fstat(TEMPORARY_FD, &opened) != 0 ||
       fstatat(PARENT_FD, final_name, &published, AT_SYMLINK_NOFOLLOW) != 0 ||
       !same_identity(&opened, &published) || !private_directory(&published)) {
-    return RESULT_UNSAFE;
+    return quarantine_final_entry(final_name) ? RESULT_QUARANTINED : RESULT_QUARANTINE_FAILED;
   }
   if (fsync(PARENT_FD) != 0) {
-    if (exclusive_rename(PARENT_FD, final_name, PARENT_FD, temporary_name) == 0) {
-      (void)fsync(PARENT_FD);
-    }
-    return RESULT_DURABILITY;
-  }
-  return RESULT_OK;
-}
-
-static enum operation_result cleanup_bundle(const char *temporary_name) {
-  struct contract_entries entries;
-  if (!validate_directory_identity(temporary_name) ||
-      !inspect_contract_entries(0, &entries) ||
-      !validate_directory_identity(temporary_name)) {
-    return RESULT_CLEANUP_REFUSED;
-  }
-  if (entries.manifest_json != 0 && unlinkat(TEMPORARY_FD, "manifest.json", 0) != 0) {
-    return RESULT_OPERATION;
-  }
-  if (entries.database_dump != 0 && unlinkat(TEMPORARY_FD, "database.dump", 0) != 0) {
-    return RESULT_OPERATION;
-  }
-  if (fsync(TEMPORARY_FD) != 0 || !validate_directory_identity(temporary_name)) {
-    return RESULT_DURABILITY;
-  }
-  if (unlinkat(PARENT_FD, temporary_name, AT_REMOVEDIR) != 0) {
-    return RESULT_OPERATION;
-  }
-  if (fsync(PARENT_FD) != 0) {
-    return RESULT_DURABILITY;
+    return quarantine_final_entry(final_name) ? RESULT_QUARANTINED : RESULT_QUARANTINE_FAILED;
   }
   return RESULT_OK;
 }
@@ -319,7 +397,7 @@ int main(int argc, char **argv) {
   }
   if (argc == 4 && strcmp(argv[1], "publish") == 0 &&
       valid_temporary_name(argv[2]) && valid_final_name(argv[3])) {
-    enum operation_result result = publish_bundle(argv[2], argv[3]);
+    enum operation_result result = publish_bundle(argv[2], argv[3], 0);
     if (result == RESULT_OK) {
       return stable_result("safe_bundle_v1:published\n", STATUS_OK);
     }
@@ -335,24 +413,26 @@ int main(int argc, char **argv) {
     if (result == RESULT_UNSAFE) {
       return stable_result("safe_bundle_v1:unsafe\n", STATUS_UNSAFE);
     }
-    return stable_result("safe_bundle_v1:operation_failed\n", STATUS_OPERATION);
-  }
-  if (argc == 3 && strcmp(argv[1], "cleanup") == 0 &&
-      valid_temporary_name(argv[2])) {
-    enum operation_result result = cleanup_bundle(argv[2]);
-    if (result == RESULT_OK) {
-      return stable_result("safe_bundle_v1:cleaned\n", STATUS_OK);
+    if (result == RESULT_QUARANTINED) {
+      return stable_result("safe_bundle_v1:quarantined\n", STATUS_QUARANTINED);
     }
-    if (result == RESULT_CLEANUP_REFUSED || result == RESULT_UNSAFE) {
-      return stable_result("safe_bundle_v1:cleanup_refused\n", STATUS_CLEANUP_REFUSED);
-    }
-    if (result == RESULT_DURABILITY) {
-      return stable_result("safe_bundle_v1:durability_failed\n", STATUS_DURABILITY);
-    }
-    if (result == RESULT_UNAVAILABLE) {
-      return stable_result("safe_bundle_v1:unavailable\n", STATUS_UNAVAILABLE);
+    if (result == RESULT_QUARANTINE_FAILED) {
+      return stable_result("safe_bundle_v1:quarantine_failed\n", STATUS_QUARANTINE_FAILED);
     }
     return stable_result("safe_bundle_v1:operation_failed\n", STATUS_OPERATION);
   }
+#if defined(SAFE_BUNDLE_TESTING)
+  if (argc == 4 && strcmp(argv[1], "publish-source-swap-test") == 0 &&
+      valid_temporary_name(argv[2]) && valid_final_name(argv[3])) {
+    enum operation_result result = publish_bundle(argv[2], argv[3], 1);
+    if (result == RESULT_QUARANTINED) {
+      return stable_result("safe_bundle_v1:quarantined\n", STATUS_QUARANTINED);
+    }
+    if (result == RESULT_QUARANTINE_FAILED) {
+      return stable_result("safe_bundle_v1:quarantine_failed\n", STATUS_QUARANTINE_FAILED);
+    }
+    return stable_result("safe_bundle_v1:operation_failed\n", STATUS_OPERATION);
+  }
+#endif
   return stable_result("safe_bundle_v1:protocol_error\n", STATUS_PROTOCOL);
 }

@@ -1,6 +1,7 @@
 import { constants, closeSync, openSync } from 'node:fs';
 import {
   chmod,
+  copyFile,
   lstat,
   mkdir,
   mkdtemp,
@@ -9,6 +10,7 @@ import {
   realpath,
   rename,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -18,12 +20,14 @@ import { spawnSync } from 'node:child_process';
 import { afterEach, describe, expect, test } from 'vitest';
 
 import { openPrivateDirectory } from '../src/private-files.js';
-import {
-  cleanupPrivateBundle,
-  publishPrivateBundle,
-} from '../src/native-helper.js';
+import { publishPrivateBundle } from '../src/native-helper.js';
 
 const helperPath = fileURLToPath(new URL('../.native/safe-bundle', import.meta.url));
+const testHelperPath = fileURLToPath(new URL('../.native/safe-bundle-test', import.meta.url));
+const buildScriptPath = fileURLToPath(
+  new URL('../scripts/build-native-helper.mjs', import.meta.url),
+);
+const helperSourcePath = fileURLToPath(new URL('../native/safe-bundle.c', import.meta.url));
 const roots: string[] = [];
 const finalName = 'baby-care-backup-20260817T123456Z';
 
@@ -81,7 +85,7 @@ describe('safe-bundle native protocol', () => {
     const parentFd = openSync(root, constants.O_RDONLY);
     const temporaryFd = openSync(temporary, constants.O_RDONLY);
     try {
-      const result = spawnSync(helperPath, ['cleanup', basename(temporary)], {
+      const result = spawnSync(helperPath, ['publish', basename(temporary), finalName], {
         env: {},
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe', parentFd, temporaryFd, parentFd],
@@ -93,6 +97,32 @@ describe('safe-bundle native protocol', () => {
       closeSync(temporaryFd);
       closeSync(parentFd);
     }
+  });
+});
+
+describe('native helper build boundary', () => {
+  test('rejects a package-local .native symlink before writing through it', async () => {
+    const root = await privateRoot();
+    const packageRoot = join(root, 'package');
+    const scripts = join(packageRoot, 'scripts');
+    const native = join(packageRoot, 'native');
+    const outside = join(root, 'outside');
+    await mkdir(scripts, { recursive: true });
+    await mkdir(native, { recursive: true });
+    await mkdir(outside, { mode: 0o700 });
+    await copyFile(buildScriptPath, join(scripts, 'build-native-helper.mjs'));
+    await copyFile(helperSourcePath, join(native, 'safe-bundle.c'));
+    await symlink(outside, join(packageRoot, '.native'), 'dir');
+
+    const result = spawnSync(process.execPath, [join(scripts, 'build-native-helper.mjs')], {
+      env: {},
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('native_helper_build_failed\n');
+    expect(result.stderr).toBe('');
+    expect(await readdir(outside)).toEqual([]);
   });
 });
 
@@ -127,7 +157,41 @@ describe('native no-replace publication', () => {
     }
   });
 
-  test('can clean the original temporary bundle after no-replace publication is refused', async () => {
+  test('quarantines a source swapped after validation and leaves no final entry', async () => {
+    const root = await privateRoot();
+    const temporary = await privateTemporary(root);
+    await writeContractFiles(temporary);
+    const parentFd = openSync(root, constants.O_RDONLY);
+    const temporaryFd = openSync(temporary, constants.O_RDONLY);
+    try {
+      const result = spawnSync(
+        testHelperPath,
+        ['publish-source-swap-test', basename(temporary), finalName],
+        {
+          env: {},
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe', parentFd, temporaryFd],
+        },
+      );
+      expect(result.status).toBe(71);
+      expect(result.stdout).toBe('safe_bundle_v1:quarantined\n');
+      expect(result.stderr).toBe('');
+      await expect(lstat(join(root, finalName))).rejects.toMatchObject({ code: 'ENOENT' });
+      const entries = (await readdir(root)).sort();
+      expect(entries).toContain('.baby-care-helper-test-original');
+      expect(entries.filter((entry) => /^\.baby-care-backup-quarantine-[a-f0-9]{32}$/.test(entry)))
+        .toHaveLength(1);
+      expect((await readdir(join(root, '.baby-care-helper-test-original'))).sort()).toEqual([
+        'database.dump',
+        'manifest.json',
+      ]);
+    } finally {
+      closeSync(temporaryFd);
+      closeSync(parentFd);
+    }
+  });
+
+  test('retains the original temporary bundle after no-replace publication is refused', async () => {
     const root = await privateRoot();
     const temporary = await privateTemporary(root);
     await writeContractFiles(temporary);
@@ -143,10 +207,7 @@ describe('native no-replace publication', () => {
           finalName,
         ),
       ).rejects.toThrowError('backup_exists');
-      await expect(
-        cleanupPrivateBundle(parentHandle, temporaryHandle, basename(temporary)),
-      ).resolves.toBeUndefined();
-      await expect(lstat(temporary)).rejects.toMatchObject({ code: 'ENOENT' });
+      expect((await readdir(temporary)).sort()).toEqual(['database.dump', 'manifest.json']);
     } finally {
       await temporaryHandle.close();
       await parentHandle.close();
@@ -154,60 +215,38 @@ describe('native no-replace publication', () => {
   });
 });
 
-describe('native descriptor-relative cleanup', () => {
-  test('removes only a contract-shaped owned temporary bundle', async () => {
+describe('preservation-first failure state', () => {
+  test('does not expose automatic cleanup and preserves the complete temporary bundle', async () => {
     const root = await privateRoot();
     const temporary = await privateTemporary(root);
     await writeContractFiles(temporary);
-    const parentHandle = await openPrivateDirectory(root);
-    const temporaryHandle = await openPrivateDirectory(temporary);
-    await cleanupPrivateBundle(parentHandle, temporaryHandle, basename(temporary));
-    await temporaryHandle.close();
-    await parentHandle.close();
-    await expect(lstat(temporary)).rejects.toMatchObject({ code: 'ENOENT' });
+    const parentFd = openSync(root, constants.O_RDONLY);
+    const temporaryFd = openSync(temporary, constants.O_RDONLY);
+    try {
+      const result = spawnSync(helperPath, ['cleanup', basename(temporary)], {
+        env: {},
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe', parentFd, temporaryFd],
+      });
+      expect(result.status).toBe(64);
+      expect(result.stdout).toBe('safe_bundle_v1:protocol_error\n');
+      expect(result.stderr).toBe('');
+      expect((await readdir(temporary)).sort()).toEqual(['database.dump', 'manifest.json']);
+    } finally {
+      closeSync(temporaryFd);
+      closeSync(parentFd);
+    }
   });
 
-  test('preserves a replacement at the top-level temporary basename', async () => {
+  test('preserves a replacement and non-contract entry without invoking deletion', async () => {
     const root = await privateRoot();
     const temporary = await privateTemporary(root);
     await writeContractFiles(temporary);
     const displaced = join(root, 'displaced-owned-temp');
-    const parentHandle = await openPrivateDirectory(root);
-    const temporaryHandle = await openPrivateDirectory(temporary);
     await rename(temporary, displaced);
     await mkdir(temporary, { mode: 0o700 });
-    await writeFile(join(temporary, 'sentinel'), 'preserve replacement', { mode: 0o600 });
-    try {
-      await expect(
-        cleanupPrivateBundle(parentHandle, temporaryHandle, basename(temporary)),
-      ).rejects.toThrowError('backup_cleanup_refused');
-      expect(await readFile(join(temporary, 'sentinel'), 'utf8')).toBe('preserve replacement');
-      expect((await readdir(displaced)).sort()).toEqual(['database.dump', 'manifest.json']);
-    } finally {
-      await temporaryHandle.close();
-      await parentHandle.close();
-    }
-  });
-
-  test('preserves the entire bundle when a non-contract entry exists', async () => {
-    const root = await privateRoot();
-    const temporary = await privateTemporary(root);
-    await writeContractFiles(temporary);
-    await writeFile(join(temporary, 'unexpected'), 'preserve all', { mode: 0o600 });
-    const parentHandle = await openPrivateDirectory(root);
-    const temporaryHandle = await openPrivateDirectory(temporary);
-    try {
-      await expect(
-        cleanupPrivateBundle(parentHandle, temporaryHandle, basename(temporary)),
-      ).rejects.toThrowError('backup_cleanup_refused');
-      expect((await readdir(temporary)).sort()).toEqual([
-        'database.dump',
-        'manifest.json',
-        'unexpected',
-      ]);
-    } finally {
-      await temporaryHandle.close();
-      await parentHandle.close();
-    }
+    await writeFile(join(temporary, 'unexpected'), 'preserve replacement', { mode: 0o600 });
+    expect(await readFile(join(temporary, 'unexpected'), 'utf8')).toBe('preserve replacement');
+    expect((await readdir(displaced)).sort()).toEqual(['database.dump', 'manifest.json']);
   });
 });

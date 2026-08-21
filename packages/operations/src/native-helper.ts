@@ -10,12 +10,13 @@ import { BackupError } from './contracts.js';
 const HELPER_PATH = fileURLToPath(new URL('../.native/safe-bundle', import.meta.url));
 const TEMPORARY_NAME = /^\.baby-care-backup-tmp-[A-Za-z0-9]{6}$/;
 const FINAL_NAME = /^baby-care-backup-\d{8}T\d{6}Z$/;
-const HELPER_TIMEOUT_MS = 5_000;
 const HELPER_OUTPUT_LIMIT = 128;
 
-type HelperOperation =
-  | { operation: 'publish'; temporaryName: string; finalName: string }
-  | { operation: 'cleanup'; temporaryName: string };
+interface HelperOperation {
+  operation: 'publish';
+  temporaryName: string;
+  finalName: string;
+}
 
 function privateOwner(uid: number): boolean {
   return typeof process.getuid !== 'function' || uid === process.getuid();
@@ -64,7 +65,6 @@ function validateOperation(request: HelperOperation): string[] {
   if (!TEMPORARY_NAME.test(request.temporaryName)) {
     throw new BackupError('backup_helper_protocol_failed');
   }
-  if (request.operation === 'cleanup') return ['cleanup', request.temporaryName];
   if (!FINAL_NAME.test(request.finalName)) {
     throw new BackupError('backup_helper_protocol_failed');
   }
@@ -78,6 +78,7 @@ async function runHelper(
 ): Promise<void> {
   const args = validateOperation(request);
   await assertPrivateHelper();
+  // Do not kill this helper after publication starts; it must finish fsync or quarantine.
   const outcome = await new Promise<{ status: number | null; output: string; bounded: boolean }>(
     (resolve) => {
       let output = '';
@@ -95,15 +96,9 @@ async function runHelper(
         resolve({ status: null, output: '', bounded: false });
         return;
       }
-      const timer = setTimeout(() => {
-        bounded = false;
-        child.kill('SIGKILL');
-      }, HELPER_TIMEOUT_MS);
-      timer.unref();
       stdout.on('data', (chunk: Buffer) => {
         if (output.length + chunk.byteLength > HELPER_OUTPUT_LIMIT) {
           bounded = false;
-          child.kill('SIGKILL');
           return;
         }
         output += chunk.toString('utf8');
@@ -112,13 +107,11 @@ async function runHelper(
       child.once('error', () => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
         resolve({ status: null, output: '', bounded: false });
       });
       child.once('close', (status) => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
         resolve({ status, output, bounded });
       });
     },
@@ -127,14 +120,10 @@ async function runHelper(
     throw new BackupError('backup_helper_unavailable');
   }
   const exact = `${outcome.status}:${outcome.output}`;
-  if (request.operation === 'publish' && exact === '0:safe_bundle_v1:published\n') return;
-  if (request.operation === 'cleanup' && exact === '0:safe_bundle_v1:cleaned\n') return;
+  if (exact === '0:safe_bundle_v1:published\n') return;
   if (exact === '66:safe_bundle_v1:exists\n') throw new BackupError('backup_exists');
   if (exact === '67:safe_bundle_v1:durability_failed\n') {
     throw new BackupError('backup_durability_failed');
-  }
-  if (exact === '68:safe_bundle_v1:cleanup_refused\n') {
-    throw new BackupError('backup_cleanup_refused');
   }
   if (exact === '69:safe_bundle_v1:unavailable\n') {
     throw new BackupError('backup_helper_unavailable');
@@ -143,9 +132,13 @@ async function runHelper(
     throw new BackupError('backup_unsafe_storage');
   }
   if (exact === '70:safe_bundle_v1:operation_failed\n') {
-    throw new BackupError(
-      request.operation === 'cleanup' ? 'backup_cleanup_failed' : 'backup_publish_failed',
-    );
+    throw new BackupError('backup_publish_failed');
+  }
+  if (exact === '71:safe_bundle_v1:quarantined\n') {
+    throw new BackupError('backup_cleanup_required');
+  }
+  if (exact === '72:safe_bundle_v1:quarantine_failed\n') {
+    throw new BackupError('backup_quarantine_failed');
   }
   throw new BackupError('backup_helper_protocol_failed');
 }
@@ -161,12 +154,4 @@ export async function publishPrivateBundle(
     parentHandle,
     temporaryHandle,
   );
-}
-
-export async function cleanupPrivateBundle(
-  parentHandle: FileHandle,
-  temporaryHandle: FileHandle,
-  temporaryName: string,
-): Promise<void> {
-  await runHelper({ operation: 'cleanup', temporaryName }, parentHandle, temporaryHandle);
 }

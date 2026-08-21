@@ -24,10 +24,8 @@ import {
   createPrivateFile,
   formatBackupBundleName,
   fsyncDirectory,
-  openPrivateDirectory,
   validateBackupBundleName,
 } from '../src/private-files.js';
-import { cleanupPrivateBundle } from '../src/native-helper.js';
 
 const roots: string[] = [];
 
@@ -192,35 +190,14 @@ describe('private file primitives', () => {
     await expect(fsyncDirectory(file)).rejects.toThrowError('backup_durability_failed');
   });
 
-  test('cleans only a direct owned temporary bundle', async () => {
+  test('keeps an owner-private temporary bundle as non-final retained state', async () => {
     const root = await privateRoot();
     const temp = await mkdtemp(join(root, '.baby-care-backup-tmp-'));
     await chmod(temp, 0o700);
     await writeFile(join(temp, 'database.dump'), 'partial', { mode: 0o600 });
-    const rootHandle = await openPrivateDirectory(root);
-    const tempHandle = await openPrivateDirectory(temp);
-    await cleanupPrivateBundle(rootHandle, tempHandle, basename(temp));
-    await tempHandle.close();
-    await expect(lstat(temp)).rejects.toMatchObject({ code: 'ENOENT' });
-
-    const unrelated = join(root, 'unrelated');
-    await mkdir(unrelated, { mode: 0o700 });
-    const unrelatedHandle = await openPrivateDirectory(unrelated);
-    await expect(
-      cleanupPrivateBundle(rootHandle, unrelatedHandle, basename(unrelated)),
-    ).rejects.toThrowError('backup_helper_protocol_failed');
-    await unrelatedHandle.close();
-    await expect(lstat(unrelated)).resolves.toBeDefined();
-
-    const outside = await privateRoot();
-    const outsideTemp = await mkdtemp(join(outside, '.baby-care-backup-tmp-'));
-    await chmod(outsideTemp, 0o700);
-    const outsideHandle = await openPrivateDirectory(outsideTemp);
-    await expect(
-      cleanupPrivateBundle(rootHandle, outsideHandle, basename(outsideTemp)),
-    ).rejects.toThrowError('backup_cleanup_refused');
-    await outsideHandle.close();
-    await rootHandle.close();
+    await expect(assertPrivateDirectory(temp)).resolves.toBeUndefined();
+    expect(() => validateBackupBundleName(basename(temp))).toThrowError('backup_invalid_bundle');
+    expect(await readFile(join(temp, 'database.dump'), 'utf8')).toBe('partial');
   });
 
   test('uses O_NOFOLLOW when the platform exposes it', () => {

@@ -74,6 +74,16 @@ async function createValidBundle(root: string): Promise<void> {
   await createBackup({ outputParent: root, createdAt }, fakeTools());
 }
 
+async function expectRetainedNonFinalState(root: string): Promise<string[]> {
+  const entries = (await readdir(root)).sort();
+  expect(entries.some((entry) => entry.startsWith('.baby-care-backup-tmp-'))).toBe(true);
+  expect(entries.some((entry) => /^baby-care-backup-\d{8}T\d{6}Z$/.test(entry))).toBe(false);
+  for (const entry of entries.filter((name) => name.startsWith('.baby-care-backup-tmp-'))) {
+    expect((await lstat(join(root, entry))).mode & 0o777).toBe(0o700);
+  }
+  return entries;
+}
+
 describe('BackupManifestV1Schema', () => {
   const valid = {
     schemaVersion: 1,
@@ -172,13 +182,16 @@ describe('createBackup', () => {
           concurrentIdentity = await lstat(bundle);
         },
       }),
-    ).rejects.toThrowError('backup_exists');
+    ).rejects.toThrowError('backup_cleanup_required');
     const preservedIdentity = await lstat(bundle);
     expect(concurrentIdentity).toBeDefined();
     expect([preservedIdentity.dev, preservedIdentity.ino]).toEqual([
       concurrentIdentity?.dev,
       concurrentIdentity?.ino,
     ]);
+    expect((await readdir(root)).some((entry) => entry.startsWith('.baby-care-backup-tmp-'))).toBe(
+      true,
+    );
   });
 
   test('fails before dumping when the source server is not PostgreSQL 16', async () => {
@@ -194,8 +207,19 @@ describe('createBackup', () => {
     expect(await readdir(root)).toEqual([]);
   });
 
+  test('leaves no state when creation fails before the temporary bundle exists', async () => {
+    const root = await privateRoot();
+    await expect(
+      createBackup({ outputParent: root, createdAt }, fakeTools(), {
+        onStage(stage) {
+          if (stage === 'before_temp_create') throw new Error('before temporary creation');
+        },
+      }),
+    ).rejects.toThrowError('backup_failed');
+    expect(await readdir(root)).toEqual([]);
+  });
+
   test.each<BackupCreateStage>([
-    'before_temp_create',
     'before_dump_fsync',
     'before_manifest_write',
     'before_manifest_fsync',
@@ -203,7 +227,7 @@ describe('createBackup', () => {
     'before_bundle_fsync',
     'before_parent_fsync',
     'before_rename',
-  ])('leaves no final-looking bundle when %s fails', async (stage) => {
+  ])('retains private non-final state when %s fails', async (stage) => {
     const root = await privateRoot();
     await expect(
       createBackup({ outputParent: root, createdAt }, fakeTools(), {
@@ -211,11 +235,11 @@ describe('createBackup', () => {
           if (current === stage) throw new Error(`private stage ${stage}`);
         },
       }),
-    ).rejects.toThrowError(/^backup_/);
-    expect(await readdir(root)).toEqual([]);
+    ).rejects.toThrowError('backup_cleanup_required');
+    await expectRetainedNonFinalState(root);
   });
 
-  test('cleans partial state when the dump stream fails and redacts the raw error', async () => {
+  test('retains partial state when the dump stream fails and redacts the raw error', async () => {
     const root = await privateRoot();
     const tools = fakeTools({
       dump: async () => {
@@ -228,9 +252,12 @@ describe('createBackup', () => {
     } catch (error) {
       caught = error;
     }
-    expect(caught).toMatchObject({ code: 'backup_dump_failed', message: 'backup_dump_failed' });
+    expect(caught).toMatchObject({
+      code: 'backup_cleanup_required',
+      message: 'backup_cleanup_required',
+    });
     expect(String(caught)).not.toContain('secret');
-    expect(await readdir(root)).toEqual([]);
+    await expectRetainedNonFinalState(root);
   });
 
   test('self-verification rejects a dump changed after manifest creation', async () => {
@@ -245,11 +272,11 @@ describe('createBackup', () => {
           }
         },
       }),
-    ).rejects.toThrowError('backup_integrity_failed');
-    expect(await readdir(root)).toEqual([]);
+    ).rejects.toThrowError('backup_cleanup_required');
+    await expectRetainedNonFinalState(root);
   });
 
-  test('refuses cleanup when the owned temporary path is replaced', async () => {
+  test('preserves both objects when the owned temporary path is replaced', async () => {
     const root = await privateRoot();
     const displaced = join(root, 'displaced-owned-temp');
     let replacement = '';
@@ -268,7 +295,7 @@ describe('createBackup', () => {
           throw new Error('fault after temporary replacement');
         },
       }),
-    ).rejects.toThrowError('backup_cleanup_failed');
+    ).rejects.toThrowError('backup_cleanup_required');
     expect(await readFile(join(replacement, 'sentinel'), 'utf8')).toBe('do-not-delete');
     expect(await readFile(join(displaced, 'database.dump'))).toEqual(dumpBytes);
   });
@@ -291,7 +318,7 @@ describe('createBackup', () => {
           await link(join(displaced, 'manifest.json'), join(replacement, 'manifest.json'));
         },
       }),
-    ).rejects.toThrowError(/^backup_/);
+    ).rejects.toThrowError('backup_cleanup_required');
     await expect(lstat(join(root, bundleName))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
@@ -315,7 +342,7 @@ describe('createBackup', () => {
           await writeFile(join(replacementTemp, 'sentinel'), 'do-not-publish', { mode: 0o600 });
         },
       }),
-    ).rejects.toThrowError('backup_unsafe_storage');
+    ).rejects.toThrowError('backup_cleanup_required');
     expect(await readFile(join(replacementTemp, 'sentinel'), 'utf8')).toBe('do-not-publish');
   });
 
@@ -329,8 +356,8 @@ describe('createBackup', () => {
           }
         },
       }),
-    ).rejects.toThrowError(/^backup_/);
-    expect(await readdir(root)).toEqual([]);
+    ).rejects.toThrowError('backup_cleanup_required');
+    await expectRetainedNonFinalState(root);
   });
 });
 

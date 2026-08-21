@@ -28,7 +28,7 @@ import {
   privateBundlePaths,
   validateBackupBundleName,
 } from './private-files.js';
-import { cleanupPrivateBundle, publishPrivateBundle } from './native-helper.js';
+import { publishPrivateBundle } from './native-helper.js';
 import {
   COMPLETE_CATALOGUE_FACTS,
   type DumpCatalogueFacts,
@@ -323,13 +323,8 @@ export async function createBackup(
     return { code: 'backup_created' };
   } catch (error) {
     const failure = closed(error, 'backup_failed');
-    if (parent && temporary && parentHandle && temporaryHandle) {
-      try {
-        await cleanupPrivateBundle(parentHandle, temporaryHandle, basename(temporary));
-      } catch {
-        throw new BackupError('backup_cleanup_failed');
-      }
-    }
+    if (failure.code === 'backup_quarantine_failed') throw failure;
+    if (temporary) throw new BackupError('backup_cleanup_required');
     throw failure;
   } finally {
     await temporaryHandle?.close().catch(() => undefined);

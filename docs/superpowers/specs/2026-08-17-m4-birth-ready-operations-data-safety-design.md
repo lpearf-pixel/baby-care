@@ -207,15 +207,18 @@ ancestors and non-regular bundle files. A same-filesystem temporary directory is
 with mode `0700`; files use `0600`; the final bundle appears only after dump completion,
 manifest validation, digest verification, file/directory `fsync`, and atomic rename.
 If any durability operation is unavailable or fails, the run fails closed. A failed run
-leaves no valid-looking final bundle.
+leaves no valid-looking final bundle. Once private temporary state exists, automatic failure
+handling preserves it under a non-final owner-private name and returns
+`backup_cleanup_required`; it never recursively removes or basename-unlinks that state.
 
-On macOS, final directory publication and owned temporary-bundle cleanup use a minimal
-repository-native helper because Node's path-based `rename`/recursive removal APIs do not
-provide the required kernel-enforced no-replace and descriptor-relative operations. The
-helper accepts only fixed bundle operations, inherited validated directory descriptors and
-validated basenames; it accepts no absolute path, database coordinate, credential, SQL or
-caller-supplied filesystem flag. An unavailable or unsupported helper fails closed without a
-path-based fallback.
+On macOS, final directory publication uses a minimal repository-native helper because Node's
+path-based `rename` API does not provide kernel-enforced no-replace. The helper accepts only
+fixed bundle operations, inherited validated directory descriptors and validated basenames;
+it accepts no absolute path, database coordinate, credential, SQL or caller-supplied
+filesystem flag. If post-publication identity or durability verification fails, the helper
+atomically moves the current final entry to a bounded-random non-final quarantine name,
+verifies the final name is absent, preserves the quarantined object and returns a closed
+failure. An unavailable or unsupported helper fails closed without a path-based fallback.
 
 Database credentials are consumed from the existing protected environment/runtime
 boundary. They must not be copied into command arguments, output, manifests, diagnostics,
