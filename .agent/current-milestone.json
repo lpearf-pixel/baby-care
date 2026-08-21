@@ -80,9 +80,14 @@
       "task": "Task 6 Fail-Closed Restore, Invariants And Session Sanitation",
       "commit": "de09494",
       "review": "approved_after_fix_round_2"
+    },
+    {
+      "task": "Task 7 Operator CLI And Disposable PostgreSQL 16 Restore Practice",
+      "commit": "5b92477",
+      "review": "approved_no_findings"
     }
   ],
-  "m4_current_task": "Task 7 Operator CLI And Disposable PostgreSQL 16 Restore Practice",
+  "m4_current_task": "Task 8 Synthetic Birth Ready Operations Simulation And Privacy Gate",
   "m4_scope": [
     "Dad/Mom-only private family data export",
     "atomic private PostgreSQL backup and integrity verification",
@@ -103,7 +108,7 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "execute M4 Task 7 operator CLI and disposable PostgreSQL 16 restore practice",
+    "execute M4 Task 8 synthetic Birth Ready operations simulation and privacy gate",
     "continue M4 in bounded RED-GREEN segments"
   ],
   "requires_separate_post_m3_design": [

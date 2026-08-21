@@ -596,15 +596,15 @@ Configuration is environment-only and schema-validated. At minimum it includes t
 
 **Steps:**
 
-- [ ] Add CLI RED cases for missing/unknown configuration, unsafe parent, unknown command/extra positional args, and attempted restore flags. Assert exit codes and stable messages only; capture stdout/stderr and scan for fixture paths, credentials, SQL, subprocess arguments and raw errors.
-- [ ] Add `backup:create`/`backup:verify` RED contract tests proving only the final generic status code is printed and no final bundle is overwritten.
-- [ ] Add `backup:restore` RED tests proving it requires a separately running configured target and does not create/delete infrastructure.
-- [ ] Add `backup:restore-verify` RED tests proving it creates a new disposable PostgreSQL 16 restore service/volume, waits for health, invokes restore, captures only aggregate result, starts the restored API/probe only after verification, and tears down that isolated service/volume in `finally`. On failure the target remains disconnected/unusable for inspection or is discarded by this wrapper. It must refuse a Compose project/service identity not matching the fixed configuration.
-- [ ] Define `infra/backup/compose.operations.yaml` with `postgres_restore` on its own volume and no household volume mount. Add a restored API/probe service that starts only after restore; do not auto-migrate the target before the empty-target proof. The normal API must never point at this target.
-- [ ] Implement the production adapter on the host: invoke `pg_dump`, `pg_restore` and `psql` only through validated, named PostgreSQL 16 Compose services; stream dump bytes over stdio; keep credentials inside service environment; and suppress/reduce subprocess output. Fail before backup if tool and source/target server major versions are not 16.
-- [ ] Implement the CLI as a thin mapping from four exact commands to library calls. Never log config or caught exceptions. Use an allow-listed error-code mapper.
-- [ ] Write operator docs with: sensitivity warning; private destination prerequisites; exact create/verify/restore-verify/status cleanup commands; source/target distinction; no in-place restore; no automatic retention/encryption claims; and explicit prohibition on storing bundles/exports in Git or CI artifacts.
-- [ ] Run GREEN:
+- [x] Add CLI RED cases for missing/unknown configuration, unsafe parent, unknown command/extra positional args, and attempted restore flags. Assert exit codes and stable messages only; capture stdout/stderr and scan for fixture paths, credentials, SQL, subprocess arguments and raw errors.
+- [x] Add `backup:create`/`backup:verify` RED contract tests proving only the final generic status code is printed and no final bundle is overwritten.
+- [x] Add `backup:restore` RED tests proving it requires a separately running configured target and does not create/delete infrastructure.
+- [x] Add `backup:restore-verify` RED tests proving it creates a new disposable PostgreSQL 16 restore service/volume, waits for health, invokes restore, captures only aggregate result, starts the restored API/probe only after verification, and tears down that isolated service/volume in `finally`. On failure the target remains disconnected/unusable for inspection or is discarded by this wrapper. It must refuse a Compose project/service identity not matching the fixed configuration.
+- [x] Define `infra/backup/compose.operations.yaml` with `postgres_restore` on its own volume and no household volume mount. Add a restored API/probe service that starts only after restore; do not auto-migrate the target before the empty-target proof. The normal API must never point at this target.
+- [x] Implement the production adapter on the host: invoke `pg_dump`, `pg_restore` and `psql` only through validated, named PostgreSQL 16 Compose services; stream dump bytes over stdio; keep credentials inside service environment; and suppress/reduce subprocess output. Fail before backup if tool and source/target server major versions are not 16.
+- [x] Implement the CLI as a thin mapping from four exact commands to library calls. Never log config or caught exceptions. Use an allow-listed error-code mapper.
+- [x] Write operator docs with: sensitivity warning; private destination prerequisites; exact create/verify/restore-verify/status cleanup commands; source/target distinction; no in-place restore; no automatic retention/encryption claims; and explicit prohibition on storing bundles/exports in Git or CI artifacts.
+- [x] Run GREEN:
 
   ```bash
   pnpm --filter @baby-care/operations test -- cli.test.ts restore.integration.test.ts
@@ -618,9 +618,9 @@ Configuration is environment-only and schema-validated. At minimum it includes t
 
   `--help` may show command names and generic configuration key names only; it must not print effective values or paths.
 
-- [ ] If Docker is available, run the disposable generated-data flow once and verify modes with `stat`; otherwise defer the real tool path to Task 8 exact-head Compose CI without weakening tests.
-- [ ] Review command injection, argv/environment boundaries, Compose volume identity, teardown scope, docs and absence of destructive flags.
-- [ ] Commit locally:
+- [x] If Docker is available, run the disposable generated-data flow once and verify modes with `stat`; otherwise defer the real tool path to Task 8 exact-head Compose CI without weakening tests.
+- [x] Review command injection, argv/environment boundaries, Compose volume identity, teardown scope, docs and absence of destructive flags.
+- [x] Commit locally:
 
   ```bash
   git add packages/operations infra/backup compose.yaml package.json pnpm-lock.yaml

@@ -9,7 +9,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 ## Current state
 
-Current milestone: **M4 — Birth Ready Operations and Data Safety — Task 6 complete**
+Current milestone: **M4 — Birth Ready Operations and Data Safety — Task 7 complete**
 Completed milestone: **M3 — Care Workspace — verified complete**
 Previous milestone: **M2 — Care Recording MVP — verified complete**
 
@@ -113,8 +113,12 @@ verified bundles restore only to a distinct empty PG16 target, fixed read-only i
 run before transactional restored-session revocation, and the existing API read models
 plus fresh login are proven against generated restored data. Fresh evidence is 87
 operations tests, 5/5 real dual-PG16 restore cases, full workspace tests/typecheck/lint/
-build and independent review with no Critical/Important findings. The next executable
-slice is Task 7, operator CLI and disposable PostgreSQL 16 restore practice.
+build and independent review with no Critical/Important findings. Task 7 is complete at
+`5b92477`: four guarded operator commands, fixed PostgreSQL 16 Compose adapters, bounded
+subprocess cleanup and disposable isolated restore practice passed 130 focused tests,
+one real generated-data Compose flow, full lint/typecheck/build/privacy gates and an
+independent review with no Critical/Important findings. The next executable slice is
+Task 8, synthetic Birth Ready operations simulation and privacy gate.
 M3 implementation scope must not be reopened implicitly.
 
 ## Hard scope boundaries
