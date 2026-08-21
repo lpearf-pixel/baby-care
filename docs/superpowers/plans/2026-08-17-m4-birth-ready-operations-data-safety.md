@@ -365,6 +365,10 @@ POST /api/family/export
 
 ### Task 4: Family-Admin Web Download Surface
 
+**Status:** Complete through `40aa49a` (`test: close family export privacy
+regressions`); independent review approved with no findings after no-preview, Mom,
+retry and transient-anchor cleanup coverage was strengthened.
+
 **Files:**
 
 - Modify: `apps/web/src/api-client.ts`
@@ -386,18 +390,18 @@ BabyCareApi.exportFamilyData(): Promise<FamilyExportDownload>;
 
 **Steps:**
 
-- [ ] Add Web RED tests for admin visibility, Nanny absence, private-data warning, pending disabled state, one request under double click, successful generic filename download, `URL.createObjectURL`/anchor click/`URL.revokeObjectURL`, and no JSON preview/render.
-- [ ] Add RED failure cases: API error keeps the page and warning visible, re-enables retry, revokes any already-created URL, and shows concise text without response details. A forged direct component call under a caregiver session must still receive API denial in the API integration suite.
-- [ ] Add response parsing RED cases: require `application/json`, accept only a generic filename matching the contract regex, and substitute a locally generated generic filename if `Content-Disposition` is missing/malformed/private-looking.
-- [ ] Run RED:
+- [x] Add Web RED tests for admin visibility, Nanny absence, private-data warning, pending disabled state, one request under double click, successful generic filename download, `URL.createObjectURL`/anchor click/`URL.revokeObjectURL`, and no JSON preview/render.
+- [x] Add RED failure cases: API error keeps the page and warning visible, re-enables retry, revokes any already-created URL, and shows concise text without response details. A forged direct component call under a caregiver session must still receive API denial in the API integration suite.
+- [x] Add response parsing RED cases: require `application/json`, accept only a generic filename matching the contract regex, and substitute a locally generated generic filename if `Content-Disposition` is missing/malformed/private-looking.
+- [x] Run RED:
 
   ```bash
   pnpm --filter @baby-care/web test -- family-data-export.test.tsx App.test.tsx
   ```
 
-- [ ] Implement `exportFamilyData` as a dedicated binary request path rather than routing through the JSON `request<T>` helper. Always send credentials and the current origin automatically through fetch; do not accept ownership/body parameters.
-- [ ] Implement `FamilyDataExport` under the existing Dad/Mom family-admin section. Use a normal button, status text with `aria-live="polite"`, no audio, and existing day/night tokens. Revoke the object URL in `finally` after click scheduling.
-- [ ] Run GREEN, Web regression, typecheck and build:
+- [x] Implement `exportFamilyData` as a dedicated binary request path rather than routing through the JSON `request<T>` helper. Always send credentials and the current origin automatically through fetch; do not accept ownership/body parameters.
+- [x] Implement `FamilyDataExport` under the existing Dad/Mom family-admin section. Use a normal button, status text with `aria-live="polite"`, no audio, and existing day/night tokens. Revoke the object URL in `finally` after click scheduling.
+- [x] Run GREEN, Web regression, typecheck and build:
 
   ```bash
   pnpm --filter @baby-care/web test -- family-data-export.test.tsx App.test.tsx care-day-night-reminders.test.tsx
@@ -408,8 +412,8 @@ BabyCareApi.exportFamilyData(): Promise<FamilyExportDownload>;
   git diff --check
   ```
 
-- [ ] Review keyboard access, 44px target, narrow layout, night contrast, URL cleanup and absence from Nanny DOM.
-- [ ] Commit locally:
+- [x] Review keyboard access, 44px target, narrow layout, night contrast, URL cleanup and absence from Nanny DOM.
+- [x] Commit locally:
 
   ```bash
   git add apps/web/src apps/web/test

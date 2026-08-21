@@ -9,7 +9,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 ## Current state
 
-Current milestone: **M4 — Birth Ready Operations and Data Safety — Task 2 complete**
+Current milestone: **M4 — Birth Ready Operations and Data Safety — Task 4 complete**
 Completed milestone: **M3 — Care Workspace — verified complete**
 Previous milestone: **M2 — Care Recording MVP — verified complete**
 
@@ -101,8 +101,11 @@ Task 2 is complete at `6d5a166`: a family-scoped export buffer is assembled thro
 revision-causality validation, deterministic UTF-8 serialization, and a closed byte
 limit. Independent review approved with no findings. The two PostgreSQL integration
 cases remain enabled but were skipped locally because `TEST_DATABASE_URL` is absent.
-The next executable slice is Task 3, the authenticated export route, audit, and
-per-actor concurrency gate.
+Task 3 is complete through `98de9fc`: authenticated Dad/Mom-only export, per-actor
+concurrency, private headers and fail-closed audit behavior are reviewed. Task 4 is
+complete through `40aa49a`: the bounded Dad/Mom Web download surface is independently
+reviewed, with Nanny absence and non-preview/cleanup/retry privacy regressions proven.
+The next executable slice is Task 5, private atomic backup creation and verification.
 M3 implementation scope must not be reopened implicitly.
 
 ## Hard scope boundaries
