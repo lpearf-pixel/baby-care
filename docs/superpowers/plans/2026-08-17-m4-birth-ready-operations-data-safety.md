@@ -534,22 +534,22 @@ interface RestoreInvariantReport {
 
 **Steps:**
 
-- [ ] Add unit RED cases enforcing order: verify bundle -> query source/target cluster identity -> require different `system_identifier` -> require PG16 -> require empty target -> restore -> read-only invariants -> transactionally revoke sessions -> existing API read-model probe -> success. Every failed predecessor prevents later calls.
-- [ ] Add RED cases for same cluster even with different database name, unknown identity, non-empty public objects, existing Drizzle migration history, wrong PG major, forbidden restore flags, restore failure, invariant failure, sanitation rollback and read-model failure.
-- [ ] Add PostgreSQL RED integration using disposable generated databases: valid restore, non-empty target refusal, source remains byte/count/version unchanged after target failure, migration fingerprint equality, foreign-key/orphan checks, typed-detail cardinality, revision `fromVersion -> toVersion`, active/voided coherence, handoff/reminder ownership.
-- [ ] Add restored-session RED: seed active/revoked sessions, restore, revoke all non-revoked sessions in one transaction, prove the old raw cookie is rejected, prove restored password hash still permits a fresh Dad login, and prove only `sessions.revoked_at` changes. Care, revision, handoff, reminder, family, baby, user and audit rows remain byte-for-byte/logically unchanged by sanitation.
-- [ ] Add API verifier RED cases that construct the existing `createQueryService`, derive one server-owned family/baby actor context from fixed SQL, run summary and a one-item timeline on the target, and emit only a closed success/failure code.
-- [ ] Run RED:
+- [x] Add unit RED cases enforcing order: verify bundle -> query source/target cluster identity -> require different `system_identifier` -> require PG16 -> require empty target -> restore -> read-only invariants -> transactionally revoke sessions -> existing API read-model probe -> success. Every failed predecessor prevents later calls.
+- [x] Add RED cases for same cluster even with different database name, unknown identity, non-empty public objects, existing Drizzle migration history, wrong PG major, forbidden restore flags, restore failure, invariant failure, sanitation rollback and read-model failure.
+- [x] Add PostgreSQL RED integration using disposable generated databases: valid restore, non-empty target refusal, source remains byte/count/version unchanged after target failure, migration fingerprint equality, foreign-key/orphan checks, typed-detail cardinality, revision `fromVersion -> toVersion`, active/voided coherence, handoff/reminder ownership.
+- [x] Add restored-session RED: seed active/revoked sessions, restore, revoke all non-revoked sessions in one transaction, prove the old raw cookie is rejected, prove restored password hash still permits a fresh Dad login, and prove only `sessions.revoked_at` changes. Care, revision, handoff, reminder, family, baby, user and audit rows remain byte-for-byte/logically unchanged by sanitation.
+- [x] Add API verifier RED cases that construct the existing `createQueryService`, derive one server-owned family/baby actor context from fixed SQL, run summary and a one-item timeline on the target, and emit only a closed success/failure code.
+- [x] Run RED:
 
   ```bash
   pnpm --filter @baby-care/operations test -- restore.test.ts restore.integration.test.ts
   pnpm --filter @baby-care/api test -- restored-database-verifier.integration.test.ts
   ```
 
-- [ ] Implement target checks with fixed SQL and no caller-provided SQL. `pg_restore` receives only the verified dump plus fixed `--exit-on-error --no-owner --no-privileges`; never expose `--clean`, `--create`, role or schema selection.
-- [ ] Run structural invariants in a `REPEATABLE READ READ ONLY` transaction. Perform session revocation in a separate transaction only after structural success. Then run the API read-model probe; a probe failure leaves the restored target explicitly unusable and emits no success marker.
-- [ ] Ensure cleanup waits for bounded subprocess/client settlement and never modifies source state. Do not automatically delete a failed operator target; the disposable `restore-verify` wrapper handles teardown later.
-- [ ] Run GREEN and focused regression:
+- [x] Implement target checks with fixed SQL and no caller-provided SQL. `pg_restore` receives only the verified dump plus fixed `--exit-on-error --no-owner --no-privileges` and the fixed `babycare` target database coordinate; never expose `--clean`, `--create`, role or schema selection.
+- [x] Run structural invariants in a `REPEATABLE READ READ ONLY` transaction. Perform session revocation in a separate transaction only after structural success. Then run the API read-model probe; a probe failure leaves the restored target explicitly unusable and emits no success marker.
+- [x] Ensure cleanup waits for bounded subprocess/client settlement and never modifies source state. Do not automatically delete a failed operator target; the disposable `restore-verify` wrapper handles teardown later.
+- [x] Run GREEN and focused regression:
 
   ```bash
   pnpm --filter @baby-care/operations test
@@ -560,8 +560,8 @@ interface RestoreInvariantReport {
   git diff --check
   ```
 
-- [ ] Independently review source/target identity proof, empty-target definition, write set, transaction ordering, session behavior, restored login and failure cleanup.
-- [ ] Commit locally:
+- [x] Independently review source/target identity proof, empty-target definition, write set, transaction ordering, session behavior, restored login and failure cleanup.
+- [x] Commit locally:
 
   ```bash
   git add packages/operations apps/api/src/operations apps/api/test/restored-database-verifier.integration.test.ts apps/api/tsup.config.ts

@@ -7,9 +7,9 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 
 ## 1. Current authoritative state
 
-- Current active milestone: **M4 — Birth Ready Operations and Data Safety**. Tasks 1–5
-  are complete; Task 5 closes at `df43b93`. The next slice is Task 6, fail-closed
-  isolated restore, invariants and restored-session sanitation.
+- Current active milestone: **M4 — Birth Ready Operations and Data Safety**. Tasks 1–6
+  are complete; Task 6 closes at `de09494`. The next slice is Task 7, operator CLI and
+  disposable PostgreSQL 16 restore practice.
 - Current completed milestone: **M3 — Care Workspace**, verified complete.
 - M3 authoritative final head: `52b042a66122464af338a2b4931315d92dff0965`.
 - M3 authoritative CI: `31959895049` — static / unit / PostgreSQL integration / production build / production Compose smoke 5/5 PASS.
@@ -59,6 +59,15 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   five bounded hardening rounds. Fresh Node 24 evidence is 67 operations tests plus root
   typecheck, lint, production build and offline frozen-lock PASS. Real PostgreSQL 16
   dump/list and Linux-native execution remain Task 7/8 and exact-head CI gates.
+- M4 Task 6 implementation: `de09494` — verified private bundles restore only to a
+  distinct empty PostgreSQL 16 target. Fixed repeatable-read invariants precede a
+  separate restored-session revocation transaction; the existing API summary/timeline,
+  old-cookie rejection and fresh Dad login run against generated restored data. The
+  original source remains unchanged. An owner-private anonymous disk snapshot binds
+  catalogue and restore to identical bytes without an undocumented recovery-size cap.
+  Fresh Node 24 evidence is 87 operations tests, 5/5 real dual-PG16 integration, full
+  workspace tests/typecheck/lint/build and independent review with no Critical/Important
+  findings. Operator subprocess/Compose cleanup remains Task 7.
 
 Release-gate history:
 
@@ -125,10 +134,11 @@ M4 closes the Birth Ready operational/data-safety loop independently of Guardian
 
 M4 does not add cloud/off-site backup, automatic deletion, in-place production restore,
 full offline synchronization, Guardian/voice integration, medical behavior, or `main`
-integration. Tasks 1–5 are implemented and reviewed: contracts and bounds are fixed,
+integration. Tasks 1–6 are implemented and reviewed: contracts and bounds are fixed,
 the deterministic repeatable-read export service exists, and Dad/Mom can request the
-private audited attachment through the bounded Web download surface. The private atomic
-backup library now exists; Task 6 owns fail-closed isolated restore and session sanitation.
+private audited attachment through the bounded Web download surface. Private atomic backup
+and fail-closed isolated restore libraries now exist; Task 7 owns the guarded operator CLI
+and disposable PostgreSQL 16 practice path.
 
 ## 5. Baby Guardian / baby-monitor-local boundary
 
@@ -235,7 +245,7 @@ Recommended first sequence:
 
 1. Read the authoritative state files and the M4 design.
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
-3. Resume at Task 6 of the approved M4 implementation plan.
+3. Resume at Task 7 of the approved M4 implementation plan.
 4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary.
 
 ## 10. Copy/paste prompt for M4 implementation approval
@@ -249,7 +259,7 @@ Recommended first sequence:
 基线为 `codex/m4-birth-ready-operations`，来源是已通过 CI `31959895049`
 五项门禁的 M3 精确头 `52b042a66122464af338a2b4931315d92dff0965`。
 
-按已批准规格和正式计划执行 Task 3。严格 RED-GREEN，完成聚焦测试、回归、
+按已批准规格和正式计划执行 Task 7。严格 RED-GREEN，完成聚焦测试、回归、
 审查和本地提交后更新状态。普通实现问题和可恢复测试失败自行处理。
 
 不要开发 Guardian/语音、完整离线同步、云备份、医疗功能或 in-place restore；
