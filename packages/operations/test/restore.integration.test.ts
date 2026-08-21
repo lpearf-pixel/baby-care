@@ -1,9 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { chmod, mkdtemp, readFile, readdir, realpath, rm } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, readdir, realpath, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { Readable, type Writable } from 'node:stream';
+import { PassThrough, Readable, type Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, test, vi } from 'vitest';
@@ -16,6 +16,9 @@ import { createDatabase } from '../../../apps/api/src/db.js';
 import { verifyRestoredDatabase } from '../../../apps/api/src/operations/verify-restored-database.js';
 import { canonicalMigrationFingerprint, type MigrationHistoryFact } from '../src/contracts.js';
 import { restoreBackup } from '../src/restore.js';
+import { createProductionOperatorDependencies, type OperatorConfig } from '../src/cli.js';
+import { createComposePostgresRunners } from '../src/compose-postgres.js';
+import { createDockerComposeExecutor } from '../src/compose-executor.js';
 import {
   COMPLETE_CATALOGUE_FACTS,
   createPg16RestoreTools,
@@ -49,7 +52,7 @@ async function docker(args: readonly string[], input?: Readable | Buffer): Promi
     const timeout = setTimeout(() => {
       child.kill('SIGKILL');
       rejectPromise(new Error('docker_test_timeout'));
-    }, 60_000);
+    }, 180_000);
     const collect = (destination: Buffer[]) => (chunk: Buffer) => {
       bytes += chunk.byteLength;
       if (bytes > 32 * 1024 * 1024) {
@@ -118,18 +121,26 @@ async function psql(name: string, sql: string): Promise<string> {
   return (await docker(psqlArgs(name), Buffer.from(sql))).toString('utf8').trim();
 }
 
-async function migrateAndSeed(name: string): Promise<void> {
+async function migrateAndSeed(
+  name: string,
+  executeSql: (target: string, sql: string) => Promise<string> = psql,
+): Promise<void> {
   for (const migration of [
     '0000_m1_family_identity.sql',
     '0001_m2_care_recording.sql',
     '0002_m3_care_workspace.sql',
     '0003_m3_care_revision_versions.sql',
   ]) {
-    await docker(psqlArgs(name), await readFile(join(repositoryRoot, 'migrations', migration)));
+    try {
+      await executeSql(name, await readFile(join(repositoryRoot, 'migrations', migration), 'utf8'));
+    } catch (error) {
+      throw new Error(`synthetic_seed_failed_${migration.slice(0, 4)}`, { cause: error });
+    }
   }
   const tokenHash = createHash('sha256').update('restored-cookie-test-only').digest('hex');
   const passwordHash = await hashPassword('dad-test-password');
-  await psql(name, `
+  try {
+    await executeSql(name, `
     create schema drizzle;
     create table drizzle.__drizzle_migrations (
       id serial primary key, hash text not null, created_at bigint not null
@@ -220,7 +231,10 @@ async function migrateAndSeed(name: string): Promise<void> {
       '22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333',
       '44444444-4444-4444-8444-444444444444', '08:00', 127, true
     );
-  `);
+    `);
+  } catch (error) {
+    throw new Error('synthetic_seed_failed_data', { cause: error });
+  }
 }
 
 async function containerDump(name: string, extraArgs: readonly string[] = []): Promise<Buffer> {
@@ -372,6 +386,147 @@ async function createRealBackup(root: string, tools: PostgresBackupTools): Promi
     throw new Error(`real_backup_failed_after_${lastStage}`);
   }
 }
+
+function operationsCompose(project: string): string[] {
+  return [
+    'compose', '--profile', 'operations', '--project-name', project,
+    '--file', join(repositoryRoot, 'compose.yaml'),
+    '--file', join(repositoryRoot, 'infra/backup/compose.operations.yaml'),
+  ];
+}
+
+async function composeSourceSql(_target: string, sql: string): Promise<string> {
+  return (await docker([
+    ...operationsCompose('baby-care'),
+    'exec', '--no-TTY', 'postgres', 'psql',
+    '--no-psqlrc', '--set=ON_ERROR_STOP=1', '--tuples-only', '--no-align',
+    '--field-separator=\t', '--username=babycare', '--dbname=babycare',
+  ], Buffer.from(sql))).toString('utf8').trim();
+}
+
+async function composeSourceDump(): Promise<Buffer> {
+  return docker([
+    ...operationsCompose('baby-care'),
+    'exec', '--no-TTY', 'postgres', 'pg_dump', '--username=babycare', '--dbname=babycare',
+    '--data-only', '--column-inserts', '--no-owner', '--no-privileges',
+  ]);
+}
+
+async function composeProjectObjects(project: string): Promise<string[]> {
+  const containers = (await docker([
+    'ps', '--all', '--filter', `label=com.docker.compose.project=${project}`, '--format', '{{.ID}}',
+  ])).toString('utf8').trim();
+  const volumes = (await docker([
+    'volume', 'ls', '--filter', `label=com.docker.compose.project=${project}`, '--format', '{{.Name}}',
+  ])).toString('utf8').trim();
+  const networks = (await docker([
+    'network', 'ls', '--filter', `label=com.docker.compose.project=${project}`, '--format', '{{.Name}}',
+  ])).toString('utf8').trim();
+  return [containers, volumes, networks].flatMap((value) => value.split('\n').filter(Boolean));
+}
+
+describePg16('real fixed Compose operator flow', () => {
+  test('creates, verifies and practices a generated-data restore without changing source', async () => {
+    expect(await composeProjectObjects('baby-care')).toEqual([]);
+    let ownsSource = false;
+    let stage = 'source-start';
+    try {
+      ownsSource = true;
+      await docker([...operationsCompose('baby-care'), 'up', '--detach', '--no-deps', 'postgres']);
+      stage = 'source-health';
+      let consecutiveReady = 0;
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        try {
+          await docker([
+            ...operationsCompose('baby-care'), 'exec', '--no-TTY', 'postgres',
+            'pg_isready', '--username=babycare', '--dbname=babycare',
+          ]);
+          consecutiveReady += 1;
+          if (consecutiveReady === 3) break;
+        } catch {
+          consecutiveReady = 0;
+          if (attempt === 39) throw new Error('compose_source_not_ready');
+        }
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
+      }
+      stage = 'source-seed';
+      await migrateAndSeed('postgres', composeSourceSql);
+      stage = 'source-snapshot';
+      const sourceBefore = await composeSourceDump();
+      const root = await privateRoot();
+      const config: OperatorConfig = {
+        BABY_CARE_BACKUP_PARENT: root,
+        BABY_CARE_BACKUP_BUNDLE: 'baby-care-backup-20260817T123456Z',
+        BABY_CARE_COMPOSE_PROJECT: 'baby-care',
+        BABY_CARE_RESTORE_PROJECT: 'baby-care-restore',
+        BABY_CARE_SOURCE_SERVICE: 'postgres',
+        BABY_CARE_RESTORE_SERVICE: 'postgres_restore',
+        BABY_CARE_RESTORE_PROBE_SERVICE: 'restored_api_probe',
+      };
+      const diagnosticRunners = createComposePostgresRunners({
+        sourceProject: 'baby-care',
+        targetProject: 'baby-care-restore',
+        sourceService: 'postgres',
+        targetService: 'postgres_restore',
+        verifierService: 'operations_verifier',
+      }, createDockerComposeExecutor({ repositoryRoot }));
+      const diagnosticTools = createPg16BackupTools(diagnosticRunners.backupRunner);
+      stage = 'adapter-tool-major';
+      await diagnosticTools.toolMajor();
+      stage = 'adapter-source-major';
+      await diagnosticTools.sourceMajor();
+      stage = 'adapter-migrations';
+      await diagnosticTools.migrationHistory();
+      stage = 'adapter-dump';
+      const diagnosticDump = new PassThrough();
+      const diagnosticChunks: Buffer[] = [];
+      diagnosticDump.on('data', (chunk) => diagnosticChunks.push(Buffer.from(chunk)));
+      await diagnosticTools.dump(diagnosticDump);
+      stage = 'adapter-list';
+      expect(await diagnosticTools.listDump(Readable.from(diagnosticChunks))).toEqual(
+        COMPLETE_CATALOGUE_FACTS,
+      );
+      stage = 'verifier-build';
+      await docker([
+        ...operationsCompose('baby-care'), 'build', 'operations_verifier', 'restored_api_probe',
+      ]);
+      const beforeRestoreProjects = await docker([
+        'ps', '--all', '--filter', 'label=com.docker.compose.project',
+        '--format', '{{.Label "com.docker.compose.project"}}',
+      ]);
+      const dependencies = createProductionOperatorDependencies(config, { repositoryRoot });
+      stage = 'backup-create';
+      await expect(dependencies.create()).resolves.toEqual({ code: 'backup_created' });
+      stage = 'backup-verify';
+      await expect(dependencies.verify()).resolves.toEqual({ code: 'backup_verified' });
+      stage = 'restore-verify';
+      await expect(dependencies.restoreVerify()).resolves.toEqual({
+        code: 'restore_verified',
+        revokedSessionCount: 1,
+      });
+      expect(stableDump(await composeSourceDump())).toBe(stableDump(sourceBefore));
+      const afterRestoreProjects = await docker([
+        'ps', '--all', '--filter', 'label=com.docker.compose.project',
+        '--format', '{{.Label "com.docker.compose.project"}}',
+      ]);
+      expect(afterRestoreProjects.toString('utf8')).toBe(beforeRestoreProjects.toString('utf8'));
+      const bundle = join(root, 'baby-care-backup-20260817T123456Z');
+      expect((await stat(root)).mode & 0o777).toBe(0o700);
+      expect((await stat(bundle)).mode & 0o777).toBe(0o700);
+      expect((await stat(join(bundle, 'database.dump'))).mode & 0o777).toBe(0o600);
+      expect((await stat(join(bundle, 'manifest.json'))).mode & 0o777).toBe(0o600);
+    } catch (error) {
+      throw new Error(`compose_operator_failed_after_${stage}`, { cause: error });
+    } finally {
+      if (ownsSource) {
+        await docker([
+          ...operationsCompose('baby-care'),
+          'down', '--volumes', '--remove-orphans', '--timeout', '10',
+        ]).catch(() => undefined);
+      }
+    }
+  }, 300_000);
+});
 
 describePg16('real isolated PostgreSQL 16 restore', () => {
   test('restores across distinct clusters, preserves source and changes only restored revoked_at', async () => {

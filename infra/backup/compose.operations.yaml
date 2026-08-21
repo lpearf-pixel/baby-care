@@ -1,0 +1,39 @@
+services:
+  postgres_restore:
+    profiles: ["operations"]
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: babycare
+      POSTGRES_USER: babycare
+      POSTGRES_PASSWORD: restore-practice-only
+    volumes:
+      - babycare_restore:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U babycare -d babycare"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  operations_verifier:
+    profiles: ["operations"]
+    build:
+      context: .
+      dockerfile: infra/backup/verifier.Dockerfile
+    command: ["sleep", "infinity"]
+    environment:
+      DATABASE_URL: postgres://babycare:restore-practice-only@postgres_restore:5432/babycare
+
+  restored_api_probe:
+    profiles: ["operations"]
+    build:
+      context: .
+      dockerfile: infra/backup/verifier.Dockerfile
+    command: ["sleep", "infinity"]
+    environment:
+      DATABASE_URL: postgres://babycare:restore-practice-only@postgres_restore:5432/babycare
+    depends_on:
+      postgres_restore:
+        condition: service_healthy
+
+volumes:
+  babycare_restore:

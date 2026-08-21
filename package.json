@@ -6,6 +6,10 @@
     "node": ">=24"
   },
   "scripts": {
+    "backup:create": "node packages/operations/dist/cli.js backup:create",
+    "backup:verify": "node packages/operations/dist/cli.js backup:verify",
+    "backup:restore": "node packages/operations/dist/cli.js backup:restore",
+    "backup:restore-verify": "node packages/operations/dist/cli.js backup:restore-verify",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",

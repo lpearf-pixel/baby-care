@@ -34,3 +34,10 @@ export type {
   RestoreTargetState,
   StructuralInvariantReport,
 } from './restore.js';
+export {
+  parseOperatorConfig,
+  runDisposableRestore,
+  runExistingTargetRestore,
+  runOperatorCli,
+} from './cli.js';
+export type { OperatorCliOptions, OperatorConfig, OperatorDependencies } from './cli.js';
