@@ -27,7 +27,7 @@ const testHelperPath = fileURLToPath(new URL('../.native/safe-bundle-test', impo
 const buildScriptPath = fileURLToPath(
   new URL('../scripts/build-native-helper.mjs', import.meta.url),
 );
-const helperSourcePath = fileURLToPath(new URL('../native/safe-bundle.c', import.meta.url));
+const nativeSourceDirectory = fileURLToPath(new URL('../native/', import.meta.url));
 const roots: string[] = [];
 const finalName = 'baby-care-backup-20260817T123456Z';
 
@@ -49,6 +49,17 @@ async function writeContractFiles(temporary: string): Promise<void> {
   await writeFile(join(temporary, 'manifest.json'), '{}', { mode: 0o600 });
 }
 
+async function copyNativeBuildPackage(packageRoot: string): Promise<void> {
+  const scripts = join(packageRoot, 'scripts');
+  const native = join(packageRoot, 'native');
+  await mkdir(scripts, { recursive: true });
+  await mkdir(native, { recursive: true });
+  await copyFile(buildScriptPath, join(scripts, 'build-native-helper.mjs'));
+  for (const name of await readdir(nativeSourceDirectory)) {
+    await copyFile(join(nativeSourceDirectory, name), join(native, name));
+  }
+}
+
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
@@ -59,6 +70,18 @@ describe('safe-bundle native protocol', () => {
     ['absolute path', ['cleanup', '/forbidden/.baby-care-backup-tmp-ABC123']],
     ['separator', ['cleanup', 'nested/.baby-care-backup-tmp-ABC123']],
     ['arbitrary flag', ['publish', '.baby-care-backup-tmp-ABC123', finalName, 'RENAME_SWAP']],
+    [
+      'test-only source-swap operation in production',
+      ['publish-source-swap-test', '.baby-care-backup-tmp-ABC123', finalName],
+    ],
+    [
+      'test-only quarantine-fsync operation in production',
+      [
+        'publish-source-swap-quarantine-fsync-failure-test',
+        '.baby-care-backup-tmp-ABC123',
+        finalName,
+      ],
+    ],
   ])('rejects %s with one stable closed protocol result', async (_name, args) => {
     const root = await privateRoot();
     const temporary = await privateTemporary(root);
@@ -104,17 +127,12 @@ describe('native helper build boundary', () => {
   test('rejects a package-local .native symlink before writing through it', async () => {
     const root = await privateRoot();
     const packageRoot = join(root, 'package');
-    const scripts = join(packageRoot, 'scripts');
-    const native = join(packageRoot, 'native');
     const outside = join(root, 'outside');
-    await mkdir(scripts, { recursive: true });
-    await mkdir(native, { recursive: true });
+    await copyNativeBuildPackage(packageRoot);
     await mkdir(outside, { mode: 0o700 });
-    await copyFile(buildScriptPath, join(scripts, 'build-native-helper.mjs'));
-    await copyFile(helperSourcePath, join(native, 'safe-bundle.c'));
     await symlink(outside, join(packageRoot, '.native'), 'dir');
 
-    const result = spawnSync(process.execPath, [join(scripts, 'build-native-helper.mjs')], {
+    const result = spawnSync(process.execPath, [join(packageRoot, 'scripts', 'build-native-helper.mjs')], {
       env: {},
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -123,6 +141,35 @@ describe('native helper build boundary', () => {
     expect(result.stdout).toBe('native_helper_build_failed\n');
     expect(result.stderr).toBe('');
     expect(await readdir(outside)).toEqual([]);
+  });
+
+  test('publishes through the held directory after a mid-build .native symlink swap', async () => {
+    const root = await privateRoot();
+    const packageRoot = join(root, 'package');
+    const outside = join(packageRoot, '.native-build-swap-external');
+    const displaced = join(packageRoot, '.native-build-swap-original');
+    await copyNativeBuildPackage(packageRoot);
+    await mkdir(outside, { mode: 0o700 });
+    await writeFile(join(outside, 'safe-bundle'), 'outside-original', { mode: 0o700 });
+
+    const result = spawnSync(
+      process.execPath,
+      [join(packageRoot, 'scripts', 'build-native-helper.mjs'), '--test-directory-swap'],
+      {
+        env: {},
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('native_helper_build_failed\n');
+    expect(result.stderr).toBe('');
+    expect(await readFile(join(outside, 'safe-bundle'), 'utf8')).toBe('outside-original');
+    expect(await readdir(outside)).toEqual(['safe-bundle']);
+    await expect(readFile(join(displaced, 'safe-bundle'))).resolves.not.toHaveLength(0);
+    const installed = await lstat(join(displaced, 'safe-bundle'));
+    expect(installed.isFile()).toBe(true);
+    expect(installed.mode & 0o777).toBe(0o700);
   });
 });
 
@@ -185,6 +232,40 @@ describe('native no-replace publication', () => {
         'database.dump',
         'manifest.json',
       ]);
+    } finally {
+      closeSync(temporaryFd);
+      closeSync(parentFd);
+    }
+  });
+
+  test('reports quarantine failure when the required parent fsync fails', async () => {
+    const root = await privateRoot();
+    const temporary = await privateTemporary(root);
+    await writeContractFiles(temporary);
+    const parentFd = openSync(root, constants.O_RDONLY);
+    const temporaryFd = openSync(temporary, constants.O_RDONLY);
+    try {
+      const result = spawnSync(
+        testHelperPath,
+        [
+          'publish-source-swap-quarantine-fsync-failure-test',
+          basename(temporary),
+          finalName,
+        ],
+        {
+          env: {},
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe', parentFd, temporaryFd],
+        },
+      );
+      expect(result.status).toBe(72);
+      expect(result.stdout).toBe('safe_bundle_v1:quarantine_failed\n');
+      expect(result.stderr).toBe('');
+      await expect(lstat(join(root, finalName))).rejects.toMatchObject({ code: 'ENOENT' });
+      const entries = (await readdir(root)).sort();
+      expect(entries).toContain('.baby-care-helper-test-original');
+      expect(entries.filter((entry) => /^\.baby-care-backup-quarantine-[a-f0-9]{32}$/.test(entry)))
+        .toHaveLength(1);
     } finally {
       closeSync(temporaryFd);
       closeSync(parentFd);

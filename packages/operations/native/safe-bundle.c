@@ -307,25 +307,35 @@ static int final_entry_absent(const char *final_name) {
   return errno == ENOENT;
 }
 
-static int quarantine_final_entry(const char *final_name) {
+static int durable_final_absence(const char *final_name, int inject_fsync_failure) {
+#if defined(SAFE_BUNDLE_TESTING)
+  if (inject_fsync_failure != 0) {
+    errno = EIO;
+    return 0;
+  }
+#else
+  (void)inject_fsync_failure;
+#endif
+  if (fsync(PARENT_FD) != 0) {
+    return 0;
+  }
+  return final_entry_absent(final_name);
+}
+
+static int quarantine_final_entry(const char *final_name, int inject_fsync_failure) {
   for (int attempt = 0; attempt < 16; attempt += 1) {
     char retained_name[96];
     if (!quarantine_name(retained_name, sizeof(retained_name))) {
       return 0;
     }
     if (exclusive_rename(PARENT_FD, final_name, PARENT_FD, retained_name) == 0) {
-      if (!final_entry_absent(final_name)) {
-        return 0;
-      }
-      (void)fsync(PARENT_FD);
-      return 1;
+      return durable_final_absence(final_name, inject_fsync_failure);
     }
     if (errno == EEXIST || errno == ENOTEMPTY) {
       continue;
     }
-    if (errno == ENOENT && final_entry_absent(final_name)) {
-      (void)fsync(PARENT_FD);
-      return 1;
+    if (errno == ENOENT) {
+      return durable_final_absence(final_name, inject_fsync_failure);
     }
     return 0;
   }
@@ -351,7 +361,8 @@ static int inject_source_swap(const char *temporary_name) {
 
 static enum operation_result publish_bundle(const char *temporary_name,
                                              const char *final_name,
-                                             int inject_swap) {
+                                             int inject_swap,
+                                             int inject_quarantine_fsync_failure) {
   struct contract_entries entries;
   if (!validate_directory_identity(temporary_name) ||
       !inspect_contract_entries(1, &entries) ||
@@ -383,10 +394,14 @@ static enum operation_result publish_bundle(const char *temporary_name,
   if (fstat(TEMPORARY_FD, &opened) != 0 ||
       fstatat(PARENT_FD, final_name, &published, AT_SYMLINK_NOFOLLOW) != 0 ||
       !same_identity(&opened, &published) || !private_directory(&published)) {
-    return quarantine_final_entry(final_name) ? RESULT_QUARANTINED : RESULT_QUARANTINE_FAILED;
+    return quarantine_final_entry(final_name, inject_quarantine_fsync_failure)
+               ? RESULT_QUARANTINED
+               : RESULT_QUARANTINE_FAILED;
   }
   if (fsync(PARENT_FD) != 0) {
-    return quarantine_final_entry(final_name) ? RESULT_QUARANTINED : RESULT_QUARANTINE_FAILED;
+    return quarantine_final_entry(final_name, inject_quarantine_fsync_failure)
+               ? RESULT_QUARANTINED
+               : RESULT_QUARANTINE_FAILED;
   }
   return RESULT_OK;
 }
@@ -397,7 +412,7 @@ int main(int argc, char **argv) {
   }
   if (argc == 4 && strcmp(argv[1], "publish") == 0 &&
       valid_temporary_name(argv[2]) && valid_final_name(argv[3])) {
-    enum operation_result result = publish_bundle(argv[2], argv[3], 0);
+    enum operation_result result = publish_bundle(argv[2], argv[3], 0, 0);
     if (result == RESULT_OK) {
       return stable_result("safe_bundle_v1:published\n", STATUS_OK);
     }
@@ -424,12 +439,22 @@ int main(int argc, char **argv) {
 #if defined(SAFE_BUNDLE_TESTING)
   if (argc == 4 && strcmp(argv[1], "publish-source-swap-test") == 0 &&
       valid_temporary_name(argv[2]) && valid_final_name(argv[3])) {
-    enum operation_result result = publish_bundle(argv[2], argv[3], 1);
+    enum operation_result result = publish_bundle(argv[2], argv[3], 1, 0);
     if (result == RESULT_QUARANTINED) {
       return stable_result("safe_bundle_v1:quarantined\n", STATUS_QUARANTINED);
     }
     if (result == RESULT_QUARANTINE_FAILED) {
       return stable_result("safe_bundle_v1:quarantine_failed\n", STATUS_QUARANTINE_FAILED);
+    }
+    return stable_result("safe_bundle_v1:operation_failed\n", STATUS_OPERATION);
+  }
+  if (argc == 4 &&
+      strcmp(argv[1], "publish-source-swap-quarantine-fsync-failure-test") == 0 &&
+      valid_temporary_name(argv[2]) && valid_final_name(argv[3])) {
+    enum operation_result result = publish_bundle(argv[2], argv[3], 1, 1);
+    if (result == RESULT_QUARANTINE_FAILED) {
+      return stable_result("safe_bundle_v1:quarantine_failed\n",
+                           STATUS_QUARANTINE_FAILED);
     }
     return stable_result("safe_bundle_v1:operation_failed\n", STATUS_OPERATION);
   }

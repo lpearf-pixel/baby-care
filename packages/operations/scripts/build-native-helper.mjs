@@ -1,5 +1,4 @@
 import { constants } from 'node:fs';
-import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import {
   lstat,
@@ -9,6 +8,7 @@ import {
   realpath,
   rename,
   rmdir,
+  symlink,
   unlink,
 } from 'node:fs/promises';
 import { dirname, join, parse, resolve, sep } from 'node:path';
@@ -18,10 +18,13 @@ import { fileURLToPath } from 'node:url';
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sourcePath = resolve(packageRoot, 'native', 'safe-bundle.c');
+const installerSourcePath = resolve(packageRoot, 'native', 'install-helper.c');
 const outputDirectory = resolve(packageRoot, '.native');
 const compiler = '/usr/bin/cc';
 const buildTests = process.argv.length === 3 && process.argv[2] === '--test';
-const validArguments = process.argv.length === 2 || buildTests;
+const testDirectorySwap =
+  process.argv.length === 3 && process.argv[2] === '--test-directory-swap';
+const validArguments = process.argv.length === 2 || buildTests || testDirectorySwap;
 
 function ownedByCurrentUser(uid) {
   return typeof process.getuid !== 'function' || uid === process.getuid();
@@ -105,22 +108,7 @@ async function assertBuildDirectoryIdentity(handle) {
   }
 }
 
-async function compileHelper(directoryHandle, sourceHandle, name, testing) {
-  const sourceDescriptor = process.platform === 'darwin' ? '/dev/fd/4' : '/proc/self/fd/4';
-  const temporaryName = `.safe-bundle-build-${randomBytes(12).toString('hex')}`;
-  const temporaryPath = join(outputDirectory, temporaryName);
-  const outputPath = join(outputDirectory, name);
-  const scratch = await realpath(await mkdtemp(join(tmpdir(), 'baby-care-native-build-')));
-  const compiledPath = join(scratch, 'safe-bundle');
-  const scratchStat = await lstat(scratch);
-  if (
-    !scratchStat.isDirectory() ||
-    scratchStat.isSymbolicLink() ||
-    !ownedByCurrentUser(scratchStat.uid) ||
-    (scratchStat.mode & 0o777) !== 0o700
-  ) {
-    throw new Error('unsafe');
-  }
+function compilerFlags(testing = false) {
   const flags = [
     '-std=c11',
     '-O2',
@@ -137,102 +125,179 @@ async function compileHelper(directoryHandle, sourceHandle, name, testing) {
   ];
   if (process.platform === 'linux') flags.push('-D_FORTIFY_SOURCE=2');
   if (testing) flags.push('-DSAFE_BUNDLE_TESTING=1');
-  flags.push('-x', 'c', sourceDescriptor, '-o', compiledPath);
+  return flags;
+}
 
+function compileSource(sourceHandle, outputPath, testing = false) {
+  const sourceDescriptor = process.platform === 'darwin' ? '/dev/fd/4' : '/proc/self/fd/4';
+  const flags = compilerFlags(testing);
+  flags.push('-x', 'c', sourceDescriptor, '-o', outputPath);
+  const result = spawnSync(compiler, flags, {
+    env: {
+      LANG: 'C',
+      LC_ALL: 'C',
+      PATH: '/usr/bin:/bin',
+      TMPDIR: process.env.TMPDIR ?? tmpdir(),
+    },
+    stdio: ['ignore', 'ignore', 'ignore', 'ignore', sourceHandle.fd],
+    timeout: 30_000,
+  });
+  if (result.error || result.signal || result.status !== 0) throw new Error('compile');
+}
+
+async function assertCompiledArtifact(handle) {
+  const stat = await handle.stat();
+  if (
+    !stat.isFile() ||
+    !ownedByCurrentUser(stat.uid) ||
+    (stat.mode & 0o022) !== 0 ||
+    stat.size <= 0 ||
+    stat.size > 1024 * 1024
+  ) {
+    throw new Error('unsafe');
+  }
+}
+
+function runInstaller(installerPath, operation, directoryHandle, artifactHandle) {
+  const result = spawnSync(installerPath, [operation], {
+    env: {},
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe', directoryHandle.fd, artifactHandle.fd],
+    timeout: 5_000,
+  });
+  if (
+    result.error ||
+    result.signal ||
+    result.status !== 0 ||
+    result.stdout !== 'native_installer_v1:installed\n' ||
+    result.stderr !== ''
+  ) {
+    throw new Error('install');
+  }
+}
+
+async function injectBuildDirectorySwap() {
+  const external = resolve(packageRoot, '.native-build-swap-external');
+  const displaced = resolve(packageRoot, '.native-build-swap-original');
+  const externalStat = await lstat(external);
+  if (
+    !externalStat.isDirectory() ||
+    externalStat.isSymbolicLink() ||
+    !ownedByCurrentUser(externalStat.uid) ||
+    (externalStat.mode & 0o777) !== 0o700
+  ) {
+    throw new Error('unsafe');
+  }
+  await rename(outputDirectory, displaced);
+  await symlink('.native-build-swap-external', outputDirectory, 'dir');
+}
+
+async function installCompiledArtifact(
+  installerPath,
+  compiledPath,
+  operation,
+  directoryHandle,
+  injectSwap,
+) {
+  const artifactHandle = await open(
+    compiledPath,
+    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
+  );
   try {
-    const result = spawnSync(compiler, flags, {
-      env: {
-        LANG: 'C',
-        LC_ALL: 'C',
-        PATH: '/usr/bin:/bin',
-        TMPDIR: process.env.TMPDIR ?? tmpdir(),
-      },
-      stdio: ['ignore', 'ignore', 'ignore', 'ignore', sourceHandle.fd],
-      timeout: 30_000,
-    });
-    if (result.error || result.signal || result.status !== 0) throw new Error('compile');
+    await assertCompiledArtifact(artifactHandle);
     await assertBuildDirectoryIdentity(directoryHandle);
-    let compiled;
-    let artifact;
-    try {
-      compiled = await open(
-        compiledPath,
-        constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
-      );
-      artifact = await open(
-        temporaryPath,
-        constants.O_WRONLY |
-          constants.O_CREAT |
-          constants.O_EXCL |
-          (constants.O_NOFOLLOW ?? 0),
-        0o700,
-      );
-      await assertBuildDirectoryIdentity(directoryHandle);
-      const compiledStat = await compiled.stat();
-      if (!compiledStat.isFile() || !ownedByCurrentUser(compiledStat.uid)) {
-        throw new Error('unsafe');
-      }
-      await artifact.writeFile(await compiled.readFile());
-      await artifact.chmod(0o700);
-      await artifact.sync();
-      const stat = await artifact.stat();
-      if (!stat.isFile() || !ownedByCurrentUser(stat.uid) || (stat.mode & 0o777) !== 0o700) {
-        throw new Error('unsafe');
-      }
-    } finally {
-      await artifact?.close().catch(() => undefined);
-      await compiled?.close().catch(() => undefined);
-    }
-    await assertBuildDirectoryIdentity(directoryHandle);
-    await rename(temporaryPath, outputPath);
+    if (injectSwap) await injectBuildDirectorySwap();
+    runInstaller(installerPath, operation, directoryHandle, artifactHandle);
     await directoryHandle.sync();
     await assertBuildDirectoryIdentity(directoryHandle);
-  } catch (error) {
-    try {
-      await assertBuildDirectoryIdentity(directoryHandle);
-      await unlink(temporaryPath).catch(() => undefined);
-    } catch {
-      // Preserve any ambiguous path when the validated build directory identity changed.
-    }
-    throw error;
   } finally {
-    await unlink(compiledPath).catch(() => undefined);
+    await artifactHandle.close().catch(() => undefined);
+  }
+}
+
+async function compileAndInstall(
+  directoryHandle,
+  sourceHandle,
+  installerSourceHandle,
+) {
+  const scratch = await realpath(await mkdtemp(join(tmpdir(), 'baby-care-native-build-')));
+  const installerPath = join(scratch, 'native-installer');
+  const productionPath = join(scratch, 'safe-bundle');
+  const testingPath = join(scratch, 'safe-bundle-test');
+  const scratchStat = await lstat(scratch);
+  if (
+    !scratchStat.isDirectory() ||
+    scratchStat.isSymbolicLink() ||
+    !ownedByCurrentUser(scratchStat.uid) ||
+    (scratchStat.mode & 0o777) !== 0o700
+  ) {
+    throw new Error('unsafe');
+  }
+  try {
+    compileSource(installerSourceHandle, installerPath);
+    compileSource(sourceHandle, productionPath);
+    await installCompiledArtifact(
+      installerPath,
+      productionPath,
+      'install-production',
+      directoryHandle,
+      testDirectorySwap,
+    );
+    if (buildTests) {
+      compileSource(sourceHandle, testingPath, true);
+      await installCompiledArtifact(
+        installerPath,
+        testingPath,
+        'install-testing',
+        directoryHandle,
+        false,
+      );
+    }
+  } finally {
+    await unlink(testingPath).catch(() => undefined);
+    await unlink(productionPath).catch(() => undefined);
+    await unlink(installerPath).catch(() => undefined);
     await rmdir(scratch).catch(() => undefined);
   }
+}
+
+async function openBuildSource(path) {
+  await rejectSymlinkAncestors(dirname(path));
+  if ((await realpath(path)) !== path) throw new Error('unsafe');
+  const pathStat = await lstat(path);
+  if (!pathStat.isFile() || pathStat.isSymbolicLink() || !ownedByCurrentUser(pathStat.uid)) {
+    throw new Error('unsafe');
+  }
+  const handle = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  const opened = await handle.stat();
+  if (
+    !opened.isFile() ||
+    opened.dev !== pathStat.dev ||
+    opened.ino !== pathStat.ino ||
+    !ownedByCurrentUser(opened.uid)
+  ) {
+    await handle.close();
+    throw new Error('unsafe');
+  }
+  return handle;
 }
 
 async function main() {
   if (!validArguments || (process.platform !== 'darwin' && process.platform !== 'linux')) {
     throw new Error('unsupported');
   }
-  await rejectSymlinkAncestors(dirname(sourcePath));
-  if ((await realpath(sourcePath)) !== sourcePath) throw new Error('unsafe');
-  const sourceStat = await lstat(sourcePath);
-  if (!sourceStat.isFile() || sourceStat.isSymbolicLink() || !ownedByCurrentUser(sourceStat.uid)) {
-    throw new Error('unsafe');
-  }
-  const directoryHandle = await openBuildDirectory();
-  const sourceHandle = await open(
-    sourcePath,
-    constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0),
-  );
+  let sourceHandle;
+  let installerSourceHandle;
+  let directoryHandle;
   try {
-    const openedSource = await sourceHandle.stat();
-    if (
-      !openedSource.isFile() ||
-      openedSource.dev !== sourceStat.dev ||
-      openedSource.ino !== sourceStat.ino ||
-      !ownedByCurrentUser(openedSource.uid)
-    ) {
-      throw new Error('unsafe');
-    }
-    await compileHelper(directoryHandle, sourceHandle, 'safe-bundle', false);
-    if (buildTests) {
-      await compileHelper(directoryHandle, sourceHandle, 'safe-bundle-test', true);
-    }
+    sourceHandle = await openBuildSource(sourcePath);
+    installerSourceHandle = await openBuildSource(installerSourcePath);
+    directoryHandle = await openBuildDirectory();
+    await compileAndInstall(directoryHandle, sourceHandle, installerSourceHandle);
   } finally {
-    await sourceHandle.close().catch(() => undefined);
-    await directoryHandle.close().catch(() => undefined);
+    await directoryHandle?.close().catch(() => undefined);
+    await installerSourceHandle?.close().catch(() => undefined);
+    await sourceHandle?.close().catch(() => undefined);
   }
 }
 
