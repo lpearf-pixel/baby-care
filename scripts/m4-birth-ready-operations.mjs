@@ -31,6 +31,42 @@ const STABLE_COMPARISON_KEYS = Object.freeze([
   'checkpointCount',
   'maxVersion',
 ]);
+const ALLOWED_CHILD_FAILURE_CODES = new Set([
+  'backup_catalogue_invalid',
+  'backup_cleanup_required',
+  'backup_dump_failed',
+  'backup_durability_failed',
+  'backup_exists',
+  'backup_failed',
+  'backup_helper_protocol_failed',
+  'backup_helper_unavailable',
+  'backup_integrity_failed',
+  'backup_invalid_bundle',
+  'backup_invalid_config',
+  'backup_manifest_invalid',
+  'backup_migration_invalid',
+  'backup_postgres_incompatible',
+  'backup_publish_failed',
+  'backup_quarantine_failed',
+  'backup_tool_failed',
+  'backup_unsafe_storage',
+  'backup_verification_failed',
+  'operator_config_invalid',
+  'operator_failed',
+  'operator_process_failed',
+  'restore_bundle_changed',
+  'restore_failed',
+  'restore_identity_unknown',
+  'restore_invalid_config',
+  'restore_invariant_failed',
+  'restore_postgres_incompatible',
+  'restore_read_model_failed',
+  'restore_same_cluster',
+  'restore_sanitation_failed',
+  'restore_snapshot_failed',
+  'restore_target_check_failed',
+  'restore_target_not_empty',
+]);
 const COMPOSE_PREFIX = Object.freeze([
   'compose',
   '--profile',
@@ -245,7 +281,7 @@ async function runChild(command, args, options = {}) {
     child.once('close', (code) => {
       if (failed || code !== 0) {
         const candidate = Buffer.concat(errorOutput).toString('utf8').trim();
-        if (/^[a-z][a-z0-9_]{0,127}$/.test(candidate)) lastFailureCode = candidate;
+        lastFailureCode = ALLOWED_CHILD_FAILURE_CODES.has(candidate) ? candidate : 'unknown';
         finish(new Error('m4_child_failed'));
       }
       else finish(undefined, Buffer.concat(output));

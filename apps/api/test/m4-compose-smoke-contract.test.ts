@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
@@ -9,6 +10,35 @@ function source(): string {
 
 function occurrences(value: string, needle: string): number {
   return value.split(needle).length - 1;
+}
+
+function childFailureCall(stderr: string): string {
+  const childProgram = `process.stderr.write(${JSON.stringify(stderr)}); process.exitCode = 1;`;
+  return `await runChild(process.execPath, ['-e', ${JSON.stringify(childProgram)}]);`;
+}
+
+function injectChildStderr(...stderrValues: string[]) {
+  const injectedCalls = stderrValues.map((stderr, index) => (
+    index === stderrValues.length - 1
+      ? `  ${childFailureCall(stderr)}`
+      : `  try { ${childFailureCall(stderr)} } catch {}`
+  )).join('\n');
+  const instrumented = source()
+    .replace(
+      "import { FamilyExportSchemaV1 } from '../packages/contracts/src/index.ts';",
+      'const FamilyExportSchemaV1 = {};',
+    )
+    .replace(
+      '  await main();',
+      injectedCalls,
+    );
+  const result = spawnSync(process.execPath, ['--input-type=module', '-'], {
+    input: instrumented,
+    encoding: 'utf8',
+    timeout: 5_000,
+  });
+  if (result.error) throw result.error;
+  return result;
 }
 
 describe('M4 birth-ready production Compose smoke contract', () => {
@@ -120,5 +150,33 @@ describe('M4 birth-ready production Compose smoke contract', () => {
     expect(script).toContain("'network', 'ls'");
     expect(script.indexOf("'volume', 'ls'")).toBeLessThan(ownershipIndex);
     expect(script.indexOf("'network', 'ls'")).toBeLessThan(ownershipIndex);
+  });
+
+  it.each(['password', 'secret_token', 'formula'])(
+    'maps unknown or sensitive raw child stderr to the closed unknown code',
+    (rawStderr) => {
+      const result = injectChildStderr(rawStderr);
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toBe('M4_SMOKE_FAILED stage=bootstrap code=unknown\n');
+      expect(result.stderr).not.toContain(rawStderr);
+    },
+  );
+
+  it('preserves only an explicitly allow-listed child failure code', () => {
+    const result = injectChildStderr('backup_integrity_failed');
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('M4_SMOKE_FAILED stage=bootstrap code=backup_integrity_failed\n');
+  });
+
+  it('forgets a previous allow-listed code when a later child emits unknown stderr', () => {
+    const result = injectChildStderr('backup_integrity_failed', 'secret_token');
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toBe('M4_SMOKE_FAILED stage=bootstrap code=unknown\n');
+    expect(result.stderr).not.toContain('secret_token');
   });
 });
