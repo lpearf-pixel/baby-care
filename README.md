@@ -86,8 +86,16 @@ The four fixed backup/restore commands and their required environment are docume
 16 target; restoring into the live source database is forbidden. The Task 8 production
 simulation uses generated identities and disposable volumes to prove export authorization,
 backup integrity, isolated restore, restored-session revocation, fresh login, and stable
-timeline/summary/revision/handoff attribution. This local software evidence still awaits
-Task 9 exact-head CI and does not replace the pending supervised family acceptance gate.
+timeline/summary/revision/handoff attribution. Exact-head CI `32562168081` passed all five
+jobs on `debabe0018ed17e65ebf7959ca237e8770cbacd0`; its Compose job emitted each fixed M4
+marker exactly once. This software evidence does not replace the pending supervised family
+acceptance gate.
+
+Run that human gate one step at a time: Dad/Mom first checks the private export interaction,
+then selects owner-private storage outside Git, creates and verifies a backup, practices an
+isolated restore-verify, confirms Nanny cannot see export, and finally completes a supervised
+normal-care walkthrough. Do not inspect private export contents in support tooling or restore
+into the live family database.
 
 ## Privacy and diagnostics
 

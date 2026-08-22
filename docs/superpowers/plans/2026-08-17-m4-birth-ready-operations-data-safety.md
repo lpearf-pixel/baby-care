@@ -718,21 +718,21 @@ SMOKE_OK component=m4-birth-ready-operations
 
 **Steps:**
 
-- [ ] Confirm clean branch, exact local head, full local gate evidence, no private artifacts and no untracked backup/export files.
-- [ ] With explicit authorization only, push `codex/m4-birth-ready-operations` and create/update an M4 Draft PR targeting `codex/m3-care-workspace-implementation` (not `main`).
-- [ ] Wait for the exact-head GitHub Actions run. Require static, unit, PostgreSQL integration, build and production Compose 5/5 PASS.
-- [ ] Inspect compact diagnostics first on failure. Apply `superpowers:systematic-debugging`; reproduce, add a failing test, make the minimum fix, rerun all affected gates, commit, and only push again if authorization remains valid.
-- [ ] Verify the Compose job emitted each M4 marker exactly once and did not upload export/backup artifacts. Record exact head, CI run ID and Compose job ID.
-- [ ] Update durable state from `implementation_complete_awaiting_ci` to `verified_complete` only after the exact-head run. The documentation closure commit itself requires one final exact-head CI run; record the prior verified implementation run without creating an infinite self-reference requirement.
-- [ ] Commit the state closure locally, then push it only with explicit authorization. Confirm the closure-head CI 5/5 PASS and record that run in the Draft PR rather than rewriting Git state again.
-- [ ] Prepare one-step-at-a-time human acceptance instructions, but do not execute or claim them:
+- [x] Confirm clean branch, exact local head, full local gate evidence, no private artifacts and no untracked backup/export files.
+- [x] With explicit authorization, push `codex/m4-birth-ready-operations`. No Draft PR was created because PR creation was not authorized; `main` and the M3 branch remain untouched.
+- [x] Wait for the exact-head GitHub Actions run. Static, unit, PostgreSQL integration, build and production Compose passed 5/5 in run `32562168081` on `debabe0018ed17e65ebf7959ca237e8770cbacd0`.
+- [x] Inspect compact diagnostics first on failure. The Linux inherited-descriptor defect was reproduced, covered by RED/GREEN tests, independently reviewed, and closed without weakening the fixed helper protocol.
+- [x] Verify Compose job `97005337160` emitted each M4 marker exactly once and did not upload export/backup artifacts. The four markers were `m4-family-export`, `m4-backup-integrity`, `m4-isolated-restore` and `m4-birth-ready-operations`.
+- [x] Update durable state from `implementation_complete_awaiting_ci` to `verified_complete` only after the exact-head run. Record the prior verified implementation run without creating an infinite self-reference requirement.
+- [x] Prepare a state-closure commit for authorized push. Its closure-head CI result is intentionally reported outside this tracked commit rather than causing an endless documentation/SHA rewrite.
+- [x] Prepare one-step-at-a-time human acceptance instructions, but do not execute or claim them:
   1. Dad/Mom verifies the private export interaction;
   2. chooses an owner-private destination outside Git;
   3. creates/verifies a backup;
   4. runs isolated restore-verify;
   5. confirms Nanny cannot see export;
   6. completes a supervised normal-care walkthrough.
-- [ ] Do not restore into the live family database, inspect private export contents, merge PRs, modify `main`, tag a release, or start Guardian/voice work.
+- [x] Do not restore into the live family database, inspect private export contents, merge PRs, modify `main`, tag a release, or start Guardian/voice work.
 
 **Completion:** One exact Git head has all five CI jobs and four M4 markers verified, durable state is accurate, and the remaining human acceptance gate is explicit. M4 software completion does not imply household acceptance or a live restore.
 

@@ -9,9 +9,10 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 ## Current state
 
-Current milestone: **M4 — Birth Ready Operations and Data Safety — Task 8 implemented locally; exact-head CI pending**
-Completed milestone: **M3 — Care Workspace — verified complete**
-Previous milestone: **M2 — Care Recording MVP — verified complete**
+Current milestone: **M4 — Birth Ready Operations and Data Safety — verified complete**
+Current delivery gate: **supervised family acceptance — pending**
+Previous completed milestone: **M3 — Care Workspace — verified complete**
+Earlier completed milestone: **M2 — Care Recording MVP — verified complete**
 
 Verified M1 production baseline:
 
@@ -118,17 +119,22 @@ build and independent review with no Critical/Important findings. Task 7 is comp
 subprocess cleanup and disposable isolated restore practice passed 130 focused tests,
 one real generated-data Compose flow, full lint/typecheck/build/privacy gates and an
 independent review with no Critical/Important findings.
-Task 8 final-review and residual pre-publish fixes are implemented locally at `e97aa38`.
+Task 8 final-review and residual pre-publish fixes are implemented through `e97aa38`.
 Scoped re-review is clean for underlying PostgreSQL cancellation settlement and
-restore/restoreVerify pre-lifecycle storage preflight; exact-head CI remains pending.
+restore/restoreVerify pre-lifecycle storage preflight. The exact-head Linux descriptor
+compatibility closure is `debabe0`.
 The stale prior static-contract count remains superseded. Compact diagnostics discard
 untrusted export/dump/manifest/path text, and the generated
 production Compose flow preserved all M1–M3 markers before
 emitting each of the four fixed M4 markers exactly once. Dad/Mom export, Nanny denial,
 private backup verification, isolated restore, old-session rejection, fresh Dad login and
 stable read-model digests all passed with owned source/restore volumes removed afterward.
-M4 remains `implementation_complete_awaiting_ci`; Task 9 exact-head five-job CI and the
-separate supervised family acceptance checklist are still pending.
+M4 is software `verified_complete` on
+`debabe0018ed17e65ebf7959ca237e8770cbacd0`. CI run `32562168081` passed static,
+unit/contracts, PostgreSQL integration, production build and production Compose smoke
+5/5. Compose job `97005337160` emitted `m4-family-export`, `m4-backup-integrity`,
+`m4-isolated-restore` and `m4-birth-ready-operations` exactly once. The separate
+supervised family acceptance checklist remains pending and is not implied by this result.
 M3 implementation scope must not be reopened implicitly.
 
 ## Hard scope boundaries

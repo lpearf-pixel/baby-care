@@ -1,13 +1,14 @@
 {
   "schema_version": 1,
   "milestone": "M4 Birth Ready Operations and Data Safety",
-  "status": "implementation_complete_awaiting_ci",
+  "status": "verified_complete",
   "branch": "codex/m4-birth-ready-operations",
   "completed_milestones": [
     "M0 Repository and delivery foundation",
     "M1 Family and baby foundation",
     "M2 Care Recording MVP",
-    "M3 Care Workspace"
+    "M3 Care Workspace",
+    "M4 Birth Ready Operations and Data Safety"
   ],
   "m1_state": "verified_complete",
   "m1_authoritative_branch": "codex/m1-family-baby-foundation",
@@ -45,7 +46,7 @@
     "m3-care-workspace-release-flow"
   ],
   "m3_documentation_closure_gate": "closed by final exact-head CI 31959895049 on 52b042a66122464af338a2b4931315d92dff0965",
-  "m4_state": "implementation_complete_awaiting_ci",
+  "m4_state": "verified_complete",
   "m4_approved_spec": "docs/superpowers/specs/2026-08-17-m4-birth-ready-operations-data-safety-design.md",
   "m4_implementation_branch": "codex/m4-birth-ready-operations",
   "m4_implementation_plan": "docs/superpowers/plans/2026-08-17-m4-birth-ready-operations-data-safety.md",
@@ -90,11 +91,26 @@
       "task": "Task 8 Synthetic Birth Ready Operations Simulation And Privacy Gate",
       "commit": "e97aa38",
       "review": "self_reviewed_no_critical_or_important"
+    },
+    {
+      "task": "Task 9 Exact-Head Release Evidence And Human Handoff",
+      "commit": "debabe0018ed17e65ebf7959ca237e8770cbacd0",
+      "review": "exact_head_ci_5_of_5_pass"
     }
   ],
-  "m4_current_task": "Task 9 Exact-Head Release Evidence And Human Handoff",
+  "m4_current_task": "M4 Software Complete; Supervised Human Family Acceptance Pending",
   "m4_local_compose_result": "m1_m2_m3_and_four_m4_markers_passed_exactly_once",
-  "m4_exact_head_ci": "pending",
+  "m4_verified_head": "debabe0018ed17e65ebf7959ca237e8770cbacd0",
+  "m4_exact_head_ci": "verified_5_of_5",
+  "m4_exact_head_ci_run": 32562168081,
+  "m4_production_compose_job": 97005337160,
+  "m4_production_compose_markers": [
+    "m4-family-export",
+    "m4-backup-integrity",
+    "m4-isolated-restore",
+    "m4-birth-ready-operations"
+  ],
+  "m4_documentation_closure_ci": "verify_latest_branch_run_externally_without_rewriting_tracked_exact_head_evidence",
   "m4_human_family_acceptance": "pending",
   "m4_scope": [
     "Dad/Mom-only private family data export",
@@ -116,8 +132,8 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "execute M4 Task 9 exact-head five-job CI only with explicit push authorization",
-    "prepare the separate supervised human family acceptance checklist without using private data"
+    "read the latest branch CI to confirm the documentation-closure checkpoint without rewriting this exact-head record",
+    "execute the separate supervised human family acceptance checklist one step at a time"
   ],
   "requires_separate_post_m3_design": [
     "Guardian integration",

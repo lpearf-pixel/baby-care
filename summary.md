@@ -1,17 +1,19 @@
 # Baby Care Work Handoff Summary
 
-Updated: 2026-08-21
+Updated: 2026-08-22
 Repository: `lpearf-pixel/baby-care`
 
 This file is the short handoff for a fresh Work/chat. Read it together with `agent.md`, `docs/PLAN.md`, and `.agent/current-milestone.json` before planning or coding.
 
 ## 1. Current authoritative state
 
-- Current active milestone: **M4 — Birth Ready Operations and Data Safety**. Tasks 1–8
-  are implemented locally; Task 8 is the current local commit and M4 remains
-  `implementation_complete_awaiting_ci`. The next slice is Task 9 exact-head release
-  evidence and human handoff.
-- Current completed milestone: **M3 — Care Workspace**, verified complete.
+- Current completed milestone: **M4 — Birth Ready Operations and Data Safety**, software
+  `verified_complete`. The separate supervised family acceptance gate remains pending.
+- M4 authoritative implementation head: `debabe0018ed17e65ebf7959ca237e8770cbacd0`.
+- M4 authoritative CI: `32562168081` — static / unit / PostgreSQL integration /
+  production build / production Compose smoke 5/5 PASS.
+- M4 production Compose job: `97005337160` — all four required M4 markers emitted exactly once.
+- Previous completed milestone: **M3 — Care Workspace**, verified complete.
 - M3 authoritative final head: `52b042a66122464af338a2b4931315d92dff0965`.
 - M3 authoritative CI: `31959895049` — static / unit / PostgreSQL integration / production build / production Compose smoke 5/5 PASS.
 - M3 production Compose job: `95196165456` — all four required M3 markers emitted exactly once.
@@ -60,7 +62,7 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   five bounded hardening rounds. Fresh Node 24 evidence is 67 operations tests plus root
   typecheck, lint, production build and offline frozen-lock PASS. Real PostgreSQL 16
   dump/list and Linux-native execution are now exercised through the Task 7 production
-  adapter; exact-head Linux CI remains a Task 9 gate.
+  adapter and were later verified by the Task 9 exact-head Linux CI.
 - M4 Task 6 implementation: `de09494` — verified private bundles restore only to a
   distinct empty PostgreSQL 16 target. Fixed repeatable-read invariants precede a
   separate restored-session revocation transaction; the existing API summary/timeline,
@@ -87,8 +89,10 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   and the four fixed M4 markers passed locally exactly once; both owned disposable
   volumes were removed. Final-review and residual blocker fixes are recorded through
   `e97aa38`; scoped re-review is clean for underlying PostgreSQL cancellation settlement
-  and restore/restoreVerify pre-lifecycle storage preflight. Exact-head CI and supervised
-  real-family acceptance remain pending.
+  and restore/restoreVerify pre-lifecycle storage preflight. Linux native-helper
+  compatibility closed at `debabe0`; exact-head CI `32562168081` passed 5/5 and Compose
+  job `97005337160` emitted all four M4 markers exactly once. Supervised real-family
+  acceptance remains pending.
 
 Release-gate history:
 
@@ -160,8 +164,8 @@ the deterministic repeatable-read export service exists, and Dad/Mom can request
 private audited attachment through the bounded Web download surface. Private atomic backup
 and fail-closed isolated restore libraries now exist; the guarded operator CLI,
 disposable PostgreSQL 16 practice path, and Task 8 synthetic production-mode operations
-simulation are complete locally. Task 9 owns exact-head CI and human handoff; M4 is not
-verified complete until that gate passes.
+simulation are software verified complete at `debabe0` by CI `32562168081` 5/5. This
+does not satisfy the separate supervised family acceptance gate or authorize a live restore.
 
 ## 5. Baby Guardian / baby-monitor-local boundary
 
@@ -261,18 +265,19 @@ This remains separate from verified M3 Care Workspace. The first code work belon
 
 ## 9. Fresh Work entry point
 
-The next Work should continue the approved M4 design workflow without redesigning
-M2/M3 or implicitly beginning Guardian coding.
+The next Work should preserve verified M4 and run only the supervised family acceptance
+workflow when a human is available, without redesigning M2/M3 or implicitly beginning
+Guardian coding.
 
 Recommended first sequence:
 
 1. Read the authoritative state files and the M4 design.
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
-3. Resume at Task 9 of the approved M4 implementation plan; do not claim verified M4
-   completion before exact-head five-job CI passes.
+3. Preserve the M4 verified pair `debabe0018ed17e65ebf7959ca237e8770cbacd0` /
+   `32562168081`; the next product gate is supervised family acceptance.
 4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary.
 
-## 10. Copy/paste prompt for M4 exact-head closure
+## 10. Copy/paste prompt for M4 supervised family acceptance
 
 ```text
 读取 `agent.md`、`summary.md`、`docs/PLAN.md`、
@@ -283,10 +288,13 @@ Recommended first sequence:
 基线为 `codex/m4-birth-ready-operations`，来源是已通过 CI `31959895049`
 五项门禁的 M3 精确头 `52b042a66122464af338a2b4931315d92dff0965`。
 
-以当前 Task 8 提交为精确基线，按已批准规格和正式计划仅执行 Task 9。
-先取得明确 push 授权，再运行精确头五项 CI；只有五项全部 PASS 且 M1-M4
-marker 数量和顺序正确后，才把 M4 标记为 verified complete。另行准备受监督的
-家庭验收清单，不在自动化中使用私人家庭数据。
+M4 软件基线为 `debabe0018ed17e65ebf7959ca237e8770cbacd0`，精确头 CI
+`32562168081` 五项全部 PASS，Compose job `97005337160` 的四个 M4 marker
+各出现一次。不要重跑或重做已完成的软件功能。
+
+按正式 Task 9 清单一次只指导一个受监督的家庭验收步骤：Dad/Mom 私有导出交互、
+Git 外 owner-private 目的地、backup create/verify、isolated restore-verify、Nanny
+不可见导出、正常护理 walkthrough。不要读取私人导出内容，不要恢复到 live 数据库。
 
 不要开发 Guardian/语音、完整离线同步、云备份、医疗功能或 in-place restore；
 不要修改/合并 main，未经明确批准不得 push。baby-monitor-local 当前训练不阻塞本项目。
