@@ -21,6 +21,7 @@ const outputDirectory = resolve(packageRoot, '.native');
 const compiler = '/usr/bin/cc';
 const buildTests = process.argv.length === 3 && process.argv[2] === '--test';
 const validArguments = process.argv.length === 2 || buildTests;
+let failureStage = 'arguments';
 
 function ownedByCurrentUser(uid) {
   return typeof process.getuid !== 'function' || uid === process.getuid();
@@ -198,6 +199,7 @@ async function compileAndInstall(
   sourceHandle,
   installerSourceHandle,
 ) {
+  failureStage = 'scratch_open';
   const scratch = await realpath(await mkdtemp(join(tmpdir(), 'baby-care-native-build-')));
   const installerPath = join(scratch, 'native-installer');
   const productionPath = join(scratch, 'safe-bundle');
@@ -212,8 +214,11 @@ async function compileAndInstall(
     throw new Error('unsafe');
   }
   try {
+    failureStage = 'installer_compile';
     compileSource(installerSourceHandle, installerPath);
+    failureStage = 'production_compile';
     compileSource(sourceHandle, productionPath);
+    failureStage = 'production_install';
     await installCompiledArtifact(
       installerPath,
       productionPath,
@@ -221,7 +226,9 @@ async function compileAndInstall(
       directoryHandle,
     );
     if (buildTests) {
+      failureStage = 'testing_compile';
       compileSource(sourceHandle, testingPath, true);
+      failureStage = 'testing_install';
       await installCompiledArtifact(
         installerPath,
         testingPath,
@@ -266,8 +273,11 @@ async function main() {
   let installerSourceHandle;
   let directoryHandle;
   try {
+    failureStage = 'source_open';
     sourceHandle = await openBuildSource(sourcePath);
+    failureStage = 'installer_source_open';
     installerSourceHandle = await openBuildSource(installerSourcePath);
+    failureStage = 'output_open';
     directoryHandle = await openBuildDirectory();
     await compileAndInstall(directoryHandle, sourceHandle, installerSourceHandle);
   } finally {
@@ -281,6 +291,6 @@ try {
   await main();
   process.stdout.write('native_helper_built\n');
 } catch {
-  process.stdout.write('native_helper_build_failed\n');
+  process.stdout.write(`native_helper_build_failed:${failureStage}\n`);
   process.exitCode = 1;
 }

@@ -191,7 +191,7 @@ describe('native helper build boundary', () => {
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     expect(result.status).toBe(1);
-    expect(result.stdout).toBe('native_helper_build_failed\n');
+    expect(result.stdout).toBe('native_helper_build_failed:output_open\n');
     expect(result.stderr).toBe('');
     expect(await readdir(outside)).toEqual([]);
   });
@@ -215,7 +215,7 @@ describe('native helper build boundary', () => {
       },
     );
     expect(result.status).toBe(1);
-    expect(result.stdout).toBe('native_helper_build_failed\n');
+    expect(result.stdout).toBe('native_helper_build_failed:arguments\n');
     expect(result.stderr).toBe('');
     expect(await readFile(join(outside, 'safe-bundle'), 'utf8')).toBe('outside-original');
     expect(await readdir(outside)).toEqual(['safe-bundle']);
