@@ -47,8 +47,10 @@ ssize_t install_helper_test_read(int descriptor, void *buffer, size_t length) {
                              (mode_t)0700);
     if (replacement >= 0) {
       static const char marker[] = "replacement";
-      (void)write(replacement, marker, sizeof(marker) - 1U);
-      (void)fsync(replacement);
+      ssize_t marker_written = write(replacement, marker, sizeof(marker) - 1U);
+      if (marker_written == (ssize_t)(sizeof(marker) - 1U)) {
+        (void)fsync(replacement);
+      }
       (void)close(replacement);
     }
   }

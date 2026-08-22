@@ -33,6 +33,9 @@ const installerSourcePath = fileURLToPath(
 const installerPreservationHarnessPath = fileURLToPath(
   new URL('./install-helper-preservation-harness.c', import.meta.url),
 );
+const descriptorFailureHarnessPath = fileURLToPath(
+  new URL('./safe-bundle-descriptor-harness.c', import.meta.url),
+);
 const nativeSourceDirectory = fileURLToPath(new URL('../native/', import.meta.url));
 const roots: string[] = [];
 const finalName = 'baby-care-backup-20260817T123456Z';
@@ -157,9 +160,51 @@ describe('safe-bundle native protocol', () => {
     }
   });
 
-  test('rejects an unexpected inherited descriptor', async () => {
+  test('fails closed when inherited descriptor cleanup cannot be inspected', async () => {
     const root = await privateRoot();
     const temporary = await privateTemporary(root);
+    await writeContractFiles(temporary);
+    const parentFd = openSync(root, constants.O_RDONLY);
+    const temporaryFd = openSync(temporary, constants.O_RDONLY);
+    try {
+      const result = spawnSync(
+        testHelperPath,
+        ['publish-descriptor-open-failure-test', basename(temporary), finalName],
+        {
+          env: {},
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'pipe', parentFd, temporaryFd],
+        },
+      );
+      expect(result.status).toBe(64);
+      expect(result.stdout).toBe('safe_bundle_v1:descriptor_cleanup_failed\n');
+      expect(result.stderr).toBe('');
+      await expect(lstat(join(root, finalName))).rejects.toMatchObject({ code: 'ENOENT' });
+      expect((await readdir(temporary)).sort()).toEqual(['database.dump', 'manifest.json']);
+    } finally {
+      closeSync(temporaryFd);
+      closeSync(parentFd);
+    }
+  });
+
+  test('fails closed through the real descriptor-directory error branch', async () => {
+    const root = await privateRoot();
+    const harness = join(root, 'safe-bundle-descriptor-test');
+    compileInstaller(descriptorFailureHarnessPath, harness);
+    const result = spawnSync(
+      harness,
+      ['publish', '.baby-care-backup-tmp-ABC123', finalName],
+      { env: {}, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    expect(result.status).toBe(64);
+    expect(result.stdout).toBe('safe_bundle_v1:descriptor_cleanup_failed\n');
+    expect(result.stderr).toBe('');
+  });
+
+  test('does not let an unrelated inherited descriptor block fixed publication', async () => {
+    const root = await privateRoot();
+    const temporary = await privateTemporary(root);
+    await writeContractFiles(temporary);
     const parentFd = openSync(root, constants.O_RDONLY);
     const temporaryFd = openSync(temporary, constants.O_RDONLY);
     try {
@@ -168,9 +213,10 @@ describe('safe-bundle native protocol', () => {
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe', parentFd, temporaryFd, parentFd],
       });
-      expect(result.status).toBe(64);
-      expect(result.stdout).toBe('safe_bundle_v1:protocol_error\n');
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe('safe_bundle_v1:published\n');
       expect(result.stderr).toBe('');
+      await expect(lstat(join(root, finalName))).resolves.toMatchObject({ mode: expect.any(Number) });
     } finally {
       closeSync(temporaryFd);
       closeSync(parentFd);
