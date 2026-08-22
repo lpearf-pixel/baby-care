@@ -162,15 +162,24 @@ function runInstaller(installerPath, operation, directoryHandle, artifactHandle)
     stdio: ['ignore', 'pipe', 'pipe', directoryHandle.fd, artifactHandle.fd],
     timeout: 5_000,
   });
-  if (
-    result.error ||
-    result.signal ||
-    result.status !== 0 ||
-    result.stdout !== 'native_installer_v1:installed\n' ||
-    result.stderr !== ''
-  ) {
+  if (result.error) {
+    failureStage = `${failureStage}_spawn`;
     throw new Error('install');
   }
+  if (result.signal) {
+    failureStage = `${failureStage}_signal`;
+    throw new Error('install');
+  }
+  const exact = `${result.status}:${result.stdout}:${result.stderr}`;
+  if (exact === '0:native_installer_v1:installed\n:') return;
+  const fixedFailures = new Map([
+    ['64:native_installer_v1:protocol_error\n:', 'protocol'],
+    ['65:native_installer_v1:unsafe\n:', 'unsafe'],
+    ['67:native_installer_v1:durability_failed\n:', 'durability'],
+    ['70:native_installer_v1:operation_failed\n:', 'operation'],
+  ]);
+  failureStage = `${failureStage}_${fixedFailures.get(exact) ?? 'unexpected'}`;
+  throw new Error('install');
 }
 
 async function installCompiledArtifact(

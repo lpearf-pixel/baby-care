@@ -223,6 +223,28 @@ describe('native helper build boundary', () => {
     await expect(lstat(displaced)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
+  test('reports a fixed installer operation stage without exposing underlying output', async () => {
+    const root = await privateRoot();
+    const packageRoot = join(root, 'package');
+    const native = join(packageRoot, '.native');
+    await copyNativeBuildPackage(packageRoot);
+    await mkdir(native, { mode: 0o700 });
+    await mkdir(join(native, 'safe-bundle'), { mode: 0o700 });
+
+    const result = spawnSync(
+      process.execPath,
+      [join(packageRoot, 'scripts', 'build-native-helper.mjs')],
+      {
+        env: {},
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('native_helper_build_failed:production_install_operation\n');
+    expect(result.stderr).toBe('');
+  });
+
   test('installer publishes through a held directory after its .native pathname is replaced', async () => {
     const root = await privateRoot();
     const native = join(root, '.native');
