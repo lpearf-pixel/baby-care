@@ -5,9 +5,8 @@ import type { AuthContext, AuthService } from '../auth/auth-service.js';
 import { assertAllowedOrigin, OriginNotAllowedError } from '../auth/origin-guard.js';
 import { readSessionCookie } from '../auth/session-auth.js';
 import { writeAudit } from '../audit/audit-repository.js';
-import type { DatabaseContext } from '../db.js';
+import { DATABASE_OPERATION_DEADLINE_MS, type DatabaseContext } from '../db.js';
 import {
-  FAMILY_EXPORT_DEADLINE_MS,
   FamilyExportCancelledError,
   FamilyExportTooLargeError,
   type FamilyExportService,
@@ -61,19 +60,41 @@ async function requireExportAuth(
   return authenticated.context;
 }
 
-async function waitForRouteOperation<T>(
+async function settleAuditOperation<T>(
   operation: () => Promise<T>,
+  client: { release(error?: Error | boolean): void },
   signal: AbortSignal,
+  destroyClient: () => void,
 ): Promise<T> {
-  if (signal.aborted) throw new FamilyExportCancelledError();
-  return new Promise<T>((resolve, reject) => {
-    const abort = () => reject(new FamilyExportCancelledError());
-    signal.addEventListener('abort', abort, { once: true });
-    Promise.resolve()
-      .then(operation)
-      .then(resolve, reject)
-      .finally(() => signal.removeEventListener('abort', abort));
-  });
+  if (signal.aborted) {
+    destroyClient();
+    throw new FamilyExportCancelledError();
+  }
+  let aborted = false;
+  const abort = () => {
+    aborted = true;
+    destroyClient();
+  };
+  signal.addEventListener('abort', abort, { once: true });
+  try {
+    try {
+      const result = await operation();
+      if (aborted || signal.aborted) throw new FamilyExportCancelledError();
+      return result;
+    } catch (error) {
+      if (aborted || signal.aborted) throw new FamilyExportCancelledError();
+      throw error;
+    }
+  } finally {
+    signal.removeEventListener('abort', abort);
+  }
+}
+
+function isStatementTimeout(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && (error as { code?: unknown }).code === '57014';
 }
 
 async function recordExportAudit(
@@ -83,19 +104,34 @@ async function recordExportAudit(
   occurredAt: Date,
   signal: AbortSignal,
 ): Promise<void> {
-  const client = await waitForRouteOperation(() => database.pool.connect(), signal);
+  const client = await database.pool.connect();
+  let clientDestroyed = false;
+  const destroyClient = () => {
+    if (clientDestroyed) return;
+    clientDestroyed = true;
+    client.release(true);
+  };
+  if (signal.aborted) {
+    destroyClient();
+    throw new FamilyExportCancelledError();
+  }
+
   let transactionStarted = false;
   try {
-    await waitForRouteOperation(
+    await settleAuditOperation(
       () => client.query('begin').then(() => undefined),
+      client,
       signal,
+      destroyClient,
     );
     transactionStarted = true;
-    await waitForRouteOperation(
-      () => client.query('set local statement_timeout = 30000').then(() => undefined),
+    await settleAuditOperation(
+      () => client.query('set local statement_timeout = ' + DATABASE_OPERATION_DEADLINE_MS).then(() => undefined),
+      client,
       signal,
+      destroyClient,
     );
-    await waitForRouteOperation(() => writeAudit(client, {
+    await settleAuditOperation(() => writeAudit(client, {
       familyId: context.familyId,
       actorUserId: context.userId,
       actorMembershipId: context.membershipId,
@@ -106,22 +142,33 @@ async function recordExportAudit(
       traceId,
       metadata: null,
       occurredAt,
-    }), signal);
-    await waitForRouteOperation(
+    }), client, signal, destroyClient);
+    await settleAuditOperation(
       () => client.query('commit').then(() => undefined),
+      client,
       signal,
+      destroyClient,
     );
+    transactionStarted = false;
   } catch (error) {
-    if (transactionStarted) {
+    if (!clientDestroyed && transactionStarted) {
       try {
-        await client.query('rollback');
+        await settleAuditOperation(
+          () => client.query('rollback').then(() => undefined),
+          client,
+          signal,
+          destroyClient,
+        );
       } catch {
         // Preserve the closed audit failure.
       }
     }
+    if (signal.aborted || isStatementTimeout(error)) {
+      throw new FamilyExportCancelledError();
+    }
     throw error;
   } finally {
-    client.release();
+    if (!clientDestroyed) client.release();
   }
 }
 
@@ -136,8 +183,6 @@ export function registerFamilyExportRoute(
   app.post('/api/family/export', async (request, reply) => {
     const controller = new AbortController();
     const abort = () => controller.abort();
-    const deadline = setTimeout(abort, FAMILY_EXPORT_DEADLINE_MS);
-    deadline.unref();
     request.raw.once('aborted', abort);
     request.raw.socket.once('close', abort);
     try {
@@ -177,7 +222,6 @@ export function registerFamilyExportRoute(
       }
       return sendError(reply, 500, 'export_failed', 'The family export could not be completed.', request.id);
     } finally {
-      clearTimeout(deadline);
       request.raw.removeListener('aborted', abort);
       request.raw.socket.removeListener('close', abort);
     }

@@ -6,7 +6,7 @@ import {
   type FeedingRelatedActionInput,
 } from '@baby-care/contracts';
 import type { AuthContext } from '../src/auth/auth-service.js';
-import type { DatabaseContext } from '../src/db.js';
+import { createDatabase, type DatabaseContext } from '../src/db.js';
 import {
   createFamilyExportService,
   FamilyExportTooLargeError,
@@ -16,7 +16,10 @@ import type {
   FamilyExportRows,
 } from '../src/family/family-export-repository.js';
 import { createFamilyExportRepository } from '../src/family/family-export-repository.js';
-import { StableExportCoordinator } from '../src/family/export-coordinator.js';
+import {
+  ExportInProgressError,
+  StableExportCoordinator,
+} from '../src/family/export-coordinator.js';
 
 const ids = {
   family: '11111111-1111-4111-8111-111111111111',
@@ -201,13 +204,112 @@ describe('family export snapshot service', () => {
     expect(fixture.client.release).toHaveBeenCalledOnce();
   });
 
-  it('settles rollback and release after the fixed deadline before the actor can retry', async () => {
+  it("configures a fixed production pool acquisition timeout", async () => {
+    const database = createDatabase("");
+    try {
+      expect(database.pool.options.connectionTimeoutMillis).toBe(30_000);
+    } finally {
+      await database.close();
+    }
+  });
+
+  it("waits for an aborted active query to settle after destroying the client before actor retry", async () => {
+    let rejectRead!: (error: Error) => void;
+    let markReadStarted!: () => void;
+    const readStarted = new Promise<void>((resolve) => { markReadStarted = resolve; });
+    const firstClient = {
+      query: vi.fn(async () => ({ rows: [] })),
+      release: vi.fn(),
+    } as unknown as pg.PoolClient;
+    const secondClient = {
+      query: vi.fn(async () => ({ rows: [] })),
+      release: vi.fn(),
+    } as unknown as pg.PoolClient;
+    const connect = vi.fn()
+      .mockResolvedValueOnce(firstClient)
+      .mockResolvedValueOnce(secondClient);
+    const database = { pool: { connect } } as unknown as DatabaseContext;
+    const repository: FamilyExportRepository = {
+      readFamilyExport: vi.fn()
+        .mockImplementationOnce(() => new Promise<FamilyExportRows>((_resolve, reject) => {
+          rejectRead = reject;
+          markReadStarted();
+        }))
+        .mockResolvedValueOnce(validRows()),
+    };
+    const service = createFamilyExportService(database, repository, 1_000_000);
+    const coordinator = new StableExportCoordinator();
+    const controller = new AbortController();
+    const first = coordinator.run(actor.userId, () => (
+      service.exportFamily(actor, new Date(generatedAt), controller.signal)
+    ));
+    const firstOutcome = first.catch((error: unknown) => error);
+
+    await readStarted;
+    controller.abort();
+    expect(firstClient.release).toHaveBeenCalledWith(true);
+    await expect(coordinator.run(actor.userId, async () => undefined))
+      .rejects.toBeInstanceOf(ExportInProgressError);
+
+    rejectRead(new Error("synthetic connection destruction"));
+    await expect(firstOutcome).resolves.toMatchObject({ code: "export_cancelled" });
+    await expect(coordinator.run(actor.userId, () => (
+      service.exportFamily(actor, new Date(generatedAt), new AbortController().signal)
+    ))).resolves.toMatchObject({ serialized: expect.any(Buffer) });
+    expect(secondClient.release).toHaveBeenCalledOnce();
+  });
+
+  it("destroys a client acquired after request abort before releasing the actor slot", async () => {
+    let resolveFirstConnect!: (client: pg.PoolClient) => void;
+    const firstClient = {
+      query: vi.fn(async () => ({ rows: [] })),
+      release: vi.fn(),
+    } as unknown as pg.PoolClient;
+    const secondClient = {
+      query: vi.fn(async () => ({ rows: [] })),
+      release: vi.fn(),
+    } as unknown as pg.PoolClient;
+    const connect = vi.fn()
+      .mockImplementationOnce(() => new Promise<pg.PoolClient>((resolve) => {
+        resolveFirstConnect = resolve;
+      }))
+      .mockResolvedValueOnce(secondClient);
+    const database = { pool: { connect } } as unknown as DatabaseContext;
+    const service = createFamilyExportService(database, repositoryReturning(validRows()), 1_000_000);
+    const coordinator = new StableExportCoordinator();
+    const controller = new AbortController();
+    const first = coordinator.run(actor.userId, () => (
+      service.exportFamily(actor, new Date(generatedAt), controller.signal)
+    ));
+    const firstOutcome = first.catch((error: unknown) => error);
+
+    await Promise.resolve();
+    controller.abort();
+    await expect(coordinator.run(actor.userId, async () => undefined))
+      .rejects.toBeInstanceOf(ExportInProgressError);
+    resolveFirstConnect(firstClient);
+
+    await expect(firstOutcome).resolves.toMatchObject({ code: "export_cancelled" });
+    expect(firstClient.query).not.toHaveBeenCalled();
+    expect(firstClient.release).toHaveBeenCalledWith(true);
+    await expect(coordinator.run(actor.userId, () => (
+      service.exportFamily(actor, new Date(generatedAt), new AbortController().signal)
+    ))).resolves.toMatchObject({ serialized: expect.any(Buffer) });
+  });
+
+  it("waits for statement timeout rejection before rollback, release, and actor retry", async () => {
     vi.useFakeTimers();
     try {
       const fixture = recordingDatabase();
+      let querySettled = false;
       const repository: FamilyExportRepository = {
         readFamilyExport: vi.fn()
-          .mockImplementationOnce(() => new Promise<FamilyExportRows>(() => undefined))
+          .mockImplementationOnce(() => new Promise<FamilyExportRows>((_resolve, reject) => {
+            setTimeout(() => {
+              querySettled = true;
+              reject(Object.assign(new Error("statement timeout"), { code: "57014" }));
+            }, 30_001);
+          }))
           .mockResolvedValueOnce(validRows()),
       };
       const service = createFamilyExportService(fixture.database, repository, 1_000_000);
@@ -215,21 +317,26 @@ describe('family export snapshot service', () => {
       const operation = coordinator.run(actor.userId, () => (
         service.exportFamily(actor, new Date(generatedAt), new AbortController().signal)
       ));
-      const outcome = operation.catch((error: unknown) => error);
+      let operationSettled = false;
+      const outcome = operation.catch((error: unknown) => error).finally(() => {
+        operationSettled = true;
+      });
 
       await vi.advanceTimersByTimeAsync(30_000);
+      expect(querySettled).toBe(false);
+      expect(operationSettled).toBe(false);
+      await expect(coordinator.run(actor.userId, async () => undefined))
+        .rejects.toBeInstanceOf(ExportInProgressError);
 
-      expect(fixture.statements).toEqual([
-        'begin isolation level repeatable read read only',
-        'set local statement_timeout = 30000',
-        'rollback',
-      ]);
-      expect(fixture.client.release).toHaveBeenCalledOnce();
-      expect(await outcome).toMatchObject({ code: 'export_cancelled' });
+      await vi.advanceTimersByTimeAsync(1);
+      expect(querySettled).toBe(true);
+      await expect(outcome).resolves.toMatchObject({ code: "export_cancelled" });
+      expect(fixture.statements.at(-1)).toBe("rollback");
+      expect(fixture.client.release).toHaveBeenCalledWith();
+      expect(fixture.client.release).not.toHaveBeenCalledWith(true);
       await expect(coordinator.run(actor.userId, () => (
         service.exportFamily(actor, new Date(generatedAt), new AbortController().signal)
       ))).resolves.toMatchObject({ serialized: expect.any(Buffer) });
-      expect(fixture.client.release).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }

@@ -9,7 +9,7 @@ import {
 } from '@baby-care/contracts';
 import type { FamilyExportV1 } from '@baby-care/contracts';
 import type { AuthContext } from '../auth/auth-service.js';
-import type { DatabaseContext } from '../db.js';
+import { DATABASE_OPERATION_DEADLINE_MS, type DatabaseContext } from '../db.js';
 import type { FamilyExportRepository } from './family-export-repository.js';
 
 export class FamilyExportTooLargeError extends Error {
@@ -20,8 +20,6 @@ export class FamilyExportTooLargeError extends Error {
     this.name = 'FamilyExportTooLargeError';
   }
 }
-
-export const FAMILY_EXPORT_DEADLINE_MS = 30_000;
 
 export class FamilyExportCancelledError extends Error {
   readonly code = 'export_cancelled';
@@ -56,19 +54,41 @@ function stableDocument(
   });
 }
 
-async function waitForExport<T>(
+async function settleClientOperation<T>(
   operation: () => Promise<T>,
-  signal: AbortSignal,
+  client: { release(error?: Error | boolean): void },
+  signal: AbortSignal | undefined,
+  destroyClient: () => void,
 ): Promise<T> {
-  if (signal.aborted) throw new FamilyExportCancelledError();
-  return new Promise<T>((resolve, reject) => {
-    const abort = () => reject(new FamilyExportCancelledError());
-    signal.addEventListener('abort', abort, { once: true });
-    Promise.resolve()
-      .then(operation)
-      .then(resolve, reject)
-      .finally(() => signal.removeEventListener('abort', abort));
-  });
+  if (signal?.aborted) {
+    destroyClient();
+    throw new FamilyExportCancelledError();
+  }
+  let aborted = false;
+  const abort = () => {
+    aborted = true;
+    destroyClient();
+  };
+  signal?.addEventListener('abort', abort, { once: true });
+  try {
+    try {
+      const result = await operation();
+      if (aborted || signal?.aborted) throw new FamilyExportCancelledError();
+      return result;
+    } catch (error) {
+      if (aborted || signal?.aborted) throw new FamilyExportCancelledError();
+      throw error;
+    }
+  } finally {
+    signal?.removeEventListener('abort', abort);
+  }
+}
+
+function isStatementTimeout(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && (error as { code?: unknown }).code === '57014';
 }
 
 export function createFamilyExportService(
@@ -78,50 +98,69 @@ export function createFamilyExportService(
 ): FamilyExportService {
   return {
     async exportFamily(actor: AuthContext, generatedAt: Date, requestSignal?: AbortSignal) {
-      const controller = new AbortController();
-      const abort = () => controller.abort();
-      const deadline = setTimeout(abort, FAMILY_EXPORT_DEADLINE_MS);
-      deadline.unref();
-      requestSignal?.addEventListener('abort', abort, { once: true });
-      if (requestSignal?.aborted) abort();
+      const client = await database.pool.connect();
+      let clientDestroyed = false;
+      const destroyClient = () => {
+        if (clientDestroyed) return;
+        clientDestroyed = true;
+        client.release(true);
+      };
+      if (requestSignal?.aborted) {
+        destroyClient();
+        throw new FamilyExportCancelledError();
+      }
+
+      let transactionStarted = false;
       try {
-        const client = await waitForExport(() => database.pool.connect(), controller.signal);
-        try {
-          await waitForExport(
-            () => client.query('begin isolation level repeatable read read only').then(() => undefined),
-            controller.signal,
-          );
+        await settleClientOperation(
+          () => client.query('begin isolation level repeatable read read only').then(() => undefined),
+          client,
+          requestSignal,
+          destroyClient,
+        );
+        transactionStarted = true;
+        await settleClientOperation(
+          () => client.query('set local statement_timeout = ' + DATABASE_OPERATION_DEADLINE_MS).then(() => undefined),
+          client,
+          requestSignal,
+          destroyClient,
+        );
+        const rows = await settleClientOperation(
+          () => repository.readFamilyExport(client, actor.familyId),
+          client,
+          requestSignal,
+          destroyClient,
+        );
+        const document = stableDocument(rows, generatedAt.toISOString());
+        const serialized = Buffer.from(JSON.stringify(document), 'utf8');
+        if (serialized.byteLength > maxBytes) throw new FamilyExportTooLargeError();
+        await settleClientOperation(
+          () => client.query('commit').then(() => undefined),
+          client,
+          requestSignal,
+          destroyClient,
+        );
+        transactionStarted = false;
+        return { document, serialized };
+      } catch (error) {
+        if (!clientDestroyed && transactionStarted) {
           try {
-            await waitForExport(
-              () => client.query('set local statement_timeout = 30000').then(() => undefined),
-              controller.signal,
+            await settleClientOperation(
+              () => client.query('rollback').then(() => undefined),
+              client,
+              requestSignal,
+              destroyClient,
             );
-            const rows = await waitForExport(
-              () => repository.readFamilyExport(client, actor.familyId),
-              controller.signal,
-            );
-            const document = stableDocument(rows, generatedAt.toISOString());
-            const serialized = Buffer.from(JSON.stringify(document), 'utf8');
-            if (serialized.byteLength > maxBytes) throw new FamilyExportTooLargeError();
-            await waitForExport(
-              () => client.query('commit').then(() => undefined),
-              controller.signal,
-            );
-            return { document, serialized };
-          } catch (error) {
-            try {
-              await client.query('rollback');
-            } catch {
-              // Preserve the closed export failure rather than leaking a secondary rollback error.
-            }
-            throw error;
+          } catch {
+            // Preserve the closed export failure rather than leaking a secondary rollback error.
           }
-        } finally {
-          client.release();
         }
+        if (requestSignal?.aborted || isStatementTimeout(error)) {
+          throw new FamilyExportCancelledError();
+        }
+        throw error;
       } finally {
-        clearTimeout(deadline);
-        requestSignal?.removeEventListener('abort', abort);
+        if (!clientDestroyed) client.release();
       }
     },
   };

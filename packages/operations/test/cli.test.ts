@@ -1,10 +1,14 @@
 import { describe, expect, test, vi } from 'vitest';
 import { PassThrough, Readable } from 'node:stream';
 import { EventEmitter } from 'node:events';
-import { readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  createProductionOperatorDependencies as sourceCreateProductionOperatorDependencies,
+  parseOperatorConfig as sourceParseOperatorConfig,
   runDisposableRestore as sourceRunDisposableRestore,
   runExistingTargetRestore as sourceRunExistingTargetRestore,
   runOperatorCli as sourceRunOperatorCli,
@@ -316,6 +320,39 @@ type ComposeLifecycleRequest =
     project: string;
     service: 'postgres_restore' | 'operations_verifier';
   };
+
+test('preflights repository-contained storage before restore lifecycle or executor work', async () => {
+  const repositoryRoot = await mkdtemp(join(tmpdir(), 'baby-care-repository-'));
+  const nestedParent = join(repositoryRoot, 'private-backups');
+  await mkdir(nestedParent, { mode: 0o700 });
+  try {
+    for (const outputParent of [repositoryRoot, nestedParent]) {
+      const executor: ComposeExecutor = {
+        exec: vi.fn(async () => Buffer.alloc(0)),
+        lifecycle: vi.fn(async () => Buffer.alloc(0)),
+      };
+      const config = sourceParseOperatorConfig({
+        ...validEnv,
+        BABY_CARE_BACKUP_PARENT: outputParent,
+      });
+      const dependencies = sourceCreateProductionOperatorDependencies(config, {
+        repositoryRoot,
+        executor,
+      } as never);
+
+      await expect(dependencies.restore()).rejects.toMatchObject({
+        code: 'backup_unsafe_storage',
+      });
+      await expect(dependencies.restoreVerify()).rejects.toMatchObject({
+        code: 'backup_unsafe_storage',
+      });
+      expect(executor.exec).not.toHaveBeenCalled();
+      expect(executor.lifecycle).not.toHaveBeenCalled();
+    }
+  } finally {
+    await rm(repositoryRoot, { recursive: true, force: true });
+  }
+});
 
 type CreateComposePostgresRunners = (
   config: {

@@ -3,14 +3,21 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isAbsolute, parse } from 'node:path';
 
 import { createBackup, verifyBackup } from './backup.js';
-import { createComposePostgresRunners } from './compose-postgres.js';
+import {
+  createComposePostgresRunners,
+  type ComposeExecutor,
+} from './compose-postgres.js';
 import {
   createDisposableComposeLifecycle,
   createDockerComposeExecutor,
   createExistingRestoreLifecycle,
 } from './compose-executor.js';
 import { createPg16BackupTools, createPg16RestoreTools } from './postgres-tools.js';
-import { validateBackupBundleName } from './private-files.js';
+import {
+  assertOutsideRepositoryRoot,
+  assertSafePrivateParent,
+  validateBackupBundleName,
+} from './private-files.js';
 import { restoreBackup } from './restore.js';
 
 const OperatorConfigSchema = z
@@ -230,10 +237,10 @@ export async function runExistingTargetRestore(options: {
 
 export function createProductionOperatorDependencies(
   config: OperatorConfig,
-  options: { repositoryRoot?: string } = {},
+  options: { repositoryRoot?: string; executor?: ComposeExecutor } = {},
 ): OperatorDependencies {
   const repositoryRoot = options.repositoryRoot ?? fileURLToPath(new URL('../../..', import.meta.url));
-  const executor = createDockerComposeExecutor({ repositoryRoot });
+  const executor = options.executor ?? createDockerComposeExecutor({ repositoryRoot });
   const baseRunnerConfig = {
     sourceProject: config.BABY_CARE_COMPOSE_PROJECT,
     targetProject: config.BABY_CARE_RESTORE_PROJECT,
@@ -262,14 +269,26 @@ export function createProductionOperatorDependencies(
     `T${compactTimestamp.slice(9, 11)}:${compactTimestamp.slice(11, 13)}:${compactTimestamp.slice(13, 15)}.000Z`,
   );
 
+  const preflightStorage = async () => {
+    const canonicalParent = await assertSafePrivateParent(bundle.outputParent);
+    await assertOutsideRepositoryRoot(canonicalParent, bundle.repositoryRoot);
+  };
+
   return {
-    create: () => createBackup({
-      outputParent: bundle.outputParent,
-      createdAt,
-      repositoryRoot: bundle.repositoryRoot,
-    }, backupTools),
-    verify: () => verifyBackup(bundle, backupTools),
-    restore: () => {
+    create: async () => {
+      await preflightStorage();
+      return createBackup({
+        outputParent: bundle.outputParent,
+        createdAt,
+        repositoryRoot: bundle.repositoryRoot,
+      }, backupTools);
+    },
+    verify: async () => {
+      await preflightStorage();
+      return verifyBackup(bundle, backupTools);
+    },
+    restore: async () => {
+      await preflightStorage();
       const lifecycle = createExistingRestoreLifecycle(executor);
       return runExistingTargetRestore({
         assertTargetRunning: lifecycle.assertTargetRunning,
@@ -277,6 +296,7 @@ export function createProductionOperatorDependencies(
       });
     },
     restoreVerify: async () => {
+      await preflightStorage();
       const lifecycle = createDisposableComposeLifecycle(executor);
       const disposableRunners = createComposePostgresRunners({
         ...baseRunnerConfig,

@@ -6,6 +6,8 @@ import * as schema from './schema.js';
 
 const migrationsFolder = fileURLToPath(new URL('../../../migrations', import.meta.url));
 
+export const DATABASE_OPERATION_DEADLINE_MS = 30_000;
+
 export interface DatabaseContext {
   pool: pg.Pool;
   orm: ReturnType<typeof drizzle>;
@@ -15,7 +17,7 @@ export interface DatabaseContext {
 }
 
 export function createDatabase(databaseUrl: string): DatabaseContext {
-  const pool = new pg.Pool({ connectionString: databaseUrl });
+  const pool = new pg.Pool({ connectionString: databaseUrl, connectionTimeoutMillis: DATABASE_OPERATION_DEADLINE_MS });
   const orm = drizzle(pool, { schema });
 
   return {
