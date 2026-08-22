@@ -66,7 +66,8 @@ async function copyNativeBuildPackage(packageRoot: string): Promise<void> {
   }
 }
 
-function compileInstaller(sourcePath: string, outputPath: string): void {
+function compileInstaller(sourcePath: string, outputPath: string, testing = false): void {
+  const testingFlags = testing ? ['-DINSTALL_HELPER_TESTING=1'] : [];
   const result = spawnSync(
     '/usr/bin/cc',
     [
@@ -82,6 +83,7 @@ function compileInstaller(sourcePath: string, outputPath: string): void {
       '-Wshadow',
       '-Wstrict-prototypes',
       '-fstack-protector-strong',
+      ...testingFlags,
       sourcePath,
       '-o',
       outputPath,
@@ -271,6 +273,54 @@ describe('native helper build boundary', () => {
     expect(await readFile(join(outside, 'safe-bundle'), 'utf8')).toBe('outside-original');
     expect(await readdir(outside)).toEqual(['safe-bundle']);
     await expect(readFile(join(displaced, 'safe-bundle'))).resolves.not.toHaveLength(0);
+  });
+
+  test('installer closes inherited descriptors above its fixed protocol before installation', async () => {
+    const root = await privateRoot();
+    const native = join(root, '.native');
+    const installer = join(root, 'native-installer');
+    await mkdir(native, { mode: 0o700 });
+    compileInstaller(installerSourcePath, installer);
+    const directoryFd = openSync(native, constants.O_RDONLY);
+    const artifactFd = openSync(helperPath, constants.O_RDONLY);
+    try {
+      const result = spawnSync(installer, ['install-production'], {
+        env: {},
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe', directoryFd, artifactFd, directoryFd],
+      });
+      expect(result.status).toBe(0);
+      expect(result.stdout).toBe('native_installer_v1:installed\n');
+      expect(result.stderr).toBe('');
+    } finally {
+      closeSync(artifactFd);
+      closeSync(directoryFd);
+    }
+    await expect(readFile(join(native, 'safe-bundle'))).resolves.not.toHaveLength(0);
+  });
+
+  test('installer fails closed when inherited descriptor cleanup cannot be inspected', async () => {
+    const root = await privateRoot();
+    const native = join(root, '.native');
+    const installer = join(root, 'native-installer-testing');
+    await mkdir(native, { mode: 0o700 });
+    compileInstaller(installerSourcePath, installer, true);
+    const directoryFd = openSync(native, constants.O_RDONLY);
+    const artifactFd = openSync(helperPath, constants.O_RDONLY);
+    try {
+      const result = spawnSync(installer, ['install-production-descriptor-open-failure-test'], {
+        env: {},
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe', directoryFd, artifactFd],
+      });
+      expect(result.status).toBe(64);
+      expect(result.stdout).toBe('native_installer_v1:descriptor_cleanup_failed\n');
+      expect(result.stderr).toBe('');
+    } finally {
+      closeSync(artifactFd);
+      closeSync(directoryFd);
+    }
+    await expect(lstat(join(native, 'safe-bundle'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   test('installer randomizes its private temporary basename', async () => {

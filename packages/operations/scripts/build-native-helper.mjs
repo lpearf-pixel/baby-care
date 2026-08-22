@@ -174,6 +174,7 @@ function runInstaller(installerPath, operation, directoryHandle, artifactHandle)
   if (exact === '0:native_installer_v1:installed\n:') return;
   const fixedFailures = new Map([
     ['64:native_installer_v1:protocol_error\n:', 'protocol'],
+    ['64:native_installer_v1:descriptor_cleanup_failed\n:', 'descriptor_cleanup'],
     ['65:native_installer_v1:unsafe\n:', 'unsafe'],
     ['67:native_installer_v1:durability_failed\n:', 'durability'],
     ['70:native_installer_v1:operation_failed\n:', 'operation'],

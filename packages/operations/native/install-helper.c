@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +37,10 @@ enum install_result {
   RESULT_OPERATION
 };
 
+#if defined(INSTALL_HELPER_TESTING)
+static int inject_descriptor_open_failure = 0;
+#endif
+
 static int stable_result(const char *message, int status) {
   size_t remaining = strlen(message);
   const char *cursor = message;
@@ -56,26 +61,31 @@ static int stable_result(const char *message, int status) {
   return status;
 }
 
-static int unexpected_descriptor_present(void) {
+static int close_unexpected_descriptors(void) {
+#if defined(INSTALL_HELPER_TESTING)
+  if (inject_descriptor_open_failure != 0) {
+    return 0;
+  }
+#endif
 #if defined(__APPLE__)
   static const char descriptor_directory[] = "/dev/fd";
 #elif defined(__linux__)
   static const char descriptor_directory[] = "/proc/self/fd";
 #else
-  return 1;
+  return 0;
 #endif
   DIR *directory = opendir(descriptor_directory);
   if (directory == NULL) {
-    return 1;
+    return 0;
   }
   int scanner_fd = dirfd(directory);
-  int unexpected = 0;
+  int accepted = 1;
   errno = 0;
   for (;;) {
     struct dirent *entry = readdir(directory);
     if (entry == NULL) {
       if (errno != 0) {
-        unexpected = 1;
+        accepted = 0;
       }
       break;
     }
@@ -86,14 +96,17 @@ static int unexpected_descriptor_present(void) {
       continue;
     }
     if (descriptor > ARTIFACT_FD && descriptor != scanner_fd) {
-      unexpected = 1;
-      break;
+      if (descriptor > INT_MAX ||
+          (close((int)descriptor) != 0 && errno != EBADF)) {
+        accepted = 0;
+        break;
+      }
     }
   }
   if (closedir(directory) != 0) {
-    unexpected = 1;
+    accepted = 0;
   }
-  return unexpected;
+  return accepted;
 }
 
 static int private_build_directory(const struct stat *value) {
@@ -294,7 +307,17 @@ cleanup:
 }
 
 int main(int argc, char **argv) {
-  if (unexpected_descriptor_present() || argc != 2) {
+#if defined(INSTALL_HELPER_TESTING)
+  if (argc == 2 &&
+      strcmp(argv[1], "install-production-descriptor-open-failure-test") == 0) {
+    inject_descriptor_open_failure = 1;
+  }
+#endif
+  if (!close_unexpected_descriptors()) {
+    return stable_result("native_installer_v1:descriptor_cleanup_failed\n",
+                         STATUS_PROTOCOL);
+  }
+  if (argc != 2) {
     return stable_result("native_installer_v1:protocol_error\n", STATUS_PROTOCOL);
   }
   const char *target_name = NULL;
