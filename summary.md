@@ -79,16 +79,16 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   121.817 seconds, full lint/typecheck/build/help/privacy gates passed, and independent
   review found no Critical/Important findings. Real-family backup usability remains a
   human gate.
-- M4 Task 8 implementation: `7ff99d2` — a generated Dad/Mom/Nanny
+- M4 Task 8 implementation: `e97aa38` — a generated Dad/Mom/Nanny
   production simulation now covers the family-local-midnight care flow, both admin
   exports, stable Nanny denial, warning/revision/handoff/reminder behavior, private
   backup integrity, isolated PostgreSQL 16 restore, revoked old sessions, fresh Dad
   login and stable read-model digest/count/version comparison. All prior M1–M3 markers
   and the four fixed M4 markers passed locally exactly once; both owned disposable
-  volumes were removed. The stale prior contract count is superseded by the final-review
-  fix wave at `7ff99d2`; this separate documentation checkpoint records that exact
-  business-fix SHA. Exact-head CI and
-  supervised real-family acceptance remain pending.
+  volumes were removed. Final-review and residual blocker fixes are recorded through
+  `e97aa38`; scoped re-review is clean for underlying PostgreSQL cancellation settlement
+  and restore/restoreVerify pre-lifecycle storage preflight. Exact-head CI and supervised
+  real-family acceptance remain pending.
 
 Release-gate history:
 

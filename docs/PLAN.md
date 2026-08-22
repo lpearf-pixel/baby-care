@@ -118,10 +118,11 @@ build and independent review with no Critical/Important findings. Task 7 is comp
 subprocess cleanup and disposable isolated restore practice passed 130 focused tests,
 one real generated-data Compose flow, full lint/typecheck/build/privacy gates and an
 independent review with no Critical/Important findings.
-Task 8 final-review business fixes are implemented locally at `7ff99d2`; the stale
-prior static-contract count is superseded, and this separate documentation checkpoint
-records the exact business-fix SHA.
-compact diagnostics discard untrusted export/dump/manifest/path text, and the generated
+Task 8 final-review and residual pre-publish fixes are implemented locally at `e97aa38`.
+Scoped re-review is clean for underlying PostgreSQL cancellation settlement and
+restore/restoreVerify pre-lifecycle storage preflight; exact-head CI remains pending.
+The stale prior static-contract count remains superseded. Compact diagnostics discard
+untrusted export/dump/manifest/path text, and the generated
 production Compose flow preserved all M1–M3 markers before
 emitting each of the four fixed M4 markers exactly once. Dad/Mom export, Nanny denial,
 private backup verification, isolated restore, old-session rejection, fresh Dad login and
