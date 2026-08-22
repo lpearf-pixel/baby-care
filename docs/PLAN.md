@@ -118,8 +118,9 @@ build and independent review with no Critical/Important findings. Task 7 is comp
 subprocess cleanup and disposable isolated restore practice passed 130 focused tests,
 one real generated-data Compose flow, full lint/typecheck/build/privacy gates and an
 independent review with no Critical/Important findings.
-Task 8 is now implemented locally on the current Task 8 commit: its static contract went
-from 5/5 RED to initial 5/5 GREEN and is now 6/6 after an ownership self-review regression;
+Task 8 is implemented locally under `final_review_fix_pending_checkpoint`; the stale
+prior static-contract count is superseded by this final-review fix wave and will receive
+a separate exact-SHA documentation checkpoint after the business-fix commit.
 compact diagnostics discard untrusted export/dump/manifest/path text, and the generated
 production Compose flow preserved all M1–M3 markers before
 emitting each of the four fixed M4 markers exactly once. Dad/Mom export, Nanny denial,

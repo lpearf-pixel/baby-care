@@ -114,19 +114,6 @@ jobs:
           --health-interval 3s
           --health-timeout 3s
           --health-retries 20
-      postgres_restore:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: babycare_restore_test
-          POSTGRES_USER: babycare
-          POSTGRES_PASSWORD: babycare
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U babycare -d babycare_restore_test"
-          --health-interval 3s
-          --health-timeout 3s
-          --health-retries 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -144,7 +131,6 @@ jobs:
         shell: bash
         env:
           TEST_DATABASE_URL: postgres://babycare:babycare@127.0.0.1:5432/babycare_test
-          TEST_RESTORE_DATABASE_URL: postgres://babycare:babycare@127.0.0.1:5433/babycare_restore_test
           BABY_CARE_PG16_INTEGRATION: "1"
         run: |
           set -o pipefail

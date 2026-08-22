@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { chmod, mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { FamilyExportSchemaV1 } from '../packages/contracts/src/index.ts';
@@ -82,6 +82,22 @@ const COMPOSE_PREFIX = Object.freeze([
 const emittedMarkers = new Set();
 let currentStage = 'bootstrap';
 let lastFailureCode = 'unknown';
+
+async function safePrivateTempRoot() {
+  try {
+    const canonicalRepositoryRoot = await realpath(REPOSITORY_ROOT);
+    const canonicalTempRoot = await realpath(tmpdir());
+    const relation = relative(canonicalRepositoryRoot, canonicalTempRoot);
+    if (
+      relation === ''
+      || (relation !== '..' && !relation.startsWith('..' + sep) && !isAbsolute(relation))
+    ) throw new Error('unsafe temporary root');
+    return canonicalTempRoot;
+  } catch {
+    lastFailureCode = 'backup_unsafe_storage';
+    throw new Error('m4_temp_root_unsafe');
+  }
+}
 
 function emitMarker(marker) {
   if (!M4_MARKERS.includes(marker) || emittedMarkers.has(marker)) throw new Error('m4_marker_invalid');
@@ -777,7 +793,8 @@ async function main() {
       .every((eventType) => eventTypes.has(eventType))
   ) throw new Error('m4_care_coverage_invalid');
 
-  const privateTempRoot = await realpath(tmpdir());
+  currentStage = 'backup-create';
+  const privateTempRoot = await safePrivateTempRoot();
   const backupParent = await mkdtemp(join(privateTempRoot, 'baby-care-m4-'));
   await chmod(backupParent, 0o700);
   const bundleName = `baby-care-backup-${new Date().toISOString().slice(0, 19).replaceAll('-', '').replaceAll(':', '')}Z`;
@@ -795,7 +812,6 @@ async function main() {
   let operationError;
   let cleanupFailed = false;
   try {
-    currentStage = 'backup-create';
     await runExpected('pnpm', ['--silent', 'backup:create'], 'backup_created', { env: operatorEnv });
     currentStage = 'backup-verify';
     await runExpected('pnpm', ['--silent', 'backup:verify'], 'backup_verified', { env: operatorEnv });

@@ -2,7 +2,7 @@ import { constants } from 'node:fs';
 import type { Stats } from 'node:fs';
 import type { FileHandle } from 'node:fs/promises';
 import { lstat, open, realpath } from 'node:fs/promises';
-import { isAbsolute, join, parse, resolve, sep } from 'node:path';
+import { isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 
 import { BackupError } from './contracts.js';
 
@@ -69,6 +69,26 @@ export async function assertSafePrivateParent(path: string): Promise<string> {
     }
     if ((stat.mode & 0o777) !== 0o700) throw new BackupError('backup_unsafe_storage');
     return canonical;
+  } catch (error) {
+    if (error instanceof BackupError) throw error;
+    throw new BackupError('backup_unsafe_storage');
+  }
+}
+
+export async function assertOutsideRepositoryRoot(
+  canonicalParent: string,
+  repositoryRoot: string,
+): Promise<void> {
+  try {
+    if (!isAbsolute(repositoryRoot)) throw new BackupError('backup_unsafe_storage');
+    const canonicalRepositoryRoot = await realpath(repositoryRoot);
+    const relation = relative(canonicalRepositoryRoot, canonicalParent);
+    if (
+      relation === ''
+      || (relation !== '..' && !relation.startsWith('..' + sep) && !isAbsolute(relation))
+    ) {
+      throw new BackupError('backup_unsafe_storage');
+    }
   } catch (error) {
     if (error instanceof BackupError) throw error;
     throw new BackupError('backup_unsafe_storage');

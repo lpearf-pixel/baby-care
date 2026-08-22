@@ -24,6 +24,11 @@ export interface ComposeExecutor {
 
 export type ComposeLifecycleRequest =
   | { action: 'project-status'; project: string }
+  | {
+    action: 'project-object-status';
+    project: string;
+    objectType: 'container' | 'volume' | 'network';
+  }
   | { action: 'create-restore-target'; project: string }
   | { action: 'start-restored-probe'; project: string }
   | { action: 'remove-owned-project'; project: string }

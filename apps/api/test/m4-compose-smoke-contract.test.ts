@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const scriptUrl = new URL('../../../scripts/m4-birth-ready-operations.mjs', import.meta.url);
+const workflowUrl = new URL('../../../.github/workflows/ci.yml', import.meta.url);
 
 function source(): string {
   return readFileSync(scriptUrl, 'utf8');
@@ -31,6 +32,25 @@ function injectChildStderr(...stderrValues: string[]) {
     .replace(
       '  await main();',
       injectedCalls,
+    );
+  const result = spawnSync(process.execPath, ['--input-type=module', '-'], {
+    input: instrumented,
+    encoding: 'utf8',
+    timeout: 5_000,
+  });
+  if (result.error) throw result.error;
+  return result;
+}
+
+function injectRepositoryTmpdir() {
+  const instrumented = source()
+    .replace(
+      "import { FamilyExportSchemaV1 } from '../packages/contracts/src/index.ts';",
+      'const FamilyExportSchemaV1 = {};',
+    )
+    .replace(
+      '  await main();',
+      "  currentStage = 'backup-create'; process.env.TMPDIR = REPOSITORY_ROOT; await safePrivateTempRoot(); process.stdout.write('backup-create-reached');",
     );
   const result = spawnSync(process.execPath, ['--input-type=module', '-'], {
     input: instrumented,
@@ -140,6 +160,24 @@ describe('M4 birth-ready production Compose smoke contract', () => {
     for (const statement of outputStatements) {
       expect(statement).not.toMatch(forbidden);
     }
+  });
+
+  it('uses the self-provisioning operations integration as the only restore PG gate', () => {
+    const workflow = readFileSync(workflowUrl, 'utf8');
+
+    expect(workflow).not.toContain('TEST_RESTORE_DATABASE_URL');
+    expect(workflow).not.toMatch(/^\s{6}postgres_restore:/m);
+    expect(workflow).toContain('BABY_CARE_PG16_INTEGRATION: "1"');
+    expect(workflow).toContain('restore.integration.test.ts');
+  });
+
+  it('rejects a repository-contained TMPDIR before backup creation', () => {
+    const result = injectRepositoryTmpdir();
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('M4_SMOKE_FAILED stage=backup-create code=backup_unsafe_storage\n');
+    expect(result.stdout).not.toContain('backup-create-reached');
   });
 
   it('proves exclusive restore-project ownership before any cleanup is armed', () => {

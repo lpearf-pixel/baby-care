@@ -283,6 +283,7 @@ function trackedSnapshotDatabase(
             async query(statement: string, values?: unknown[]) {
               const normalized = statement.replace(/\s+/g, ' ').trim().toLowerCase();
               const transactionStatement = normalized === 'begin isolation level repeatable read read only'
+                || normalized === 'set local statement_timeout = 30000'
                 || normalized === 'commit'
                 || normalized === 'rollback';
               if (!transactionStatement) queryCount += 1;

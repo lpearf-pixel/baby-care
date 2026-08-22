@@ -16,6 +16,7 @@ import {
 import {
   assertOpenFileIdentity,
   assertOpenDirectoryIdentity,
+  assertOutsideRepositoryRoot,
   assertPrivateDirectory,
   assertPrivateRegularFile,
   assertSafePrivateParent,
@@ -216,6 +217,9 @@ async function openVerifiedDump(
   snapshotHandle: FileHandle;
 }> {
   const parent = await assertSafePrivateParent(config.outputParent);
+  if (config.repositoryRoot) {
+    await assertOutsideRepositoryRoot(parent, config.repositoryRoot);
+  }
   const bundleName = validateBackupBundleName(config.bundleName);
   const bundle = join(parent, bundleName);
   const paths = privateBundlePaths(bundle);

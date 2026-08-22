@@ -303,6 +303,11 @@ interface ComposeExecutor {
 
 type ComposeLifecycleRequest =
   | { action: 'project-status'; project: string }
+  | {
+    action: 'project-object-status';
+    project: string;
+    objectType: 'container' | 'volume' | 'network';
+  }
   | { action: 'create-restore-target'; project: string }
   | { action: 'start-restored-probe'; project: string }
   | { action: 'remove-owned-project'; project: string }
@@ -496,6 +501,39 @@ describe('bounded Docker Compose child execution', () => {
     expect(JSON.stringify(spawned)).not.toMatch(/secret|select fixed/);
   });
 
+  test.each([
+    ['container', ['ps', '--all', '--quiet']],
+    ['volume', ['volume', 'ls', '--quiet']],
+    ['network', ['network', 'ls', '--quiet']],
+  ] as const)('queries project-labelled %s objects without Compose scoping', async (objectType, prefix) => {
+    const { child, events } = fakeChild();
+    const spawned: Array<{ command: string; args: readonly string[] }> = [];
+    const executor = createDockerComposeExecutor!({
+      repositoryRoot: '/fixture/repository',
+      spawnProcess: (command, args) => {
+        spawned.push({ command, args });
+        queueMicrotask(() => {
+          child.stdout.end('object-id');
+          child.stderr.end();
+          events.emit('close', 0, null);
+        });
+        return child;
+      },
+    });
+    const project = 'baby-care-restore-0123456789abcdef01234567';
+
+    await expect(executor.lifecycle({
+      action: 'project-object-status',
+      project,
+      objectType,
+    }, new AbortController().signal)).resolves.toEqual(Buffer.from('object-id'));
+
+    expect(spawned).toEqual([{
+      command: 'docker',
+      args: [...prefix, '--filter', 'label=com.docker.compose.project=' + project],
+    }]);
+  });
+
   test('aborts then waits for child close before returning a closed failure', async () => {
     expect(createDockerComposeExecutor).toBeTypeOf('function');
     const { child, events } = fakeChild();
@@ -663,7 +701,9 @@ describe('owned disposable Compose identity', () => {
       teardown: lifecycle.teardown,
     })).rejects.toThrow('partial create');
     expect(calls).toEqual([
-      { action: 'project-status', project: lifecycle.project },
+      { action: 'project-object-status', project: lifecycle.project, objectType: 'container' },
+      { action: 'project-object-status', project: lifecycle.project, objectType: 'volume' },
+      { action: 'project-object-status', project: lifecycle.project, objectType: 'network' },
       { action: 'create-restore-target', project: lifecycle.project },
       { action: 'remove-owned-project', project: lifecycle.project },
     ]);
@@ -671,30 +711,41 @@ describe('owned disposable Compose identity', () => {
     expect(calls.some((call) => call.project === 'baby-care-restore')).toBe(false);
   });
 
-  test('does not tear down a pre-existing random project identity', async () => {
-    expect(createDisposableComposeLifecycle).toBeTypeOf('function');
-    const calls: ComposeLifecycleRequest[] = [];
-    const executor: ComposeExecutor = {
-      exec: async () => Buffer.alloc(0),
-      lifecycle: async (request) => {
-        calls.push(request);
-        if (request.action === 'project-status') return Buffer.from('preexisting-container-id\n');
-        return Buffer.alloc(0);
-      },
-    };
-    const lifecycle = createDisposableComposeLifecycle!(executor, () => 'abcdefabcdefabcdefabcdef');
-    await expect(runDisposableRestore!({
-      createTarget: lifecycle.createTarget,
-      waitForTarget: async () => undefined,
-      restore: async () => ({ code: 'restore_verified', revokedSessionCount: 0 }),
-      startProbe: async () => undefined,
-      executeProbe: async () => ({ summaryExecutable: true, timelineExecutable: true }),
-      teardown: lifecycle.teardown,
-    })).rejects.toMatchObject({ code: 'restore_target_not_empty' });
-    expect(calls).toEqual([
-      { action: 'project-status', project: lifecycle.project },
-    ]);
-  });
+  test.each(['container', 'volume', 'network'] as const)(
+    'does not arm teardown when a project-labelled %s pre-exists',
+    async (objectType) => {
+      expect(createDisposableComposeLifecycle).toBeTypeOf('function');
+      const calls: ComposeLifecycleRequest[] = [];
+      const executor: ComposeExecutor = {
+        exec: async () => Buffer.alloc(0),
+        lifecycle: async (request) => {
+          calls.push(request);
+          if (request.action === 'project-object-status' && request.objectType === objectType) {
+            return Buffer.from('preexisting-object-id\n');
+          }
+          return Buffer.alloc(0);
+        },
+      };
+      const lifecycle = createDisposableComposeLifecycle!(executor, () => 'abcdefabcdefabcdefabcdef');
+      await expect(runDisposableRestore!({
+        createTarget: lifecycle.createTarget,
+        waitForTarget: async () => undefined,
+        restore: async () => ({ code: 'restore_verified', revokedSessionCount: 0 }),
+        startProbe: async () => undefined,
+        executeProbe: async () => ({ summaryExecutable: true, timelineExecutable: true }),
+        teardown: lifecycle.teardown,
+      })).rejects.toMatchObject({ code: 'restore_target_not_empty' });
+      const objectTypes = ['container', 'volume', 'network'] as const;
+      expect(calls).toEqual(objectTypes
+        .slice(0, objectTypes.indexOf(objectType) + 1)
+        .map((type) => ({
+          action: 'project-object-status',
+          project: lifecycle.project,
+          objectType: type,
+        })));
+      expect(calls.map((call) => call.action)).not.toContain('remove-owned-project');
+    },
+  );
 });
 
 test('restore overlay is profile-isolated and never starts a migrating API process', async () => {

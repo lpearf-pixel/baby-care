@@ -251,6 +251,7 @@ export function createProductionOperatorDependencies(
   const bundle = {
     outputParent: config.BABY_CARE_BACKUP_PARENT,
     bundleName: config.BABY_CARE_BACKUP_BUNDLE,
+    repositoryRoot,
   };
   const compactTimestamp = config.BABY_CARE_BACKUP_BUNDLE.slice(
     'baby-care-backup-'.length,
@@ -262,7 +263,11 @@ export function createProductionOperatorDependencies(
   );
 
   return {
-    create: () => createBackup({ outputParent: bundle.outputParent, createdAt }, backupTools),
+    create: () => createBackup({
+      outputParent: bundle.outputParent,
+      createdAt,
+      repositoryRoot: bundle.repositoryRoot,
+    }, backupTools),
     verify: () => verifyBackup(bundle, backupTools),
     restore: () => {
       const lifecycle = createExistingRestoreLifecycle(executor);

@@ -7,6 +7,8 @@ import { readSessionCookie } from '../auth/session-auth.js';
 import { writeAudit } from '../audit/audit-repository.js';
 import type { DatabaseContext } from '../db.js';
 import {
+  FAMILY_EXPORT_DEADLINE_MS,
+  FamilyExportCancelledError,
   FamilyExportTooLargeError,
   type FamilyExportService,
 } from '../family/family-export-service.js';
@@ -59,18 +61,41 @@ async function requireExportAuth(
   return authenticated.context;
 }
 
+async function waitForRouteOperation<T>(
+  operation: () => Promise<T>,
+  signal: AbortSignal,
+): Promise<T> {
+  if (signal.aborted) throw new FamilyExportCancelledError();
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(new FamilyExportCancelledError());
+    signal.addEventListener('abort', abort, { once: true });
+    Promise.resolve()
+      .then(operation)
+      .then(resolve, reject)
+      .finally(() => signal.removeEventListener('abort', abort));
+  });
+}
+
 async function recordExportAudit(
   database: DatabaseContext,
   context: AuthContext,
   traceId: string,
   occurredAt: Date,
+  signal: AbortSignal,
 ): Promise<void> {
-  const client = await database.pool.connect();
+  const client = await waitForRouteOperation(() => database.pool.connect(), signal);
   let transactionStarted = false;
   try {
-    await client.query('begin');
+    await waitForRouteOperation(
+      () => client.query('begin').then(() => undefined),
+      signal,
+    );
     transactionStarted = true;
-    await writeAudit(client, {
+    await waitForRouteOperation(
+      () => client.query('set local statement_timeout = 30000').then(() => undefined),
+      signal,
+    );
+    await waitForRouteOperation(() => writeAudit(client, {
       familyId: context.familyId,
       actorUserId: context.userId,
       actorMembershipId: context.membershipId,
@@ -81,8 +106,11 @@ async function recordExportAudit(
       traceId,
       metadata: null,
       occurredAt,
-    });
-    await client.query('commit');
+    }), signal);
+    await waitForRouteOperation(
+      () => client.query('commit').then(() => undefined),
+      signal,
+    );
   } catch (error) {
     if (transactionStarted) {
       try {
@@ -106,22 +134,41 @@ export function registerFamilyExportRoute(
   dependencies: FamilyExportRouteDependencies,
 ): void {
   app.post('/api/family/export', async (request, reply) => {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    const deadline = setTimeout(abort, FAMILY_EXPORT_DEADLINE_MS);
+    deadline.unref();
+    request.raw.once('aborted', abort);
+    request.raw.socket.once('close', abort);
     try {
       const context = await requireExportAuth(request, reply, dependencies);
       if (!context) return;
       await dependencies.coordinator.run(context.userId, async () => {
         const generatedAt = dependencies.now();
-        const result = await dependencies.exportService.exportFamily(context, generatedAt);
+        const result = await dependencies.exportService.exportFamily(
+          context,
+          generatedAt,
+          controller.signal,
+        );
+        if (controller.signal.aborted) throw new FamilyExportCancelledError();
         if (!Buffer.isBuffer(result.serialized)) throw new Error('invalid export buffer');
-        await recordExportAudit(dependencies.database, context, request.id, generatedAt);
+        await recordExportAudit(
+          dependencies.database,
+          context,
+          request.id,
+          generatedAt,
+          controller.signal,
+        );
+        if (controller.signal.aborted) throw new FamilyExportCancelledError();
         reply
           .type('application/json')
           .header('cache-control', 'no-store')
           .header('x-content-type-options', 'nosniff')
-          .header('content-disposition', `attachment; filename="${filename(generatedAt)}"`)
+          .header('content-disposition', 'attachment; filename="' + filename(generatedAt) + '"')
           .send(result.serialized);
       });
     } catch (error) {
+      if (error instanceof FamilyExportCancelledError || controller.signal.aborted) return;
       if (error instanceof ExportInProgressError) {
         return sendError(reply, 409, 'export_in_progress', 'An export is already in progress.', request.id);
       }
@@ -129,6 +176,10 @@ export function registerFamilyExportRoute(
         return sendError(reply, 413, 'export_too_large', 'The family export is too large.', request.id);
       }
       return sendError(reply, 500, 'export_failed', 'The family export could not be completed.', request.id);
+    } finally {
+      clearTimeout(deadline);
+      request.raw.removeListener('aborted', abort);
+      request.raw.socket.removeListener('close', abort);
     }
   });
 }

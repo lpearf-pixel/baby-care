@@ -16,6 +16,7 @@ import type {
   FamilyExportRows,
 } from '../src/family/family-export-repository.js';
 import { createFamilyExportRepository } from '../src/family/family-export-repository.js';
+import { StableExportCoordinator } from '../src/family/export-coordinator.js';
 
 const ids = {
   family: '11111111-1111-4111-8111-111111111111',
@@ -174,6 +175,7 @@ describe('family export snapshot service', () => {
     expect(fixture.poolQuery).not.toHaveBeenCalled();
     expect(fixture.statements).toEqual([
       'begin isolation level repeatable read read only',
+      'set local statement_timeout = 30000',
       'commit',
     ]);
     expect(fixture.client.release).toHaveBeenCalledOnce();
@@ -193,9 +195,44 @@ describe('family export snapshot service', () => {
 
     expect(fixture.statements).toEqual([
       'begin isolation level repeatable read read only',
+      'set local statement_timeout = 30000',
       'rollback',
     ]);
     expect(fixture.client.release).toHaveBeenCalledOnce();
+  });
+
+  it('settles rollback and release after the fixed deadline before the actor can retry', async () => {
+    vi.useFakeTimers();
+    try {
+      const fixture = recordingDatabase();
+      const repository: FamilyExportRepository = {
+        readFamilyExport: vi.fn()
+          .mockImplementationOnce(() => new Promise<FamilyExportRows>(() => undefined))
+          .mockResolvedValueOnce(validRows()),
+      };
+      const service = createFamilyExportService(fixture.database, repository, 1_000_000);
+      const coordinator = new StableExportCoordinator();
+      const operation = coordinator.run(actor.userId, () => (
+        service.exportFamily(actor, new Date(generatedAt), new AbortController().signal)
+      ));
+      const outcome = operation.catch((error: unknown) => error);
+
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(fixture.statements).toEqual([
+        'begin isolation level repeatable read read only',
+        'set local statement_timeout = 30000',
+        'rollback',
+      ]);
+      expect(fixture.client.release).toHaveBeenCalledOnce();
+      expect(await outcome).toMatchObject({ code: 'export_cancelled' });
+      await expect(coordinator.run(actor.userId, () => (
+        service.exportFamily(actor, new Date(generatedAt), new AbortController().signal)
+      ))).resolves.toMatchObject({ serialized: expect.any(Buffer) });
+      expect(fixture.client.release).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rolls back strict schema failures and releases the client once', async () => {
@@ -208,6 +245,7 @@ describe('family export snapshot service', () => {
 
     expect(fixture.statements).toEqual([
       'begin isolation level repeatable read read only',
+      'set local statement_timeout = 30000',
       'rollback',
     ]);
     expect(fixture.client.release).toHaveBeenCalledOnce();
@@ -227,6 +265,7 @@ describe('family export snapshot service', () => {
 
     expect(fixture.statements).toEqual([
       'begin isolation level repeatable read read only',
+      'set local statement_timeout = 30000',
       'rollback',
     ]);
     expect(fixture.client.release).toHaveBeenCalledOnce();
@@ -250,6 +289,7 @@ describe('family export snapshot service', () => {
       .exportFamily(actor, new Date(generatedAt))).rejects.toBeInstanceOf(FamilyExportTooLargeError);
     expect(overflowFixture.statements).toEqual([
       'begin isolation level repeatable read read only',
+      'set local statement_timeout = 30000',
       'rollback',
     ]);
     expect(overflowFixture.client.release).toHaveBeenCalledOnce();

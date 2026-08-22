@@ -131,7 +131,11 @@ describe('family export route', () => {
       payload: { familyId: 'foreign', babyId: 'foreign' },
     });
     expect(response.statusCode).toBe(200);
-    expect(exportFamily).toHaveBeenCalledWith(context, expect.any(Date));
+    expect(exportFamily).toHaveBeenCalledWith(
+      context,
+      expect.any(Date),
+      expect.any(AbortSignal),
+    );
     await app.close();
   });
 
@@ -256,11 +260,13 @@ describe('family export route', () => {
     if (failure === 'begin') expect(statements).toEqual(['begin']);
     else if (failure === 'write') expect(statements).toEqual([
       'begin',
+      'set local statement_timeout = 30000',
       'insert into audit_events ( family_id, actor_user_id, actor_membership_id, action, target_type, target_id, source, trace_id, metadata_json, occurred_at ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
       'rollback',
     ]);
     else expect(statements).toEqual([
       'begin',
+      'set local statement_timeout = 30000',
       'insert into audit_events ( family_id, actor_user_id, actor_membership_id, action, target_type, target_id, source, trace_id, metadata_json, occurred_at ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
       'commit',
       'rollback',
@@ -268,6 +274,119 @@ describe('family export route', () => {
     await app.close();
   });
 });
+
+  it('settles an audit deadline without a committed audit or response body before retry', async () => {
+    vi.useFakeTimers();
+    try {
+      const app = Fastify({ logger: false });
+      const statements: string[] = [];
+      let auditWriteAttempt = 0;
+      const client = {
+        query: vi.fn(async (statement: string) => {
+          const normalized = statement.replace(/\s+/g, ' ').trim().toLowerCase();
+          statements.push(normalized);
+          if (normalized.startsWith('insert into audit_events')) {
+            auditWriteAttempt += 1;
+            if (auditWriteAttempt === 1) return new Promise(() => undefined);
+          }
+          return { rows: [] };
+        }),
+        release: vi.fn(),
+      };
+      const connect = vi.fn(async () => client);
+      registerFamilyExportRoute(app, {
+        authService: fakeAuth(),
+        appOrigin: origin,
+        exportService: {
+          exportFamily: vi.fn(async () => ({ document: {}, serialized: Buffer.from('{}') })),
+        } as unknown as FamilyExportService,
+        coordinator: new StableExportCoordinator(),
+        database: { pool: { connect } } as never,
+        now: () => new Date('2026-08-17T12:00:00.000Z'),
+      });
+
+      const timedOut = app.inject({
+        method: 'POST',
+        url: '/api/family/export',
+        headers: { origin, cookie: 'baby_care_session=valid' },
+      });
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(client.release).toHaveBeenCalledOnce();
+      expect(statements.slice(-1)).toEqual(['rollback']);
+      expect(statements).not.toContain('commit');
+      expect((await timedOut).body).toBe('');
+
+      const retry = await app.inject({
+        method: 'POST',
+        url: '/api/family/export',
+        headers: { origin, cookie: 'baby_care_session=valid' },
+      });
+      expect(retry.statusCode).toBe(200);
+      expect(client.release).toHaveBeenCalledTimes(2);
+      await app.close();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('settles disconnect cancellation before releasing the actor slot for retry', async () => {
+    const app = Fastify({ logger: false });
+    let requestRaw: { emit(event: string): boolean } | undefined;
+    let attempt = 0;
+    const events: string[] = [];
+    const client = { query: vi.fn(async () => ({ rows: [] })), release: vi.fn() };
+    const connect = vi.fn(async () => client);
+    app.addHook('onRequest', (request, _reply, done) => {
+      requestRaw = request.raw;
+      done();
+    });
+    registerFamilyExportRoute(app, {
+      authService: fakeAuth(),
+      appOrigin: origin,
+      exportService: {
+        exportFamily: vi.fn(async (_actor, _generatedAt, signal: AbortSignal) => {
+          attempt += 1;
+          if (attempt > 1) {
+            events.push('retry');
+            return { document: {}, serialized: Buffer.from('{}') };
+          }
+          expect(signal).toBeInstanceOf(AbortSignal);
+          return new Promise((resolve, reject) => {
+            signal.addEventListener('abort', () => {
+              events.push('cancel');
+              queueMicrotask(() => {
+                events.push('settled');
+                reject(Object.assign(new Error('cancelled'), { code: 'export_cancelled' }));
+              });
+            }, { once: true });
+            requestRaw?.emit('aborted');
+            void resolve;
+          });
+        }),
+      } as unknown as FamilyExportService,
+      coordinator: new StableExportCoordinator(),
+      database: { pool: { connect } } as never,
+      now: () => new Date('2026-08-17T12:00:00.000Z'),
+    });
+
+    const disconnected = await app.inject({
+      method: 'POST',
+      url: '/api/family/export',
+      headers: { origin, cookie: 'baby_care_session=valid' },
+    });
+    expect(disconnected.body).toBe('');
+    expect(connect).not.toHaveBeenCalled();
+
+    const retry = await app.inject({
+      method: 'POST',
+      url: '/api/family/export',
+      headers: { origin, cookie: 'baby_care_session=valid' },
+    });
+    expect(retry.statusCode).toBe(200);
+    expect(events).toEqual(['cancel', 'settled', 'retry']);
+    expect(connect).toHaveBeenCalledOnce();
+    await app.close();
+  });
 
 describe('stable export coordinator', () => {
   it('rejects a second operation for one actor and releases after every outcome', async () => {

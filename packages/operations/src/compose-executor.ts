@@ -62,6 +62,8 @@ function composePrefix(project: string): string[] {
 function lifecycleArgs(request: ComposeLifecycleRequest): readonly string[] {
   if (!/^baby-care-restore(?:-[a-f0-9]{24})?$/.test(request.project)) throw closed();
   switch (request.action) {
+    case 'project-object-status':
+      throw closed();
     case 'project-status':
       return ['ps', '--all', '--quiet'];
     case 'create-restore-target':
@@ -73,6 +75,22 @@ function lifecycleArgs(request: ComposeLifecycleRequest): readonly string[] {
     case 'running-service':
       return ['ps', '--status', 'running', '--quiet', request.service];
   }
+}
+
+function projectObjectArgs(
+  request: Extract<ComposeLifecycleRequest, { action: 'project-object-status' }>,
+): readonly string[] {
+  if (!/^baby-care-restore(?:-[a-f0-9]{24})?$/.test(request.project)) throw closed();
+  const prefix = request.objectType === 'container'
+    ? ['ps', '--all', '--quiet']
+    : request.objectType === 'volume'
+      ? ['volume', 'ls', '--quiet']
+      : ['network', 'ls', '--quiet'];
+  return [
+    ...prefix,
+    '--filter',
+    'label=com.docker.compose.project=' + request.project,
+  ];
 }
 
 function closed(): BackupError {
@@ -247,10 +265,10 @@ export function createDockerComposeExecutor(options: {
       ], signal, request.input, request.output);
     },
     lifecycle(request, signal): Promise<Buffer> {
-      return execute([
-        ...composePrefix(request.project),
-        ...lifecycleArgs(request),
-      ], signal);
+      const args = request.action === 'project-object-status'
+        ? projectObjectArgs(request)
+        : [...composePrefix(request.project), ...lifecycleArgs(request)];
+      return execute(args, signal);
     },
   };
 }
@@ -275,8 +293,16 @@ export function createDisposableComposeLifecycle(
     project,
     async createTarget() {
       const signal = new AbortController().signal;
-      const existing = await executor.lifecycle({ action: 'project-status', project }, signal);
-      if (existing.toString('utf8').trim()) throw new BackupError('restore_target_not_empty');
+      for (const objectType of ['container', 'volume', 'network'] as const) {
+        const existing = await executor.lifecycle({
+          action: 'project-object-status',
+          project,
+          objectType,
+        }, signal);
+        if (existing.toString('utf8').trim()) {
+          throw new BackupError('restore_target_not_empty');
+        }
+      }
       owned = true;
       await executor.lifecycle({ action: 'create-restore-target', project }, signal);
     },

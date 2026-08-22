@@ -159,6 +159,52 @@ describe('createBackup', () => {
     expect((await readdir(root)).sort()).toEqual([bundleName]);
   });
 
+  test('does not publish a bundle when migrations change during pg_dump', async () => {
+    const root = await privateRoot();
+    const migrationHistory = vi
+      .fn<PostgresBackupTools['migrationHistory']>()
+      .mockResolvedValueOnce(migrations)
+      .mockResolvedValueOnce([
+        ...migrations,
+        { id: 3, hash: 'c'.repeat(64), createdAt: 1_692_147_600_000 },
+      ]);
+
+    await expect(
+      createBackup({ outputParent: root, createdAt }, fakeTools({ migrationHistory })),
+    ).rejects.toThrowError('backup_cleanup_required');
+
+    expect(migrationHistory).toHaveBeenCalledTimes(2);
+    await expectRetainedNonFinalState(root);
+  });
+
+  test('rejects repository-root and nested private parents before database work', async () => {
+    const repositoryRoot = await privateRoot();
+    const nestedParent = join(repositoryRoot, 'private-backups');
+    await mkdir(nestedParent, { mode: 0o700 });
+    const toolMajor = vi.fn(async () => 16);
+    const sourceMajor = vi.fn(async () => 16);
+    const migrationHistory = vi.fn(async () => migrations);
+    const dump = vi.fn(async (destination: Writable) => {
+      destination.end(dumpBytes);
+    });
+    const listDump = vi.fn(async () => COMPLETE_CATALOGUE_FACTS);
+    const tools = fakeTools({ toolMajor, sourceMajor, migrationHistory, dump, listDump });
+
+    for (const outputParent of [repositoryRoot, nestedParent]) {
+      await expect(createBackup({
+        outputParent,
+        createdAt,
+        repositoryRoot,
+      }, tools)).rejects.toThrowError('backup_unsafe_storage');
+    }
+
+    expect(toolMajor).not.toHaveBeenCalled();
+    expect(sourceMajor).not.toHaveBeenCalled();
+    expect(migrationHistory).not.toHaveBeenCalled();
+    expect(dump).not.toHaveBeenCalled();
+    expect(listDump).not.toHaveBeenCalled();
+  });
+
   test('refuses a pre-existing final bundle without modifying it', async () => {
     const root = await privateRoot();
     const bundle = join(root, bundleName);

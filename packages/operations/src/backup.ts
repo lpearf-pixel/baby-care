@@ -17,6 +17,7 @@ import {
 import {
   assertOpenFileIdentity,
   assertOpenDirectoryIdentity,
+  assertOutsideRepositoryRoot,
   assertPrivateDirectory,
   assertPrivateRegularFile,
   assertSafePrivateParent,
@@ -40,11 +41,13 @@ const MAX_MANIFEST_BYTES = 65_536;
 export interface BackupCreateConfig {
   outputParent: string;
   createdAt: Date;
+  repositoryRoot?: string;
 }
 
 export interface BackupVerifyConfig {
   outputParent: string;
   bundleName: string;
+  repositoryRoot?: string;
 }
 
 export type BackupCreateStage =
@@ -236,6 +239,9 @@ export async function createBackup(
   let temporaryHandle: FileHandle | undefined;
   try {
     parent = await assertSafePrivateParent(config.outputParent);
+    if (config.repositoryRoot) {
+      await assertOutsideRepositoryRoot(parent, config.repositoryRoot);
+    }
     parentHandle = await openPrivateDirectory(parent);
     const name = formatBackupBundleName(config.createdAt);
     finalBundle = join(parent, name);
@@ -245,9 +251,7 @@ export async function createBackup(
     if (toolMajor !== POSTGRES_MAJOR_VERSION || sourceMajor !== POSTGRES_MAJOR_VERSION) {
       throw new BackupError('backup_postgres_incompatible');
     }
-    const migrationFingerprint = canonicalMigrationFingerprint(
-      await postgresTools.migrationHistory(),
-    );
+    let migrationFingerprint: string | undefined;
 
     await stage(options, 'before_temp_create');
     await assertOpenDirectoryIdentity(parentHandle, parent);
@@ -262,7 +266,16 @@ export async function createBackup(
     const destination = new HashingFileWritable(dumpHandle);
     try {
       try {
+        migrationFingerprint = canonicalMigrationFingerprint(
+          await postgresTools.migrationHistory(),
+        );
         await postgresTools.dump(destination);
+        const postDumpMigrationFingerprint = canonicalMigrationFingerprint(
+          await postgresTools.migrationHistory(),
+        );
+        if (postDumpMigrationFingerprint !== migrationFingerprint) {
+          throw new BackupError('backup_migration_invalid');
+        }
       } catch (error) {
         destination.destroy();
         throw closed(error, 'backup_dump_failed');
@@ -279,6 +292,7 @@ export async function createBackup(
       await dumpHandle.close().catch(() => undefined);
     }
 
+    if (!migrationFingerprint) throw new BackupError('backup_migration_invalid');
     const manifest: BackupManifestV1 = BackupManifestV1Schema.parse({
       schemaVersion: BACKUP_SCHEMA_VERSION,
       createdAt: config.createdAt.toISOString(),
@@ -347,6 +361,9 @@ export async function verifyBackup(
 ): Promise<{ code: 'backup_verified' }> {
   try {
     const parent = await assertSafePrivateParent(config.outputParent);
+    if (config.repositoryRoot) {
+      await assertOutsideRepositoryRoot(parent, config.repositoryRoot);
+    }
     const name = validateBackupBundleName(config.bundleName);
     await verifyBundleDirectory(join(parent, name), postgresTools);
     return { code: 'backup_verified' };
