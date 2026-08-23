@@ -33,6 +33,8 @@ import { registerFamilyRoutes } from './routes/family.js';
 import { registerFamilyExportRoute } from './routes/family-export.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerSetupRoutes } from './routes/setup.js';
+import { registerVoiceCareBrowserRoutes } from './routes/voice-care-browser.js';
+import { createVoiceCareDeviceService } from './voice-care/device-service.js';
 
 export interface AppDependencies {
   checkDatabase: () => Promise<boolean>;
@@ -123,6 +125,10 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
       careAuth,
       revisionService: createRevisionService(dependencies.database, now),
       revisionQueryService: createRevisionQueryService(dependencies.database),
+    });
+    registerVoiceCareBrowserRoutes(app, {
+      careAuth,
+      deviceService: createVoiceCareDeviceService(dependencies.database, now),
     });
   }
 
