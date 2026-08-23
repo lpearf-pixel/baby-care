@@ -11,6 +11,7 @@ export const SleepIntervalDtoSchema = z.object({
   startedAt: z.string().datetime({ offset: true }),
   endedAt: z.string().datetime({ offset: true }).nullable(),
   note: z.string().nullable(),
+  version: z.number().int().positive(),
 }).strict();
 
 export type StartSleepInput = z.infer<typeof StartSleepInputSchema>;

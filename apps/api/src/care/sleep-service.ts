@@ -3,12 +3,18 @@ import { validateOccurredAt } from '@baby-care/domain';
 import type { DatabaseContext } from '../db.js';
 import type { CareActorContext } from './care-auth.js';
 import { CareConfirmationRequiredError, CareStateConflictError, CareValidationError } from './care-errors.js';
-import { appendCareRevision, createCareEvent, findByClientRequestId } from './care-event-repository.js';
+import {
+  appendCareRevision,
+  createCareEvent,
+  findByClientRequestId,
+  loadCareEventForUpdate,
+} from './care-event-repository.js';
 
 interface SleepRow {
   id: string;
   occurred_at: Date;
   status: 'active' | 'voided';
+  version: number;
   note: string | null;
   started_at: Date;
   ended_at: Date | null;
@@ -22,12 +28,13 @@ function toDto(row: SleepRow): SleepIntervalDto {
     startedAt: row.started_at.toISOString(),
     endedAt: row.ended_at ? row.ended_at.toISOString() : null,
     note: row.note,
+    version: row.version,
   };
 }
 
 async function loadSleep(database: DatabaseContext, actor: CareActorContext, eventId: string): Promise<SleepIntervalDto | null> {
   const result = await database.pool.query<SleepRow>(
-    `select ce.id, ce.occurred_at, ce.status, ce.note, si.started_at, si.ended_at
+    `select ce.id, ce.occurred_at, ce.status, ce.version, ce.note, si.started_at, si.ended_at
        from care_events ce
        join sleep_intervals si on si.event_id = ce.id
       where ce.id = $1 and ce.family_id = $2 and ce.baby_id = $3
@@ -39,7 +46,7 @@ async function loadSleep(database: DatabaseContext, actor: CareActorContext, eve
 
 async function openSleeps(database: DatabaseContext, actor: CareActorContext): Promise<SleepRow[]> {
   const result = await database.pool.query<SleepRow>(
-    `select ce.id, ce.occurred_at, ce.status, ce.note, si.started_at, si.ended_at
+    `select ce.id, ce.occurred_at, ce.status, ce.version, ce.note, si.started_at, si.ended_at
        from care_events ce
        join sleep_intervals si on si.event_id = ce.id
       where ce.family_id = $1 and ce.baby_id = $2 and ce.status = 'active'
@@ -127,7 +134,7 @@ export function createSleepService(database: DatabaseContext, now: () => Date = 
       const current = open[0];
       if (!current) {
         const repeated = await database.pool.query<SleepRow>(
-          `select ce.id, ce.occurred_at, ce.status, ce.note, si.started_at, si.ended_at
+          `select ce.id, ce.occurred_at, ce.status, ce.version, ce.note, si.started_at, si.ended_at
              from care_events ce
              join sleep_intervals si on si.event_id = ce.id
             where ce.family_id = $1 and ce.baby_id = $2 and ce.status = 'active'
@@ -138,41 +145,84 @@ export function createSleepService(database: DatabaseContext, now: () => Date = 
         if (repeated.rows[0]) return toDto(repeated.rows[0]);
         throw new CareStateConflictError('There is no open sleep interval to wake.');
       }
-      if (occurredAt.getTime() < current.started_at.getTime()) {
-        throw new CareStateConflictError('Wake time cannot be earlier than sleep start.');
-      }
-
       const client = await database.pool.connect();
       try {
         await client.query('begin');
-        const before = { startedAt: current.started_at.toISOString(), endedAt: null };
+        const lockedEvent = await loadCareEventForUpdate(client, actor, current.id);
+        if (!lockedEvent || lockedEvent.status !== 'active' || lockedEvent.eventType !== 'sleep') {
+          throw new CareStateConflictError('The sleep interval changed before wake was saved.');
+        }
+        const interval = await client.query<{ started_at: Date; ended_at: Date | null }>(
+          `select started_at, ended_at from sleep_intervals where event_id = $1 for update`,
+          [lockedEvent.id],
+        );
+        const lockedInterval = interval.rows[0];
+        if (!lockedInterval) throw new CareStateConflictError('The sleep interval changed before wake was saved.');
+        if (lockedInterval.ended_at) {
+          if (lockedInterval.ended_at.getTime() !== occurredAt.getTime()) {
+            throw new CareStateConflictError('The sleep interval was already completed at another time.');
+          }
+          const repeated: SleepIntervalDto = {
+            id: lockedEvent.id,
+            occurredAt: lockedEvent.occurredAt.toISOString(),
+            status: 'active',
+            startedAt: lockedInterval.started_at.toISOString(),
+            endedAt: lockedInterval.ended_at.toISOString(),
+            note: lockedEvent.note,
+            version: lockedEvent.version,
+          };
+          await client.query('commit');
+          return repeated;
+        }
+        if (occurredAt.getTime() < lockedInterval.started_at.getTime()) {
+          throw new CareStateConflictError('Wake time cannot be earlier than sleep start.');
+        }
+        const before = {
+          eventType: 'sleep' as const,
+          startedAt: lockedInterval.started_at.toISOString(),
+          endedAt: null,
+          ...(lockedEvent.note === null ? {} : { note: lockedEvent.note }),
+        };
         await client.query(
           `update sleep_intervals set ended_at = $2 where event_id = $1 and ended_at is null`,
-          [current.id, occurredAt],
+          [lockedEvent.id, occurredAt],
         );
         await client.query(
           `update care_events set updated_at = $2, version = version + 1 where id = $1`,
-          [current.id, now()],
+          [lockedEvent.id, now()],
         );
         await appendCareRevision(client, {
-          eventId: current.id,
+          eventId: lockedEvent.id,
           actor,
           action: 'edit',
+          fromVersion: lockedEvent.version,
+          toVersion: lockedEvent.version + 1,
           before,
-          after: { startedAt: current.started_at.toISOString(), endedAt: occurredAt.toISOString() },
+          after: {
+            eventType: 'sleep',
+            startedAt: lockedInterval.started_at.toISOString(),
+            endedAt: occurredAt.toISOString(),
+            ...(lockedEvent.note === null ? {} : { note: lockedEvent.note }),
+          },
           traceId,
         });
+        const completed: SleepIntervalDto = {
+          id: lockedEvent.id,
+          occurredAt: lockedEvent.occurredAt.toISOString(),
+          status: 'active',
+          startedAt: lockedInterval.started_at.toISOString(),
+          endedAt: occurredAt.toISOString(),
+          note: lockedEvent.note,
+          version: lockedEvent.version + 1,
+        };
         await client.query('commit');
+        return completed;
       } catch (error) {
         await client.query('rollback');
         throw error;
       } finally {
         client.release();
       }
-
-      const dto = await loadSleep(database, actor, current.id);
-      if (!dto) throw new Error('sleep interval disappeared after wake');
-      return dto;
     },
   };
 }

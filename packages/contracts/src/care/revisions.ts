@@ -77,6 +77,17 @@ export const UndoCareEventResponseSchema = z.object({
   status: z.literal('voided'),
 }).strict();
 
+export const UpdateCareEventRequestSchema = z.object({
+  expectedVersion: z.number().int().positive(),
+  event: EditCareEventInputSchema,
+}).strict();
+
+export const UndoCareEventRequestSchema = z.object({
+  expectedVersion: z.number().int().positive(),
+}).strict();
+
 export type EditCareEventInput = z.infer<typeof EditCareEventInputSchema>;
 export type CareRevisionReceipt = z.infer<typeof CareRevisionReceiptSchema>;
 export type UndoCareEventResponse = z.infer<typeof UndoCareEventResponseSchema>;
+export type UpdateCareEventRequest = z.infer<typeof UpdateCareEventRequestSchema>;
+export type UndoCareEventRequest = z.infer<typeof UndoCareEventRequestSchema>;

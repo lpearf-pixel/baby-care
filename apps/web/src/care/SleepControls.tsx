@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { StartSleepInput, WakeSleepInput } from '@baby-care/contracts';
+import { createClientRequestId } from './client-request-id.js';
 
 function isoMinutesAgo(minutesAgo: number): string {
   return new Date(Date.now() - minutesAgo * 60_000).toISOString();
@@ -24,13 +25,13 @@ export function SleepControls({
 }) {
   const [custom, setCustom] = useState(false);
   const [customTime, setCustomTime] = useState('');
-  const requestId = useRef(crypto.randomUUID());
+  const requestId = useRef(createClientRequestId());
 
   async function submit(occurredAt: string) {
     const input = { occurredAt, clientRequestId: requestId.current };
     const saved = sleeping ? await onWake(input) : await onStart(input);
     if (saved) {
-      requestId.current = crypto.randomUUID();
+      requestId.current = createClientRequestId();
       setCustom(false);
       setCustomTime('');
     }

@@ -159,10 +159,33 @@ export async function loadActiveCareEventForUpdate(
   return result.rows[0] ? toCareEventRow(result.rows[0]) : null;
 }
 
+export async function loadCareEventForUpdate(
+  client: pg.PoolClient,
+  actor: CareActorContext,
+  eventId: string,
+): Promise<CareEventRow | null> {
+  const result = await client.query<CareEventDbRow>(
+    `select ${CARE_EVENT_COLUMNS}
+       from care_events
+      where id = $1 and family_id = $2 and baby_id = $3
+      for update`,
+    [eventId, actor.familyId, actor.babyId],
+  );
+  return result.rows[0] ? toCareEventRow(result.rows[0]) : null;
+}
+
+export function assertExpectedCareEventVersion(event: CareEventRow, expectedVersion: number): void {
+  if (event.version !== expectedVersion) {
+    throw new CareStateConflictError('The care event has changed since it was loaded.');
+  }
+}
+
 export interface AppendCareRevisionInput {
   eventId: string;
   actor: CareActorContext;
   action: 'edit' | 'void';
+  fromVersion: number;
+  toVersion: number;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
   traceId: string;
@@ -175,9 +198,9 @@ export async function appendCareRevision(
   const result = await client.query<{ id: string }>(
     `insert into care_event_revisions (
        event_id, edit_actor_user_id, edit_actor_membership_id,
-       revision_action, before_json, after_json, trace_id
+       revision_action, from_version, to_version, before_json, after_json, trace_id
      )
-     select ce.id, $4, $5, $6, $7, $8, $9
+     select ce.id, $4, $5, $6, $7, $8, $9, $10, $11
        from care_events ce
       where ce.id = $1 and ce.family_id = $2 and ce.baby_id = $3
      returning id`,
@@ -188,6 +211,8 @@ export async function appendCareRevision(
       input.actor.userId,
       input.actor.membershipId,
       input.action,
+      input.fromVersion,
+      input.toVersion,
       input.before,
       input.after,
       input.traceId,

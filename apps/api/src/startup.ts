@@ -33,6 +33,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
       appOrigin: config.BABY_CARE_APP_ORIGIN,
       setupToken: config.BABY_CARE_SETUP_TOKEN,
       sessionSecure: config.SESSION_SECURE,
+      familyExportMaxBytes: config.FAMILY_EXPORT_MAX_BYTES,
     });
     app.addHook('onClose', async () => {
       await database.close();

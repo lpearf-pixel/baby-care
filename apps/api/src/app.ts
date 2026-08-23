@@ -1,27 +1,36 @@
 import Fastify, { type FastifyInstance } from 'fastify';
+import { DEFAULT_FAMILY_EXPORT_MAX_BYTES } from '@baby-care/contracts';
 import { resolveTraceId } from '@baby-care/observability';
 import { createAuthService } from './auth/auth-service.js';
 import { createActionService } from './care/action-service.js';
 import { createCareAuth } from './care/care-auth.js';
 import { createDiaperService } from './care/diaper-service.js';
 import { createFeedingService } from './care/feeding-service.js';
+import { createHandoffService } from './care/handoff-service.js';
+import { createHandoffSummaryService } from './care/handoff-summary-service.js';
 import { createMeasurementService } from './care/measurement-service.js';
 import { createQueryService } from './care/query-service.js';
 import { createRevisionService } from './care/revision-service.js';
+import { createRevisionQueryService } from './care/revision-query-service.js';
 import { createSleepService } from './care/sleep-service.js';
 import type { DatabaseContext } from './db.js';
 import { createFamilyRepository } from './family/family-repository.js';
+import { createFamilyExportRepository } from './family/family-export-repository.js';
+import { createFamilyExportService } from './family/family-export-service.js';
+import { StableExportCoordinator } from './family/export-coordinator.js';
 import { createFamilyService } from './family/family-service.js';
 import { createSetupService } from './family/setup-service.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerCareActionRoutes } from './routes/care-actions.js';
 import { registerDiaperRoutes } from './routes/care-diaper.js';
 import { registerFeedingRoutes } from './routes/care-feeding.js';
+import { registerCareHandoffRoutes } from './routes/care-handoffs.js';
 import { registerMeasurementRoutes } from './routes/care-measurements.js';
 import { registerCareQueryRoutes } from './routes/care-query.js';
 import { registerCareRevisionRoutes } from './routes/care-revisions.js';
 import { registerSleepRoutes } from './routes/care-sleep.js';
 import { registerFamilyRoutes } from './routes/family.js';
+import { registerFamilyExportRoute } from './routes/family-export.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerSetupRoutes } from './routes/setup.js';
 
@@ -32,6 +41,7 @@ export interface AppDependencies {
   appOrigin?: string;
   setupToken?: string;
   sessionSecure?: boolean;
+  familyExportMaxBytes?: number;
 }
 
 export function buildApp(dependencies: AppDependencies): FastifyInstance {
@@ -57,6 +67,7 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
   if (dependencies.database && dependencies.appOrigin) {
     const authService = createAuthService(dependencies.database, now);
     const careAuth = createCareAuth({ authService, appOrigin: dependencies.appOrigin });
+    const queryService = createQueryService(dependencies.database);
     registerAuthRoutes(app, {
       authService,
       appOrigin: dependencies.appOrigin,
@@ -66,6 +77,18 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
       authService,
       familyService: createFamilyService(dependencies.database),
       appOrigin: dependencies.appOrigin,
+    });
+    registerFamilyExportRoute(app, {
+      authService,
+      appOrigin: dependencies.appOrigin,
+      database: dependencies.database,
+      coordinator: new StableExportCoordinator(),
+      exportService: createFamilyExportService(
+        dependencies.database,
+        createFamilyExportRepository(),
+        dependencies.familyExportMaxBytes ?? DEFAULT_FAMILY_EXPORT_MAX_BYTES,
+      ),
+      now,
     });
     registerFeedingRoutes(app, {
       careAuth,
@@ -89,11 +112,17 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
     });
     registerCareQueryRoutes(app, {
       careAuth,
-      queryService: createQueryService(dependencies.database),
+      queryService,
+    });
+    registerCareHandoffRoutes(app, {
+      careAuth,
+      handoffService: createHandoffService(dependencies.database, now),
+      handoffSummaryService: createHandoffSummaryService(dependencies.database),
     });
     registerCareRevisionRoutes(app, {
       careAuth,
       revisionService: createRevisionService(dependencies.database, now),
+      revisionQueryService: createRevisionQueryService(dependencies.database),
     });
   }
 

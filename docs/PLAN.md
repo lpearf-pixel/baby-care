@@ -1,6 +1,6 @@
 # Baby Care Birth Ready Plan
 
-Status: active  
+Status: verified complete
 Target: `v0.1 Birth Ready`  
 Expected birth date: 2026-09-10  
 Repository: `lpearf-pixel/baby-care`
@@ -9,9 +9,16 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 ## Current state
 
-Current milestone: **M3 — Care Workspace — ready for design**  
-Completed milestone: **M2 — Care Recording MVP — implementation complete**  
-Previous milestone: **M1 — Family and baby foundation — verified complete**
+Current milestone: **M4 — Birth Ready Operations and Data Safety — verified complete**
+Current delivery gate: **supervised family acceptance — verified complete on 2026-08-23**
+Previous completed milestone: **M3 — Care Workspace — verified complete**
+Earlier completed milestone: **M2 — Care Recording MVP — verified complete**
+
+Published integration checkpoint: `codex/m3-care-workspace-implementation` was
+fast-forwarded through the M4 documentation head `6f112e4`, includes the post-merge
+unsaved family-settings race fix `1d6d7a5`, and has verified integrated release head
+`cd968c4573b3b33eab178f0fca978e56a3d5380a`. CI `32617045070` passed static,
+unit, integration, build and production Compose smoke. `main` is unchanged.
 
 Verified M1 production baseline:
 
@@ -25,6 +32,18 @@ M2 sources:
 - reviewed plan: `docs/superpowers/plans/2026-08-13-m2-care-recording-mvp-reviewed.md`
 - implementation branch: `codex/m2-care-recording-implementation`
 - release-gate branch: `codex/m2-task11-release-gate`
+
+M3 sources:
+
+- approved design: `docs/superpowers/specs/2026-08-15-m3-care-workspace-design.md`
+- implementation plan: `docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md`
+- implementation branch: `codex/m3-care-workspace-implementation`
+
+M4 sources:
+
+- approved design: `docs/superpowers/specs/2026-08-17-m4-birth-ready-operations-data-safety-design.md`
+- design/implementation branch: `codex/m4-birth-ready-operations`
+- implementation plan: `docs/superpowers/plans/2026-08-17-m4-birth-ready-operations-data-safety.md`
 
 ## M2 delivered
 
@@ -56,13 +75,86 @@ M2 sources:
 
 A fresh five-job CI on the exact final M2 head remains the authoritative release evidence and must include this file, `.agent/current-milestone.json`, README, migration metadata, and production smoke.
 
-## Next milestone — M3 Care Workspace
+## M3 verified release scope
 
-M3 should improve timeline comprehension, handoff, correction workflows, and day/night operational UX using the M2 care facts already implemented. It must not silently expand into Guardian/JoyAI/Qwen integration; Guardian integration remains a later milestone.
+The M3 branch implements explicit caregiver takeover, recent-24-hour fallback and fixed checkpoint briefings, typed/filterable cursor timeline and event detail, version-aware historical correction with append-only history, caregiver-scoped non-authoritative reminders, and per-device low-disturbance day/night Web behavior.
+
+Authoritative M3 release evidence:
+
+- final exact-head candidate: `52b042a66122464af338a2b4931315d92dff0965`;
+- CI run `31959895049`: static, unit/contracts, PostgreSQL integration, production build, and production Compose smoke — 5/5 PASS;
+- production Compose job `95196165456` preserved the M1/M2 assertions and emitted exactly these four M3 markers:
+
+- `SMOKE_OK component=m3-handoff`
+- `SMOKE_OK component=m3-typed-timeline`
+- `SMOKE_OK component=m3-revision-conflict`
+- `SMOKE_OK component=m3-care-workspace-release-flow`
+
+M3 is verified complete on that matched final code-head/run pair. PR #5 remains Draft
+for human review and must not be merged without explicit approval.
+
+## M4 approved scope
+
+M4 closes Birth Ready operations and data safety without depending on Guardian. It adds
+Dad/Mom-only private family export, private atomic PostgreSQL backup, fail-closed restore
+to an explicitly empty isolated database, and a synthetic Dad/Mom/Nanny operational
+simulation that proves the restored care timeline, revisions, handoffs and attribution.
+
+The design and task-level RED-GREEN plan were approved on 2026-08-17. Task 1 is complete
+at `5d204bd`: strict family-export v1 contracts, export capability/errors, deterministic
+ordering helpers, and the centralized 32 MiB startup bound are implemented and reviewed.
+Task 2 is complete at `6d5a166`: a family-scoped export buffer is assembled through one
+`REPEATABLE READ READ ONLY` client with ten fixed set-oriented reads, strict typed and
+revision-causality validation, deterministic UTF-8 serialization, and a closed byte
+limit. Independent review approved with no findings. The two PostgreSQL integration
+cases remain enabled but were skipped locally because `TEST_DATABASE_URL` is absent.
+Task 3 is complete through `98de9fc`: authenticated Dad/Mom-only export, per-actor
+concurrency, private headers and fail-closed audit behavior are reviewed. Task 4 is
+complete through `40aa49a`: the bounded Dad/Mom Web download surface is independently
+reviewed, with Nanny absence and non-preview/cleanup/retry privacy regressions proven.
+Task 5 is complete through `df43b93`: strict private backup creation/verification,
+kernel-enforced no-replace publication and preservation-first native failure handling are
+independently reviewed. Fresh Node 24 evidence is 67 operations tests with typecheck,
+lint, production build and offline frozen-lock passing. Task 6 is complete at `de09494`:
+verified bundles restore only to a distinct empty PG16 target, fixed read-only invariants
+run before transactional restored-session revocation, and the existing API read models
+plus fresh login are proven against generated restored data. Fresh evidence is 87
+operations tests, 5/5 real dual-PG16 restore cases, full workspace tests/typecheck/lint/
+build and independent review with no Critical/Important findings. Task 7 is complete at
+`5b92477`: four guarded operator commands, fixed PostgreSQL 16 Compose adapters, bounded
+subprocess cleanup and disposable isolated restore practice passed 130 focused tests,
+one real generated-data Compose flow, full lint/typecheck/build/privacy gates and an
+independent review with no Critical/Important findings.
+Task 8 final-review and residual pre-publish fixes are implemented through `e97aa38`.
+Scoped re-review is clean for underlying PostgreSQL cancellation settlement and
+restore/restoreVerify pre-lifecycle storage preflight. The exact-head Linux descriptor
+compatibility closure is `debabe0`.
+The stale prior static-contract count remains superseded. Compact diagnostics discard
+untrusted export/dump/manifest/path text, and the generated
+production Compose flow preserved all M1–M3 markers before
+emitting each of the four fixed M4 markers exactly once. Dad/Mom export, Nanny denial,
+private backup verification, isolated restore, old-session rejection, fresh Dad login and
+stable read-model digests all passed with owned source/restore volumes removed afterward.
+M4 was software `verified_complete` on
+`debabe0018ed17e65ebf7959ca237e8770cbacd0`. The supervised family acceptance found and
+closed two bounded LAN Web defects: secure client request IDs at `f0d634d` and visible,
+focused timeline details at `3f6676f`. The accepted product head is
+`3f6676f2c7bf65d11efedecce6ac57e261d1545d`. CI run `32611502497` passed static,
+unit/contracts, PostgreSQL integration, production build and production Compose smoke
+5/5. Compose job `97125224186` exercised the M4 export, backup and isolated-restore path.
+The supervised family acceptance completed on 2026-08-23: Dad/Mom private export,
+owner-private Git-external backup create/verify, isolated restore-verify, Nanny export
+denial, Nanny care entry with Dad attribution review, Dad takeover, detail navigation and
+void-based undo all passed. No private export contents, household care values, credentials,
+paths or live-database restore were used as tracked evidence.
+M3 implementation scope must not be reopened implicitly.
 
 ## Hard scope boundaries
 
-No Guardian ingestion, JoyAI/Qwen runtime, automated feeding recognition, diagnosis/dose recommendation, cloud deployment, or `main` modification/merge in M2.
+M4 contains no Guardian ingestion, voice/audio runtime, JoyAI/Qwen runtime, automated
+feeding recognition, full offline synchronization, diagnosis/dose recommendation,
+cloud deployment, in-place production restore, automatic backup deletion, or `main`
+modification/merge. Those remain separate future decisions.
 
 ## Working rule
 

@@ -15,6 +15,9 @@ export const ApiErrorCodeSchema = z.enum([
   'care_confirmation_required',
   'care_event_not_found',
   'care_state_conflict',
+  'export_too_large',
+  'export_in_progress',
+  'export_failed',
 ]);
 
 const NonConfirmationErrorCodeSchema = z.enum([
@@ -30,6 +33,9 @@ const NonConfirmationErrorCodeSchema = z.enum([
   'validation_failed',
   'care_event_not_found',
   'care_state_conflict',
+  'export_too_large',
+  'export_in_progress',
+  'export_failed',
 ]);
 
 const NonConfirmationApiErrorSchema = z

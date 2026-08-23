@@ -63,7 +63,39 @@ After login, Dad, Mom, and an active Nanny can use the care workspace for `xiang
 - recent care records can be corrected or voided without deleting the original history;
 - care attribution comes from the authenticated server session, not from client-supplied family/baby/actor identifiers.
 
-The production-mode Docker Compose smoke starts from an empty PostgreSQL volume and exercises setup, authentication/authorization, feeding, diaper, sleep, summary, edit/undo, and Nanny attribution through the real Web/API container route.
+The M3 workspace adds operational handoff and history tools without changing those M2 care semantics:
+
+- an explicit Dad/Mom/Nanny takeover creates an immutable checkpoint and a derived briefing; the first takeover uses a clearly labeled recent-24-hour fallback;
+- checkpoint briefings show the fixed shift window, current care state, consumed milk totals, diaper/sleep facts, notable typed events, caregiver activity, and later corrections;
+- the typed timeline supports small category filters, cursor pagination, event detail, actor/source attribution, and backfill markers;
+- historical corrections require the current event version, stale edits or undo return `care_state_conflict`, and append-only revision history remains readable;
+- optional reminder rules are scoped to the signed-in caregiver and never create authoritative handoff checkpoints;
+- auto/day/night display preference is stored per browser/device, with no acknowledgement sound from the Web app.
+
+The production-mode Docker Compose smoke starts from an empty PostgreSQL volume and preserves the M1/M2 flow, then exercises Dad/Nanny takeover, fallback and checkpoint briefings, consumed-amount recomputation, typed cursor timeline/detail, version-aware correction, stale-undo conflict, revision history, and reminder/checkpoint separation through the real Web/API container route.
+
+## Birth Ready data safety
+
+Dad and Mom can download the family export through the authenticated Web surface. Nanny
+cannot access that operation. Export files and PostgreSQL backup bundles contain private
+family data: keep them only on owner-controlled local storage outside this repository and
+never attach them to CI artifacts, diagnostics, logs, issues, or support messages.
+
+The four fixed backup/restore commands and their required environment are documented in
+`infra/backup/README.md`. Routine restore practice always uses a new isolated PostgreSQL
+16 target; restoring into the live source database is forbidden. The Task 8 production
+simulation uses generated identities and disposable volumes to prove export authorization,
+backup integrity, isolated restore, restored-session revocation, fresh login, and stable
+timeline/summary/revision/handoff attribution. Exact-head CI `32562168081` passed all five
+jobs on `debabe0018ed17e65ebf7959ca237e8770cbacd0`; its Compose job emitted each fixed M4
+marker exactly once. This software evidence does not replace the pending supervised family
+acceptance gate.
+
+Run that human gate one step at a time: Dad/Mom first checks the private export interaction,
+then selects owner-private storage outside Git, creates and verifies a backup, practices an
+isolated restore-verify, confirms Nanny cannot see export, and finally completes a supervised
+normal-care walkthrough. Do not inspect private export contents in support tooling or restore
+into the live family database.
 
 ## Privacy and diagnostics
 
@@ -77,4 +109,4 @@ Before changing the project, read:
 2. `docs/PLAN.md`
 3. the relevant spec/implementation plan under `docs/superpowers/`
 
-The family's real M2 care habits have been collected and encoded in the approved M2 design. M3 must build on those recorded facts rather than redefining M2 interaction assumptions. Guardian/JoyAI/Qwen integration remains outside M2 and requires its own later milestone/design.
+The family's real M2 care habits were preserved by the verified M3 Care Workspace rather than redefined. Guardian/JoyAI/Qwen integration remains outside verified M3 and requires its own later milestone/design.

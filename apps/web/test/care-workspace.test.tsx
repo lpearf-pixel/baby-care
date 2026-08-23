@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { CreateFeedingSessionInput } from '@baby-care/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App.js';
 
@@ -51,10 +52,10 @@ function fakeApi() {
     resetNannyPassword: vi.fn(),
     getCareSummary: vi.fn(async () => summary),
     getFeedingQuickValues: vi.fn(async (liquidType: 'expressed_breast_milk' | 'formula') => ({ liquidType, values: [45, 60, 75] })),
-    createFeedingSession: vi.fn(async () => ({ id: '55555555-5555-4555-8555-555555555555', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const })),
+    createFeedingSession: vi.fn(async (_input: CreateFeedingSessionInput) => ({ id: '55555555-5555-4555-8555-555555555555', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const })),
     createDiaper: vi.fn(async () => ({ id: '66666666-6666-4666-8666-666666666666', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const, kind: 'urine' as const, stoolColor: null, stoolConsistency: null, stoolAmount: null, note: null })),
-    startSleep: vi.fn(async () => ({ id: '77777777-7777-4777-8777-777777777777', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const, startedAt: '2026-08-13T08:00:00.000Z', endedAt: null, note: null })),
-    wakeSleep: vi.fn(async () => ({ id: '77777777-7777-4777-8777-777777777777', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const, startedAt: '2026-08-13T07:30:00.000Z', endedAt: '2026-08-13T08:00:00.000Z', note: null })),
+    startSleep: vi.fn(async () => ({ id: '77777777-7777-4777-8777-777777777777', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const, startedAt: '2026-08-13T08:00:00.000Z', endedAt: null, note: null, version: 1 })),
+    wakeSleep: vi.fn(async () => ({ id: '77777777-7777-4777-8777-777777777777', occurredAt: '2026-08-13T08:00:00.000Z', status: 'active' as const, startedAt: '2026-08-13T07:30:00.000Z', endedAt: '2026-08-13T08:00:00.000Z', note: null, version: 2 })),
   };
 }
 
@@ -64,7 +65,10 @@ function renderWorkspace() {
   return api;
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('M2 fast care workspace', () => {
   it('shows the home care priorities immediately after login', async () => {
@@ -126,5 +130,45 @@ describe('M2 fast care workspace', () => {
     for (const label of ['现在', '10分钟前', '20分钟前', '30分钟前', '自定义']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
     }
+  });
+
+  it.each([
+    ['喂奶', '母乳瓶喂'],
+    ['尿布', '尿+便'],
+    ['睡觉/醒来', '现在'],
+    ['更多', '拍嗝'],
+  ])('opens %s controls when LAN HTTP does not expose crypto.randomUUID', async (quickAction, expectedControl) => {
+    vi.stubGlobal('crypto', {
+      getRandomValues(bytes: Uint8Array) {
+        bytes.fill(0x2a);
+        return bytes;
+      },
+    });
+
+    renderWorkspace();
+    await screen.findByRole('heading', { name: '护理状态' });
+    fireEvent.click(screen.getByRole('button', { name: quickAction }));
+
+    expect(screen.getByRole('button', { name: expectedControl })).toBeInTheDocument();
+  });
+
+  it('submits an RFC 4122 version 4 request id using LAN HTTP secure random bytes', async () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues(bytes: Uint8Array) {
+        bytes.fill(0x2a);
+        return bytes;
+      },
+    });
+
+    const api = renderWorkspace();
+    await screen.findByRole('heading', { name: '护理状态' });
+    fireEvent.click(screen.getByRole('button', { name: '喂奶' }));
+    fireEvent.click(screen.getByRole('button', { name: '亲喂' }));
+    fireEvent.change(screen.getByLabelText('本次亲喂总时长（分钟）'), { target: { value: '12' } });
+    fireEvent.click(screen.getByRole('button', { name: '保存亲喂' }));
+
+    await waitFor(() => expect(api.createFeedingSession).toHaveBeenCalled());
+    expect(api.createFeedingSession.mock.calls[0]?.[0].clientRequestId)
+      .toBe('2a2a2a2a-2a2a-4a2a-aa2a-2a2a2a2a2a2a');
   });
 });

@@ -10,5 +10,6 @@ const caregiverCapabilities = new Set<Capability>([
 
 export function can(permission: PermissionLevel, capability: Capability): boolean {
   if (permission === 'family_admin') return true;
+  if (capability === 'family.export') return false;
   return caregiverCapabilities.has(capability);
 }

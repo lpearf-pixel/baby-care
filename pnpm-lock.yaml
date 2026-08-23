@@ -115,6 +115,16 @@ importers:
         specifier: latest
         version: 4.4.3
 
+  packages/operations:
+    dependencies:
+      zod:
+        specifier: latest
+        version: 4.4.3
+    devDependencies:
+      tsup:
+        specifier: latest
+        version: 8.5.1(postcss@8.5.26)(tsx@4.23.12)(typescript@6.0.3)
+
 packages:
 
   '@adobe/css-tools@4.5.0':

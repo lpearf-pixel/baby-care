@@ -1,14 +1,22 @@
 # Baby Care Work Handoff Summary
 
-Updated: 2026-08-14
+Updated: 2026-08-23
 Repository: `lpearf-pixel/baby-care`
 
 This file is the short handoff for a fresh Work/chat. Read it together with `agent.md`, `docs/PLAN.md`, and `.agent/current-milestone.json` before planning or coding.
 
 ## 1. Current authoritative state
 
-- Current completed milestone: **M2 — Care Recording MVP**.
-- Next milestone: **M3 — Care Workspace**, status **ready for design**.
+- Current completed milestone: **M4 — Birth Ready Operations and Data Safety**, including
+  supervised family acceptance, `verified_complete`.
+- M4 accepted product head: `3f6676f2c7bf65d11efedecce6ac57e261d1545d`.
+- M4 authoritative CI: `32611502497` — static / unit / PostgreSQL integration /
+  production build / production Compose smoke 5/5 PASS.
+- M4 production Compose job: `97125224186` — export, backup and isolated restore smoke PASS.
+- Previous completed milestone: **M3 — Care Workspace**, verified complete.
+- M3 authoritative final head: `52b042a66122464af338a2b4931315d92dff0965`.
+- M3 authoritative CI: `31959895049` — static / unit / PostgreSQL integration / production build / production Compose smoke 5/5 PASS.
+- M3 production Compose job: `95196165456` — all four required M3 markers emitted exactly once.
 - M1 authoritative baseline: `codex/m1-family-baby-foundation @ 76d578a464ec2ab1f8eb1f8f33d8e429caff10ba`.
 - M1 authoritative CI: `31707486985` — 5/5 PASS.
 - M2 authoritative implementation branch: `codex/m2-care-recording-implementation`.
@@ -16,6 +24,85 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 - M2 final authoritative CI on that head: `31768875691` — static / unit / PostgreSQL integration / production build / production Compose smoke all PASS.
 - M2 Draft PR: **#4 — `M2: care recording MVP`**, base `codex/m1-family-baby-foundation`.
 - `main` has not been modified or merged for M2. Keep PR #4 Draft unless the user explicitly approves merge/integration.
+- M3 implementation branch: `codex/m3-care-workspace-implementation`.
+- Published integration state: `codex/m3-care-workspace-implementation` was fast-forwarded
+  through the M4 documentation head `6f112e4`, includes the post-merge unsaved
+  family-settings race fix `1d6d7a5`, and has verified integrated release head
+  `cd968c4573b3b33eab178f0fca978e56a3d5380a`. CI `32617045070` passed all five
+  jobs. `main` remains unchanged.
+- M3 approved design: `docs/superpowers/specs/2026-08-15-m3-care-workspace-design.md`.
+- M3 implementation plan: `docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md`.
+- M3 Draft PR #5 remains open and unmerged.
+- M4 branch: `codex/m4-birth-ready-operations`, based on the authoritative M3 final head.
+- M4 approved design:
+  `docs/superpowers/specs/2026-08-17-m4-birth-ready-operations-data-safety-design.md`.
+- M4 implementation plan:
+  `docs/superpowers/plans/2026-08-17-m4-birth-ready-operations-data-safety.md`.
+- M4 Task 1 implementation: `5d204bd` — strict family export v1 contracts, deterministic
+  ordering/filename helpers, Dad/Mom-only export capability, three closed export errors,
+  and a startup-validated default 32 MiB bound. Independent review found no issues.
+- M4 Task 2 implementation: `6d5a166` — one family-scoped `REPEATABLE READ READ ONLY`
+  snapshot, ten fixed set-oriented reads, complete typed export assembly, strict
+  revision/relation causality checks, deterministic UTF-8 serialization, and closed
+  byte-limit enforcement. Independent review approved with no findings; local API tests
+  passed while two enabled PostgreSQL cases await an environment with `TEST_DATABASE_URL`.
+- M4 Task 3 implementation: `3ebb95e` through `98de9fc` — authenticated Dad/Mom-only
+  family export route, per-actor concurrency gate, private attachment headers and a
+  fail-closed allow-listed audit transaction. Independent review approved after bounded
+  hardening of authentication, error-shape and rollback evidence. Fresh local API
+  regression passed 71 tests with 72 PostgreSQL-dependent tests explicitly skipped
+  because `TEST_DATABASE_URL` is not configured.
+- M4 Task 4 implementation: `679d9a8` plus privacy-regression closure `40aa49a` — a
+  Dad/Mom-only credentialed Web download surface with private warning, generic
+  filename, one-flight request and transient Blob URL lifecycle. Nanny receives no
+  export DOM. Independent review approved after non-vacuous no-preview, Mom visibility,
+  reject-then-retry and anchor-removal coverage. Fresh Web evidence is 87 passed with
+  typecheck, production build and repository lint passing. The separate real-family
+  download interaction passed during supervised acceptance on 2026-08-23.
+- M4 Task 5 implementation: `fd1d014` through `df43b93` — strict manifest v1,
+  streamed private custom-format dump, bounded catalogue checks, PG16/migration gates,
+  owner-private storage and kernel-enforced no-replace publication are implemented.
+  Preservation-first native failure handling never deletes ambiguous temp state; wrong
+  publication is quarantined under a non-final name. Independent review approved after
+  five bounded hardening rounds. Fresh Node 24 evidence is 67 operations tests plus root
+  typecheck, lint, production build and offline frozen-lock PASS. Real PostgreSQL 16
+  dump/list and Linux-native execution are now exercised through the Task 7 production
+  adapter and were later verified by the Task 9 exact-head Linux CI.
+- M4 Task 6 implementation: `de09494` — verified private bundles restore only to a
+  distinct empty PostgreSQL 16 target. Fixed repeatable-read invariants precede a
+  separate restored-session revocation transaction; the existing API summary/timeline,
+  old-cookie rejection and fresh Dad login run against generated restored data. The
+  original source remains unchanged. An owner-private anonymous disk snapshot binds
+  catalogue and restore to identical bytes without an undocumented recovery-size cap.
+  Fresh Node 24 evidence is 87 operations tests, 5/5 real dual-PG16 integration, full
+  workspace tests/typecheck/lint/build and independent review with no Critical/Important
+  findings.
+- M4 Task 7 implementation: `5b92477` — four guarded operator commands now provide
+  private backup create/verify, isolated restore and disposable restore practice through
+  fixed PostgreSQL 16 Compose services. Subprocess termination is bounded, source and
+  restore identities are fixed, disposable projects are random and owned, and restored
+  API probes run read-only only after Task 6 verification. Fresh evidence is 130 focused
+  tests passed / 4 opt-in skipped, one real generated-data Compose flow passed in
+  121.817 seconds, full lint/typecheck/build/help/privacy gates passed, and independent
+  review found no Critical/Important findings. Real-family backup create/verify and
+  isolated restore-verify usability passed during supervised acceptance on 2026-08-23.
+- M4 Task 8 implementation: `e97aa38` — a generated Dad/Mom/Nanny
+  production simulation now covers the family-local-midnight care flow, both admin
+  exports, stable Nanny denial, warning/revision/handoff/reminder behavior, private
+  backup integrity, isolated PostgreSQL 16 restore, revoked old sessions, fresh Dad
+  login and stable read-model digest/count/version comparison. All prior M1–M3 markers
+  and the four fixed M4 markers passed locally exactly once; both owned disposable
+  volumes were removed. Final-review and residual blocker fixes are recorded through
+  `e97aa38`; scoped re-review is clean for underlying PostgreSQL cancellation settlement
+  and restore/restoreVerify pre-lifecycle storage preflight. Linux native-helper
+  compatibility closed at `debabe0`; exact-head CI `32562168081` passed 5/5 and Compose
+  job `97005337160` emitted all four M4 markers exactly once. Supervised family acceptance
+  then completed on 2026-08-23 at accepted product head `3f6676f`: Dad/Mom export,
+  Git-external owner-private backup create/verify, isolated restore-verify, Nanny export
+  denial, attributed care entry, takeover, detail and void-based undo passed. Acceptance
+  found and closed the LAN request-ID defect at `f0d634d` and detail-navigation defect at
+  `3f6676f`; exact-head CI `32611502497` passed 5/5. No private content or live restore was
+  used as tracked evidence.
 
 Release-gate history:
 
@@ -25,7 +112,7 @@ Release-gate history:
 
 ## 2. M2 product behavior that is now fixed
 
-M2 is implemented and verified. Do not redesign these facts while starting M3:
+M2 is implemented and verified. Do not redesign these facts in later milestones:
 
 - Bottle volume means **actual consumed ml**.
 - Bottle capacity is optional metadata only. 90/150/200 ml capacities never become intake shortcuts and never enter milk totals.
@@ -51,20 +138,45 @@ The production-mode empty-DB Docker Compose flow already verifies the real stack
 
 Important invariant: bottle capacity 150 ml never contributes to intake total.
 
-## 4. M3 starting scope
+## 4. M3 verified scope
 
 M3 is **Care Workspace**, not Guardian integration.
 
-M3 should design and then improve, using the existing M2 facts rather than redefining them:
+The branch now implements these stable M3 capabilities while preserving the M2 facts above:
 
-- care timeline comprehension;
-- family handoff / 交接班 workflow;
-- day/night operational UX;
-- correction/history usability;
-- current-state comprehension for sleep-deprived caregivers;
-- keeping common actions reachable in roughly 2-3 taps.
+- explicit Dad/Mom/Nanny takeover checkpoints with a recent-24-hour fallback for the first handoff;
+- derived fixed-window briefings with current state, consumed milk totals, diaper/sleep facts, notable typed events, caregiver activity, and correction activity;
+- a typed, filterable, cursor-paginated care timeline with detail, actor/source attribution, and backfill markers;
+- complete historical correction with expected-version conflict handling and append-only revision history;
+- caregiver-scoped optional on-screen reminders that do not create checkpoint facts;
+- per-browser/device auto/day/night display choice and no Web acknowledgement sound.
 
-Do not begin M3 implementation before a dedicated M3 design/spec is written and approved.
+Exact-head CI run `31959895049` verified all five jobs on
+`52b042a66122464af338a2b4931315d92dff0965`. Production Compose job
+`95196165456` preserved M1/M2 and emitted `m3-handoff`, `m3-typed-timeline`,
+`m3-revision-conflict`, and `m3-care-workspace-release-flow` exactly once. M3 is
+verified complete.
+
+## 4.1 M4 approved direction
+
+M4 closes the Birth Ready operational/data-safety loop independently of Guardian:
+
+- Dad/Mom-only versioned private family-data export; Nanny remains denied;
+- atomic private PostgreSQL custom-format backup plus strict manifest/digest checks;
+- fail-closed restore only into an explicitly empty isolated database;
+- synthetic production-mode Dad/Mom/Nanny operational simulation, including backup,
+  restore and post-restore verification of timeline, revisions, handoffs and actors.
+
+M4 does not add cloud/off-site backup, automatic deletion, in-place production restore,
+full offline synchronization, Guardian/voice integration, medical behavior, or `main`
+integration. Tasks 1–7 are implemented and reviewed: contracts and bounds are fixed,
+the deterministic repeatable-read export service exists, and Dad/Mom can request the
+private audited attachment through the bounded Web download surface. Private atomic backup
+and fail-closed isolated restore libraries now exist; the guarded operator CLI,
+disposable PostgreSQL 16 practice path, and Task 8 synthetic production-mode operations
+simulation were software verified complete at `debabe0` by CI `32562168081` 5/5. The
+separate supervised family acceptance is now complete at `3f6676f` with CI `32611502497`
+5/5; this still does not authorize a restore into the live family database.
 
 ## 5. Baby Guardian / baby-monitor-local boundary
 
@@ -78,7 +190,7 @@ Do not begin M3 implementation before a dedicated M3 design/spec is written and 
 - Low-confidence machine conclusions become candidates for human confirmation.
 - Raw camera/video/audio should remain local by default; Baby Care should receive semantic events rather than continuous raw media.
 
-Guardian/JoyAI/Qwen integration, automated feeding recognition, medical diagnosis/dose recommendation, and cloud deployment are **not part of the current M3 scope unless a separate design explicitly changes the milestone boundary**.
+Guardian/JoyAI/Qwen integration, automated feeding recognition, medical diagnosis/dose recommendation, and cloud deployment were **not part of verified M3**. Any post-M3 integration requires a separately approved design.
 
 ## 6. Xiaomi MJSXJ17CM audio discovery — new handoff note
 
@@ -148,7 +260,7 @@ Required phased delivery in `baby-monitor-local`:
 - G3: feeding/care camera fusion and a versioned Baby Care contract simulator using synthetic/replay inputs;
 - G4: separate Baby Care Adapter/confirmation integration after its contract is approved.
 
-This remains separate from the current M3 Care Workspace implementation. The first code work belongs on a new `baby-monitor-local` feature branch based on its verified Guardian branch; Baby Care integration follows separately.
+This remains separate from verified M3 Care Workspace. The first code work belongs on a new `baby-monitor-local` feature branch based on its verified Guardian branch; Baby Care integration follows separately.
 
 ## 8. Autonomous development rules to preserve
 
@@ -164,45 +276,34 @@ This remains separate from the current M3 Care Workspace implementation. The fir
 
 ## 9. Fresh Work entry point
 
-The next Work should begin with **M3 design**, not M2 implementation and not Guardian coding.
+The next Work should preserve the accepted M4 product head and must not redesign M2/M3,
+repeat the completed family acceptance, or implicitly begin Guardian coding.
 
 Recommended first sequence:
 
-1. Read the authoritative state files.
-2. Verify live branch/PR/CI state without changing anything.
-3. Review the existing M2 Web/PWA workspace and M2 contracts only as needed.
-4. Draft the M3 Care Workspace design around timeline comprehension, handoff, day/night UX, and correction/history usability.
-5. Preserve all M2 semantics above.
-6. Explicitly keep Guardian/audio/AI outside M3 unless the user separately approves a scope change.
-7. Present the M3 design for approval before implementation.
+1. Read the authoritative state files and the M4 design.
+2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
+3. Preserve the M4 accepted pair `3f6676f2c7bf65d11efedecce6ac57e261d1545d` /
+   `32611502497`; supervised family acceptance completed on 2026-08-23.
+4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary. The
+   M3 integration release head `cd968c4` passed CI `32617045070`; await an explicit
+   next-milestone decision without modifying `main`.
 
-## 10. Copy/paste prompt for the next Work
+## 10. Copy/paste prompt after M4 acceptance
 
 ```text
-你现在接管长期项目 `lpearf-pixel/baby-care`。
+读取 `agent.md`、`summary.md`、`docs/PLAN.md`、
+`.agent/current-milestone.json`、已批准的 M4 规格和详细计划：
+`docs/superpowers/specs/2026-08-17-m4-birth-ready-operations-data-safety-design.md`
+`docs/superpowers/plans/2026-08-17-m4-birth-ready-operations-data-safety.md`。
 
-先不要直接开发。先读取并核验真实仓库状态：
+基线为 `codex/m4-birth-ready-operations`，来源是已通过 CI `31959895049`
+五项门禁的 M3 精确头 `52b042a66122464af338a2b4931315d92dff0965`。
 
-- `agent.md`
-- `summary.md`
-- `docs/PLAN.md`
-- `.agent/current-milestone.json`
-- `docs/superpowers/specs/2026-08-13-m2-care-recording-mvp-design.md`
-- `docs/superpowers/plans/2026-08-13-m2-care-recording-mvp-reviewed.md`
-- Draft PR #4
+M4 已接受产品头为 `3f6676f2c7bf65d11efedecce6ac57e261d1545d`，精确头 CI
+`32611502497` 五项全部 PASS。2026-08-23 的受监督家庭验收已经完成；不要重复执行、
+读取私人导出内容或恢复到 live 数据库。
 
-当前权威 M2 分支是 `codex/m2-care-recording-implementation`。M2 Care Recording MVP 已完成并通过最终 5/5 CI；不要重新实现 M2，不要修改或合并 `main`。
-
-你的当前任务是开始 **M3 Care Workspace**：先做设计，不直接写代码。重点是 timeline comprehension、family handoff/交接班、day/night operational UX、correction/history usability，并保持常用操作适合单手、睡眠不足场景。
-
-必须保留 M2 已确定的语义：奶瓶容量不等于摄入量；瓶喂实际 ml；母乳瓶喂与配方奶分开；亲喂只记录总时长、不做左右乳计时、不推算 ml；rolling 24h；warning 显式确认；edit 保留 revision；undo=void；actor/family/baby/source 由服务端认证上下文派生；药物只记录事实，不推荐/计算剂量。
-
-`baby-monitor-local`/Guardian 是独立系统。小米 MJSXJ17CM 音频已经被识别为未来 Guardian 多模态输入候选，但当前 live audio track 尚需真机 probe。不要把 Guardian/JoyAI/Qwen/自动喂奶识别直接塞进 M3；除非我明确批准新的集成设计。
-
-工作方式：普通可逆工作自动继续；使用 GitHub 公共 runner；失败自行诊断修复重跑；不要让我执行普通本地命令；只在重大产品方向、凭据/支付、破坏性/不可逆操作或必须真人硬件验收时找我。规格批准后继续开发、测试、CI、review，直到当前里程碑计划结束。
-
-先给我：
-1. 真实仓库/分支/PR/CI核验结果；
-2. M3 设计输入和你认为需要解决的核心交互问题；
-3. 一版可审核的 M3 设计规格。
+不要开发 Guardian/语音、完整离线同步、云备份、医疗功能或 in-place restore；
+不要修改/合并 main。等待明确的下一里程碑或分支集成决定。
 ```

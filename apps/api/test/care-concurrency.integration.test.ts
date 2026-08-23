@@ -123,6 +123,41 @@ describeDatabase('M2 concurrent caregiver attribution', () => {
       expect(afterDisable.statusCode).toBe(401);
       expect(afterDisable.json()).toMatchObject({ code: 'unauthenticated' });
 
+      const disabledWorkspaceReads = await Promise.all([
+        context.app.inject({
+          method: 'GET',
+          url: '/api/care/handoffs/latest',
+          headers: { cookie: nannyCookie },
+        }),
+        context.app.inject({
+          method: 'GET',
+          url: '/api/care/timeline',
+          headers: { cookie: nannyCookie },
+        }),
+        context.app.inject({
+          method: 'GET',
+          url: `/api/care/events/${dadWrite.json().id}`,
+          headers: { cookie: nannyCookie },
+        }),
+        context.app.inject({
+          method: 'GET',
+          url: `/api/care/events/${dadWrite.json().id}/revisions`,
+          headers: { cookie: nannyCookie },
+        }),
+        context.app.inject({
+          method: 'GET',
+          url: '/api/care/handoff-reminders',
+          headers: { cookie: nannyCookie },
+        }),
+      ]);
+      for (const response of disabledWorkspaceReads) {
+        expect(response.statusCode).toBe(401);
+        expect(response.json()).toMatchObject({
+          code: 'unauthenticated',
+          message: 'Authentication is required.',
+        });
+      }
+
       const count = await context.database.pool.query(`select count(*)::int as count from care_events`);
       expect(count.rows[0].count).toBe(2);
     } finally {

@@ -7,3 +7,4 @@ export * from './actions.js';
 export * from './measurements.js';
 export * from './query.js';
 export * from './revisions.js';
+export * from './handoffs.js';

@@ -54,6 +54,8 @@ type RepoModule = {
     eventId: string;
     actor: CareActorContext;
     action: 'edit' | 'void';
+    fromVersion: number;
+    toVersion: number;
     before: Record<string, unknown> | null;
     after: Record<string, unknown> | null;
     traceId: string;
@@ -269,6 +271,8 @@ describeDatabase('M2 authenticated care event foundation', () => {
         eventId: first.id,
         actor,
         action: 'void',
+        fromVersion: 1,
+        toVersion: 2,
         before: { status: 'active', version: 1 },
         after: { status: 'voided', version: 2 },
         traceId,

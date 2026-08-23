@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { CreateDiaperInput, DiaperKind } from '@baby-care/contracts';
+import { createClientRequestId } from './client-request-id.js';
 
 export function DiaperForm({
   busy,
@@ -12,7 +13,7 @@ export function DiaperForm({
   const [stoolColor, setStoolColor] = useState('');
   const [stoolConsistency, setStoolConsistency] = useState('');
   const [stoolAmount, setStoolAmount] = useState('');
-  const requestId = useRef(crypto.randomUUID());
+  const requestId = useRef(createClientRequestId());
   const hasStool = kind === 'stool' || kind === 'urine_stool';
 
   async function submit() {
@@ -26,7 +27,7 @@ export function DiaperForm({
       ...(hasStool && stoolAmount.trim() ? { stoolAmount: stoolAmount.trim() } : {}),
     };
     if (await onSave(input)) {
-      requestId.current = crypto.randomUUID();
+      requestId.current = createClientRequestId();
       setKind(null);
       setStoolColor('');
       setStoolConsistency('');

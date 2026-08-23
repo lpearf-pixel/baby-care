@@ -62,12 +62,15 @@ describeDatabase('M2 care revisions', () => {
         url: `/api/care/events/${eventId}`,
         headers: { origin: M2_TEST_ORIGIN, cookie: nanny.cookie },
         payload: {
-          eventType: 'diaper',
-          occurredAt: '2026-08-13T07:51:00.000Z',
-          kind: 'stool',
-          stoolColor: 'yellow',
-          stoolConsistency: 'seedy',
-          stoolAmount: 'small',
+          expectedVersion: 1,
+          event: {
+            eventType: 'diaper',
+            occurredAt: '2026-08-13T07:51:00.000Z',
+            kind: 'stool',
+            stoolColor: 'yellow',
+            stoolConsistency: 'seedy',
+            stoolAmount: 'small',
+          },
         },
       });
       expect(edited.statusCode).toBe(200);
@@ -121,9 +124,12 @@ describeDatabase('M2 care revisions', () => {
         url: `/api/care/events/${created.json().id}`,
         headers: { origin: M2_TEST_ORIGIN, cookie: context.cookie },
         payload: {
-          eventType: 'feeding',
-          occurredAt: '2026-08-13T07:50:00.000Z',
-          components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 60 }],
+          expectedVersion: 1,
+          event: {
+            eventType: 'feeding',
+            occurredAt: '2026-08-13T07:50:00.000Z',
+            components: [{ kind: 'bottle', liquidType: 'formula', amountMl: 60 }],
+          },
         },
       });
       expect(response.statusCode).toBe(409);
@@ -157,17 +163,17 @@ describeDatabase('M2 care revisions', () => {
       expect((await context.app.inject({
         method: 'PATCH', url: `/api/care/events/${sleep.json().id}`,
         headers: { origin: M2_TEST_ORIGIN, cookie: context.cookie },
-        payload: { eventType: 'sleep', startedAt: '2026-08-13T07:15:00.000Z', endedAt: '2026-08-13T07:35:00.000Z' },
+        payload: { expectedVersion: 1, event: { eventType: 'sleep', startedAt: '2026-08-13T07:15:00.000Z', endedAt: '2026-08-13T07:35:00.000Z' } },
       })).statusCode).toBe(200);
       expect((await context.app.inject({
         method: 'PATCH', url: `/api/care/events/${crying.json().id}`,
         headers: { origin: M2_TEST_ORIGIN, cookie: context.cookie },
-        payload: { eventType: 'crying', occurredAt: '2026-08-13T07:41:00.000Z', action: { kind: 'crying', durationMinutes: 9 } },
+        payload: { expectedVersion: 1, event: { eventType: 'crying', occurredAt: '2026-08-13T07:41:00.000Z', action: { kind: 'crying', durationMinutes: 9 } } },
       })).statusCode).toBe(200);
       expect((await context.app.inject({
         method: 'PATCH', url: `/api/care/events/${temperature.json().id}`,
         headers: { origin: M2_TEST_ORIGIN, cookie: context.cookie },
-        payload: { eventType: 'temperature', occurredAt: '2026-08-13T07:51:00.000Z', measurement: { kind: 'temperature', valueCelsius: 37.3, method: 'axillary' } },
+        payload: { expectedVersion: 1, event: { eventType: 'temperature', occurredAt: '2026-08-13T07:51:00.000Z', measurement: { kind: 'temperature', valueCelsius: 37.3, method: 'axillary' } } },
       })).statusCode).toBe(200);
 
       const sleepRow = await context.database.pool.query(`select started_at, ended_at from sleep_intervals where event_id = $1`, [sleep.json().id]);

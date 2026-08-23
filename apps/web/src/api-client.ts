@@ -2,9 +2,14 @@ import type {
   BabyDto,
   BottleLiquidType,
   CareActionReceipt,
+  CareHandoffBriefingDto,
   CareHomeSummaryDto,
   CareRevisionReceipt,
+  CareTimelineItemDto,
+  CareTimelineQuery,
+  CareTimelineResponse,
   CreateCareActionInput,
+  CreateCareHandoffInput,
   CreateDiaperInput,
   CreateFeedingSessionInput,
   CreateMeasurementInput,
@@ -14,17 +19,44 @@ import type {
   FamilyDto,
   FeedingQuickValuesDto,
   FeedingSessionDto,
+  HandoffReminderRuleInput,
   MeasurementReceipt,
   MemberDto,
   SessionDto,
   SetupInput,
   SleepIntervalDto,
   StartSleepInput,
+  ReplaceHandoffReminderRulesInput,
+  UndoCareEventRequest,
   UndoCareEventResponse,
+  UpdateCareEventRequest,
   UpdateBabyInput,
   UpdateFamilyInput,
   WakeSleepInput,
 } from '@baby-care/contracts';
+
+export interface HandoffReminderState {
+  rules: HandoffReminderRuleInput[];
+  shouldPrompt: boolean;
+}
+
+export interface FamilyExportDownload {
+  blob: Blob;
+  filename: string;
+}
+
+export interface CareRevisionHistoryItemDto {
+  id: string;
+  eventId: string;
+  action: 'edit' | 'void';
+  actorUserId: string;
+  actorDisplayName: string;
+  createdAt: string;
+  fromVersion: number;
+  toVersion: number;
+  before: EditCareEventInput | { status: 'active' };
+  after: EditCareEventInput | { status: 'voided' };
+}
 
 export class BabyCareApiError extends Error {
   constructor(
@@ -65,6 +97,29 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return (await response.json()) as T;
 }
 
+const FAMILY_EXPORT_FILENAME = /^baby-care-export-\d{8}T\d{6}Z\.json$/;
+
+function fallbackFamilyExportFilename(now = new Date()): string {
+  return `baby-care-export-${now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}.json`;
+}
+
+function exportFilename(contentDisposition: string | null): string | null {
+  const match = /^attachment; filename="([^"]+)"$/i.exec(contentDisposition ?? '');
+  const filename = match?.[1];
+  return filename && FAMILY_EXPORT_FILENAME.test(filename) ? filename : null;
+}
+
+async function exportFamilyData(): Promise<FamilyExportDownload> {
+  const response = await fetch('/api/family/export', { method: 'POST', credentials: 'include' });
+  if (!response.ok || response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json') {
+    throw new BabyCareApiError('export_failed', '下载失败，请稍后重试');
+  }
+  return {
+    blob: await response.blob(),
+    filename: exportFilename(response.headers.get('content-disposition')) ?? fallbackFamilyExportFilename(),
+  };
+}
+
 export interface BabyCareApi {
   getSetupStatus(): Promise<{ required: boolean }>;
   setupFamily(input: SetupInput, setupToken: string): Promise<{ status: 'created' }>;
@@ -79,7 +134,16 @@ export interface BabyCareApi {
   createNanny(input: CreateNannyInput): Promise<MemberDto>;
   setNannyStatus(membershipId: string, status: 'active' | 'disabled'): Promise<MemberDto>;
   resetNannyPassword(membershipId: string, newPassword: string): Promise<void>;
+  exportFamilyData(): Promise<FamilyExportDownload>;
   getCareSummary(at: string): Promise<CareHomeSummaryDto>;
+  getLatestCareHandoff(): Promise<CareHandoffBriefingDto | null>;
+  getCareHandoffSummary(handoffId: string): Promise<CareHandoffBriefingDto>;
+  createCareHandoff(input: CreateCareHandoffInput): Promise<CareHandoffBriefingDto>;
+  getHandoffReminders(): Promise<HandoffReminderState>;
+  replaceHandoffReminders(input: ReplaceHandoffReminderRulesInput): Promise<HandoffReminderState>;
+  getCareTimeline(query: CareTimelineQuery): Promise<CareTimelineResponse>;
+  getCareEventDetail(eventId: string): Promise<CareTimelineItemDto>;
+  getCareEventRevisions(eventId: string): Promise<CareRevisionHistoryItemDto[]>;
   getFeedingQuickValues(liquidType: BottleLiquidType): Promise<FeedingQuickValuesDto>;
   createFeedingSession(input: CreateFeedingSessionInput): Promise<FeedingSessionDto>;
   createDiaper(input: CreateDiaperInput): Promise<DiaperEventDto>;
@@ -87,8 +151,8 @@ export interface BabyCareApi {
   wakeSleep(input: WakeSleepInput): Promise<SleepIntervalDto>;
   createCareAction(input: CreateCareActionInput): Promise<CareActionReceipt>;
   createMeasurement(input: CreateMeasurementInput): Promise<MeasurementReceipt>;
-  editCareEvent(eventId: string, input: EditCareEventInput): Promise<CareRevisionReceipt>;
-  undoCareEvent(eventId: string): Promise<UndoCareEventResponse>;
+  editCareEvent(eventId: string, input: UpdateCareEventRequest): Promise<CareRevisionReceipt>;
+  undoCareEvent(eventId: string, input: UndoCareEventRequest): Promise<UndoCareEventResponse>;
 }
 
 export const babyCareApi: BabyCareApi = {
@@ -123,7 +187,27 @@ export const babyCareApi: BabyCareApi = {
       method: 'POST',
       body: JSON.stringify({ newPassword }),
     }),
+  exportFamilyData,
   getCareSummary: (at) => request(`/api/care/summary?at=${encodeURIComponent(at)}`),
+  getLatestCareHandoff: () => request('/api/care/handoffs/latest'),
+  getCareHandoffSummary: (handoffId) => request(`/api/care/handoffs/${handoffId}/summary`),
+  createCareHandoff: (input) =>
+    request('/api/care/handoffs', { method: 'POST', body: JSON.stringify(input) }),
+  getHandoffReminders: () => request('/api/care/handoff-reminders'),
+  replaceHandoffReminders: (input) =>
+    request('/api/care/handoff-reminders', { method: 'PUT', body: JSON.stringify(input) }),
+  getCareTimeline: (query) => {
+    const params = new URLSearchParams();
+    if (query.before) params.set('before', query.before);
+    if (query.cursor) params.set('cursor', query.cursor);
+    if (query.from) params.set('from', query.from);
+    if (query.to) params.set('to', query.to);
+    params.set('category', query.category);
+    params.set('limit', String(query.limit));
+    return request(`/api/care/timeline?${params.toString()}`);
+  },
+  getCareEventDetail: (eventId) => request(`/api/care/events/${eventId}`),
+  getCareEventRevisions: (eventId) => request(`/api/care/events/${eventId}/revisions`),
   getFeedingQuickValues: (liquidType) =>
     request(`/api/care/feeding/quick-values?liquidType=${encodeURIComponent(liquidType)}`),
   createFeedingSession: (input) =>
@@ -140,6 +224,6 @@ export const babyCareApi: BabyCareApi = {
     request('/api/care/measurements', { method: 'POST', body: JSON.stringify(input) }),
   editCareEvent: (eventId, input) =>
     request(`/api/care/events/${eventId}`, { method: 'PATCH', body: JSON.stringify(input) }),
-  undoCareEvent: (eventId) =>
-    request(`/api/care/events/${eventId}/undo`, { method: 'POST' }),
+  undoCareEvent: (eventId, input) =>
+    request(`/api/care/events/${eventId}/undo`, { method: 'POST', body: JSON.stringify(input) }),
 };

@@ -11,4 +11,5 @@ export type Capability =
   | 'members.manage'
   | 'credentials.reset_nanny'
   | 'care.read'
-  | 'care.write';
+  | 'care.write'
+  | 'family.export';

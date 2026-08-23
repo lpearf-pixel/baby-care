@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { CareTimelineResponseSchema } from '@baby-care/contracts';
 import { createM2TestApp, M2_TEST_ORIGIN } from './helpers/m2-family-app.js';
 
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
@@ -107,6 +108,7 @@ describeDatabase('M2 care summary and timeline', () => {
         headers: { cookie: context.cookie },
       });
       expect(response.statusCode).toBe(200);
+      expect(CareTimelineResponseSchema.safeParse(response.json()).success).toBe(true);
       const items = response.json().items as Array<{ eventType: string; occurredAt: string; status: string }>;
       expect(items.slice(0, 4).map((item) => [item.eventType, item.occurredAt])).toEqual([
         ['diaper', '2026-08-13T07:55:00.000Z'],
@@ -116,6 +118,23 @@ describeDatabase('M2 care summary and timeline', () => {
       ]);
       expect(items.every((item) => item.status === 'active')).toBe(true);
       expect(items.some((item) => item.occurredAt === '2026-08-13T07:30:00.000Z')).toBe(false);
+    } finally {
+      await context.app.close();
+      await context.database.close();
+    }
+  });
+
+  it('rejects M3 timeline query modes until typed cursor reads are implemented', async () => {
+    const context = await createM2TestApp(testDatabaseUrl!);
+    try {
+      const response = await context.app.inject({
+        method: 'GET',
+        url: '/api/care/timeline?cursor=opaque-m3-cursor',
+        headers: { cookie: context.cookie },
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ code: 'validation_failed' });
     } finally {
       await context.app.close();
       await context.database.close();

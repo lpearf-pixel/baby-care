@@ -15,6 +15,20 @@
       "when": 1786633200000,
       "tag": "0001_m2_care_recording",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786875569333,
+      "tag": "0002_m3_care_workspace",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786882139083,
+      "tag": "0003_m3_care_revision_versions",
+      "breakpoints": true
     }
   ]
 }
