@@ -6,6 +6,7 @@ import { CareWorkspace } from '../care/CareWorkspace.js';
 import { AdminFamilyPanel } from '../family/AdminFamilyPanel.js';
 import { FamilyDataExport } from '../family/FamilyDataExport.js';
 import { NannyFamilyView } from '../family/NannyFamilyView.js';
+import { VoiceCarePanel } from '../voice-care/VoiceCarePanel.js';
 
 export function AuthenticatedShell({
   api,
@@ -78,6 +79,8 @@ export function AuthenticatedShell({
       </section>
 
       <CareWorkspace api={api} familyTimeZone={family?.timezone ?? 'UTC'} />
+
+      {typeof api.getVoiceCareState === 'function' ? <VoiceCarePanel api={api} session={session} /> : null}
 
       {loading ? <p className="foundation-note">正在加载家庭资料…</p> : null}
       {!loading && (!family || !baby) ? <p className="form-error" role="alert">{message ?? '家庭资料暂不可用'}</p> : null}

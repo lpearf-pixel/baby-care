@@ -14,6 +14,9 @@ import type {
   CreateFeedingSessionInput,
   CreateMeasurementInput,
   CreateNannyInput,
+  ActivateVoiceCareLeaseInput,
+  CancelVoiceCareSessionInput,
+  ConfirmVoiceCareSessionInput,
   DiaperEventDto,
   EditCareEventInput,
   FamilyDto,
@@ -33,6 +36,12 @@ import type {
   UpdateBabyInput,
   UpdateFamilyInput,
   WakeSleepInput,
+  PairVoiceCareDeviceInput,
+  VoiceCareDeviceDto,
+  VoiceCareLeaseDto,
+  VoiceCarePairingChallengeDto,
+  VoiceCareSemanticResultV1,
+  VoiceCareStateDto,
 } from '@baby-care/contracts';
 
 export interface HandoffReminderState {
@@ -153,6 +162,14 @@ export interface BabyCareApi {
   createMeasurement(input: CreateMeasurementInput): Promise<MeasurementReceipt>;
   editCareEvent(eventId: string, input: UpdateCareEventRequest): Promise<CareRevisionReceipt>;
   undoCareEvent(eventId: string, input: UndoCareEventRequest): Promise<UndoCareEventResponse>;
+  getVoiceCareState(signal?: AbortSignal): Promise<VoiceCareStateDto>;
+  createVoiceCarePairingChallenge(): Promise<VoiceCarePairingChallengeDto>;
+  pairVoiceCareDevice(input: PairVoiceCareDeviceInput): Promise<VoiceCareDeviceDto>;
+  revokeVoiceCareDevice(deviceId: string): Promise<void>;
+  activateVoiceCareLease(deviceId: string, input: ActivateVoiceCareLeaseInput): Promise<VoiceCareLeaseDto>;
+  revokeVoiceCareLease(leaseId: string): Promise<void>;
+  confirmVoiceCareSession(sessionId: string, input: ConfirmVoiceCareSessionInput): Promise<VoiceCareSemanticResultV1>;
+  cancelVoiceCareSession(sessionId: string, input: CancelVoiceCareSessionInput): Promise<VoiceCareSemanticResultV1>;
 }
 
 export const babyCareApi: BabyCareApi = {
@@ -226,4 +243,18 @@ export const babyCareApi: BabyCareApi = {
     request(`/api/care/events/${eventId}`, { method: 'PATCH', body: JSON.stringify(input) }),
   undoCareEvent: (eventId, input) =>
     request(`/api/care/events/${eventId}/undo`, { method: 'POST', body: JSON.stringify(input) }),
+  getVoiceCareState: (signal) => request('/api/voice-care/state', signal ? { signal } : {}),
+  createVoiceCarePairingChallenge: () => request('/api/voice-care/pairing-challenges', { method: 'POST' }),
+  pairVoiceCareDevice: (input) =>
+    request('/api/voice-care/devices', { method: 'POST', body: JSON.stringify(input) }),
+  revokeVoiceCareDevice: (deviceId) =>
+    request(`/api/voice-care/devices/${deviceId}`, { method: 'DELETE' }),
+  activateVoiceCareLease: (deviceId, input) =>
+    request(`/api/voice-care/devices/${deviceId}/leases`, { method: 'POST', body: JSON.stringify(input) }),
+  revokeVoiceCareLease: (leaseId) =>
+    request(`/api/voice-care/leases/${leaseId}`, { method: 'DELETE' }),
+  confirmVoiceCareSession: (sessionId, input) =>
+    request(`/api/voice-care/sessions/${sessionId}/confirm`, { method: 'POST', body: JSON.stringify(input) }),
+  cancelVoiceCareSession: (sessionId, input) =>
+    request(`/api/voice-care/sessions/${sessionId}/cancel`, { method: 'POST', body: JSON.stringify(input) }),
 };

@@ -193,8 +193,30 @@ describeDatabase('M5 Voice Care caregiver leases', () => {
     const firstDevice = await insertDevice();
     const secondDevice = await insertDevice();
     const nannyCookie = await createNanny();
+    const nannyState = await context.app.inject({
+      method: 'GET',
+      url: '/api/voice-care/state',
+      headers: { cookie: nannyCookie },
+    });
+    expect(nannyState.statusCode).toBe(200);
+    expect(nannyState.json().devices.map((device: { id: string }) => device.id).sort())
+      .toEqual([firstDevice, secondDevice].sort());
+    expect(nannyState.body).not.toMatch(/publicKey|signature|challenge/);
     const dadLease = await activate(context.cookie, firstDevice);
     expect(dadLease.statusCode).toBe(201);
+    const nannyStateWithDadLease = await context.app.inject({
+      method: 'GET',
+      url: '/api/voice-care/state',
+      headers: { cookie: nannyCookie },
+    });
+    expect(nannyStateWithDadLease.statusCode).toBe(200);
+    expect(nannyStateWithDadLease.json().activeLeases).toEqual([
+      expect.objectContaining({
+        id: dadLease.json().id,
+        actorDisplayName: 'Dad',
+        revokedAt: null,
+      }),
+    ]);
     const denied = await revoke(nannyCookie, dadLease.json().id as string);
     expect(denied.statusCode).toBe(403);
 

@@ -36,6 +36,8 @@ function formatActor(item: CareTimelineItemDto): string {
       ? '设备记录'
       : item.source === 'guardian'
         ? 'Guardian 记录'
+        : item.source === 'voice'
+          ? '语音记录'
         : item.source === 'import'
           ? '导入记录'
           : 'AI 记录';
@@ -95,7 +97,7 @@ export function CareTimelineCard({
   onOpenDetail: (eventId: string) => void;
 }) {
   return (
-    <article className="panel care-timeline-card">
+    <article className="panel care-timeline-card" id={`care-event-${item.id}`}>
       <p className="care-timeline-time">
         <time dateTime={item.occurredAt}>{formatDateTime(item.occurredAt, familyTimeZone)}</time>
       </p>

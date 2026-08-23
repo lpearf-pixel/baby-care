@@ -57,8 +57,7 @@ export function createVoiceCareSessionService(
         await client.query('begin');
         const current = now();
         await sweepExpiredVoiceCareSessions(client, actor.familyId, current);
-        const devices = actor.permissionLevel === 'family_admin'
-          ? await client.query<{
+        const devices = await client.query<{
               id: string;
               capability: 'voice_care.intent.submit';
               status: 'active' | 'revoked';
@@ -66,11 +65,11 @@ export function createVoiceCareSessionService(
               revoked_at: Date | null;
             }>(
               `select id, capability, status, created_at, revoked_at
-                 from voice_care_devices where family_id = $1
+                 from voice_care_devices
+                where family_id = $1 and ($2::boolean or status = 'active')
                 order by created_at, id limit 16`,
-              [actor.familyId],
-            )
-          : { rows: [] };
+              [actor.familyId, actor.permissionLevel === 'family_admin'],
+            );
         const leases = await client.query<VoiceCareLeaseRow>(
           `select l.id, l.family_id, l.baby_id, l.device_id, l.actor_user_id,
                   l.actor_membership_id, u.display_name actor_display_name,
@@ -83,9 +82,8 @@ export function createVoiceCareSessionService(
               and fm.user_id = l.actor_user_id and fm.status = 'active'
              join users u on u.id = l.actor_user_id and u.status = 'active'
             where l.family_id = $1 and l.revoked_at is null and l.expires_at > $2
-              and ($3::boolean or l.actor_user_id = $4)
             order by l.issued_at, l.id limit 16`,
-          [actor.familyId, current, actor.permissionLevel === 'family_admin', actor.userId],
+          [actor.familyId, current],
         );
         const sessions = await client.query<VoiceCareSessionRow & { actor_display_name: string }>(
           `select s.id, s.family_id, s.baby_id, s.device_id, s.lease_id,
