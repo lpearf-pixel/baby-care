@@ -1,9 +1,15 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { PairVoiceCareDeviceInputSchema, type ApiErrorCode } from '@baby-care/contracts';
+import {
+  ActivateVoiceCareLeaseInputSchema,
+  PairVoiceCareDeviceInputSchema,
+  type ApiErrorCode,
+} from '@baby-care/contracts';
 import { z } from 'zod';
 
 import type { CareAuth } from '../care/care-auth.js';
+import { CareValidationError } from '../care/care-errors.js';
 import type { VoiceCareDeviceService } from '../voice-care/device-service.js';
+import type { VoiceCareLeaseService } from '../voice-care/lease-service.js';
 import {
   VoiceCareForbiddenError,
   VoiceCareNotFoundError,
@@ -12,6 +18,7 @@ import {
 } from '../voice-care/errors.js';
 
 const DeviceParamsSchema = z.object({ deviceId: z.string().uuid() }).strict();
+const LeaseParamsSchema = z.object({ leaseId: z.string().uuid() }).strict();
 
 function sendError(
   reply: FastifyReply,
@@ -24,6 +31,9 @@ function sendError(
 }
 
 function handleVoiceCareError(reply: FastifyReply, request: FastifyRequest, error: unknown) {
+  if (error instanceof CareValidationError) {
+    return sendError(reply, 400, 'validation_failed', error.message, request.id);
+  }
   if (error instanceof VoiceCareForbiddenError) {
     return sendError(reply, 403, 'forbidden', error.message, request.id);
   }
@@ -47,7 +57,11 @@ function handleVoiceCareError(reply: FastifyReply, request: FastifyRequest, erro
 
 export function registerVoiceCareBrowserRoutes(
   app: FastifyInstance,
-  dependencies: { careAuth: CareAuth; deviceService: VoiceCareDeviceService },
+  dependencies: {
+    careAuth: CareAuth;
+    deviceService: VoiceCareDeviceService;
+    leaseService: VoiceCareLeaseService;
+  },
 ): void {
   app.post('/api/voice-care/pairing-challenges', async (request, reply) => {
     const actor = await dependencies.careAuth.requireWrite(request, reply);
@@ -92,6 +106,38 @@ export function registerVoiceCareBrowserRoutes(
     }
     try {
       return reply.send(await dependencies.deviceService.revoke(actor, parsed.data.deviceId, request.id));
+    } catch (error) {
+      return handleVoiceCareError(reply, request, error);
+    }
+  });
+
+  app.post('/api/voice-care/devices/:deviceId/leases', async (request, reply) => {
+    const actor = await dependencies.careAuth.requireWrite(request, reply);
+    if (!actor) return;
+    const params = DeviceParamsSchema.safeParse(request.params);
+    const input = ActivateVoiceCareLeaseInputSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
+      return sendError(reply, 400, 'validation_failed', 'Invalid Voice Care lease input.', request.id);
+    }
+    try {
+      return reply.code(201).send(
+        await dependencies.leaseService.activate(actor, params.data.deviceId, input.data, request.id),
+      );
+    } catch (error) {
+      return handleVoiceCareError(reply, request, error);
+    }
+  });
+
+  app.delete('/api/voice-care/leases/:leaseId', async (request, reply) => {
+    const actor = await dependencies.careAuth.requireWrite(request, reply);
+    if (!actor) return;
+    const params = LeaseParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      return sendError(reply, 400, 'validation_failed', 'Invalid Voice Care lease id.', request.id);
+    }
+    try {
+      await dependencies.leaseService.revoke(actor, params.data.leaseId, request.id);
+      return reply.code(204).send();
     } catch (error) {
       return handleVoiceCareError(reply, request, error);
     }

@@ -73,11 +73,25 @@ export async function insertHandoffCheckpoint(
     traceId: string;
   },
 ): Promise<HandoffCheckpointRow | null> {
+  return insertHandoffCheckpointInTransaction(client, { ...input, source: 'manual' });
+}
+
+export async function insertHandoffCheckpointInTransaction(
+  client: pg.PoolClient,
+  input: {
+    actor: CareActorContext;
+    source: 'manual' | 'voice';
+    occurredAt: Date;
+    createdAt: Date;
+    clientRequestId: string;
+    traceId: string;
+  },
+): Promise<HandoffCheckpointRow | null> {
   const inserted = await client.query<{ id: string }>(
     `insert into care_handoff_checkpoints (
        family_id, baby_id, actor_user_id, actor_membership_id,
        source, occurred_at, created_at, client_request_id, trace_id
-     ) values ($1,$2,$3,$4,'manual',$5,$6,$7,$8)
+     ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      on conflict do nothing
      returning id`,
     [
@@ -85,6 +99,7 @@ export async function insertHandoffCheckpoint(
       input.actor.babyId,
       input.actor.userId,
       input.actor.membershipId,
+      input.source,
       input.occurredAt,
       input.createdAt,
       input.clientRequestId,

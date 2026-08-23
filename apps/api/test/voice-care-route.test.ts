@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { CareActorContext, CareAuth } from '../src/care/care-auth.js';
 import { registerVoiceCareBrowserRoutes } from '../src/routes/voice-care-browser.js';
 import type { VoiceCareDeviceService } from '../src/voice-care/device-service.js';
+import type { VoiceCareLeaseService } from '../src/voice-care/lease-service.js';
 import {
   VoiceCareNotFoundError,
   VoiceCarePairingInvalidError,
@@ -36,7 +37,11 @@ function fixture(overrides: Partial<VoiceCareDeviceService> = {}) {
     ...overrides,
   } as VoiceCareDeviceService;
   const app = Fastify({ logger: false });
-  registerVoiceCareBrowserRoutes(app, { careAuth, deviceService });
+  const leaseService = {
+    activate: vi.fn(),
+    revoke: vi.fn(),
+  } as VoiceCareLeaseService;
+  registerVoiceCareBrowserRoutes(app, { careAuth, deviceService, leaseService });
   return { app, careAuth, deviceService };
 }
 

@@ -129,29 +129,38 @@ describeDatabase('M5 Voice Care device pairing', () => {
     const foreignFamilyId = randomUUID();
     const foreignDeviceId = randomUUID();
     await context.database.pool.query('drop index if exists families_single_active_idx');
-    await context.database.pool.query(
-      `insert into families (id, name, timezone)
-       values ($1, 'Synthetic Foreign Family', 'UTC')`,
-      [foreignFamilyId],
-    );
-    await context.database.pool.query(
-      `insert into voice_care_devices
-        (id, family_id, public_key, capability, status, created_at)
-       values ($1,$2,$3,'voice_care.intent.submit','active','2026-08-13T08:00:00Z')`,
-      [foreignDeviceId, foreignFamilyId, Buffer.alloc(32, 7)],
-    );
-    const isolatedList = await context.app.inject({
-      method: 'GET',
-      url: '/api/voice-care/devices',
-      headers: { cookie: context.cookie },
-    });
-    expect(isolatedList.json()).toEqual([created.json()]);
-    const foreignRevoke = await context.app.inject({
-      method: 'DELETE',
-      url: `/api/voice-care/devices/${foreignDeviceId}`,
-      headers: { origin: M2_TEST_ORIGIN, cookie: context.cookie },
-    });
-    expect(foreignRevoke.statusCode).toBe(404);
+    try {
+      await context.database.pool.query(
+        `insert into families (id, name, timezone)
+         values ($1, 'Synthetic Foreign Family', 'UTC')`,
+        [foreignFamilyId],
+      );
+      await context.database.pool.query(
+        `insert into voice_care_devices
+          (id, family_id, public_key, capability, status, created_at)
+         values ($1,$2,$3,'voice_care.intent.submit','active','2026-08-13T08:00:00Z')`,
+        [foreignDeviceId, foreignFamilyId, Buffer.alloc(32, 7)],
+      );
+      const isolatedList = await context.app.inject({
+        method: 'GET',
+        url: '/api/voice-care/devices',
+        headers: { cookie: context.cookie },
+      });
+      expect(isolatedList.json()).toEqual([created.json()]);
+      const foreignRevoke = await context.app.inject({
+        method: 'DELETE',
+        url: `/api/voice-care/devices/${foreignDeviceId}`,
+        headers: { origin: M2_TEST_ORIGIN, cookie: context.cookie },
+      });
+      expect(foreignRevoke.statusCode).toBe(404);
+    } finally {
+      await context.database.pool.query(`delete from voice_care_devices where id = $1`, [foreignDeviceId]);
+      await context.database.pool.query(`delete from families where id = $1`, [foreignFamilyId]);
+      await context.database.pool.query(
+        `create unique index if not exists families_single_active_idx
+           on families ((1)) where status = 'active'`,
+      );
+    }
   });
 
   it('rejects expired, unknown, malformed and wrongly signed pairing inputs', async () => {

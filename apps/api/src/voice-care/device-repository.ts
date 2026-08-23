@@ -11,6 +11,11 @@ interface DeviceRow {
   revoked_at: Date | null;
 }
 
+export interface LockedVoiceCareDevice {
+  id: string;
+  status: 'active' | 'revoked';
+}
+
 export function toVoiceCareDeviceDto(row: DeviceRow): VoiceCareDeviceDto {
   return {
     id: row.id,
@@ -50,4 +55,19 @@ export async function listFamilyDevices(pool: pg.Pool, familyId: string): Promis
     [familyId],
   );
   return result.rows.map(toVoiceCareDeviceDto);
+}
+
+export async function lockFamilyVoiceCareDevice(
+  client: pg.PoolClient,
+  familyId: string,
+  deviceId: string,
+): Promise<LockedVoiceCareDevice | null> {
+  const result = await client.query<LockedVoiceCareDevice>(
+    `select id, status
+       from voice_care_devices
+      where family_id = $1 and id = $2
+      for update`,
+    [familyId, deviceId],
+  );
+  return result.rows[0] ?? null;
 }

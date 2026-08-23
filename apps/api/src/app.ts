@@ -35,6 +35,7 @@ import { registerHealthRoute } from './routes/health.js';
 import { registerSetupRoutes } from './routes/setup.js';
 import { registerVoiceCareBrowserRoutes } from './routes/voice-care-browser.js';
 import { createVoiceCareDeviceService } from './voice-care/device-service.js';
+import { createVoiceCareLeaseService } from './voice-care/lease-service.js';
 
 export interface AppDependencies {
   checkDatabase: () => Promise<boolean>;
@@ -129,6 +130,7 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
     registerVoiceCareBrowserRoutes(app, {
       careAuth,
       deviceService: createVoiceCareDeviceService(dependencies.database, now),
+      leaseService: createVoiceCareLeaseService(dependencies.database, now),
     });
   }
 
