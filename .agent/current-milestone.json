@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "milestone": "M5 Voice Care Adapter and Feeding Pilot",
-  "status": "implementation_in_progress_task_8_next",
+  "status": "implementation_in_progress_task_9_consumer_gate_pending",
   "branch": "codex/m5-voice-care-adapter-implementation",
   "m5_baseline_head": "cebd5d35c6095b08982216ccc706f0226e710dbc",
   "m5_design": "docs/superpowers/specs/2026-08-23-m5-voice-care-adapter-feeding-pilot-design.md",
@@ -9,7 +9,11 @@
   "m5_implementation_plan": "docs/superpowers/plans/2026-08-23-m5-voice-care-adapter-feeding-pilot.md",
   "m5_implementation_plan_state": "approved_2026_08_23",
   "m5_implementation_baseline_head": "579122fdd3147704c107fe811e0e04013dfd1faa",
-  "m5_business_implementation_state": "tasks_1_2_3_4_5_6_7_complete_task_8_next",
+  "m5_business_implementation_state": "tasks_1_through_8_complete_task_9_local_at_594376bb2c77a737d32f7d43c27ed402fa5e96ad_consumer_and_exact_head_ci_pending",
+  "m5_task_9_local_implementation_head": "594376bb2c77a737d32f7d43c27ed402fa5e96ad",
+  "m5_task_9_local_result": "four_markers_pass_zero_owned_docker_residue_full_workspace_456_pass_113_opt_in_skip",
+  "m5_task_9_consumer_gate": "blocked_consumer_missing_in_current_baby_local_voice_care_worktree",
+  "m5_task_9_exact_head_ci": "not_run_unpushed",
   "m5_completed_tasks": [
     {
       "task": "Task 1 Strict Contracts Canonical Bytes And Golden Corpus",
@@ -45,6 +49,11 @@
       "task": "Task 7 Responsive Web Review Lease And Cancellation Panel",
       "commit": "836d0a779a658f09ad7d124ae9c550e9f573ae2c",
       "verification": "web_108_of_108_full_utc_api_214_of_214_typecheck_lint_build_diff_privacy_pass"
+    },
+    {
+      "task": "Task 8 Family Export V2 Backup And Isolated Restore Closure",
+      "commit": "d1a582dbc19ff47425884efe3818536b815644ad",
+      "verification": "contracts_52_of_52_api_79_of_79_operations_56_pass_4_skip_real_pg16_restore_3_of_3_typecheck_pass"
     }
   ],
   "m3_m4_integration_state": "published_and_exact_head_ci_verified",
@@ -190,8 +199,9 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "execute M5 Task 8 family export v2 backup and isolated restore closure with TDD",
-    "continue on codex/m5-voice-care-adapter-implementation from Task 7 836d0a7",
+    "implement separately approved Baby Local vendored Voice Care consumer artifacts",
+    "rerun cross repository verifier then push Task 9 and require exact head CI",
+    "begin adult only Task 10 only after Task 9 consumer and CI gates pass",
     "preserve completed M4 and do not modify main"
   ],
   "requires_separate_post_m3_design": [

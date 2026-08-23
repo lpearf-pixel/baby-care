@@ -1086,7 +1086,9 @@ Voice feeding fact. Task 9 synthetic production and consumer-contract gate is ne
 
 ### Task 9: M5.7 Synthetic Production And Cross-Repository Contract Gate
 
-**Status:** Pending; requires Tasks 1-8 and the separately implemented Baby Local consumer of the exact Task 1 schema/corpus.
+**Status:** Baby Care local implementation committed at `594376b`; synthetic production
+4/4 markers and local software gates pass. Completion remains blocked by the separately
+implemented Baby Local consumer (`CONTRACT_FAIL code=consumer_missing`) and exact-head CI.
 
 **Files:**
 
@@ -1100,7 +1102,7 @@ Voice feeding fact. Task 9 synthetic production and consumer-contract gate is ne
 - Consumes: full M1-M5 production build, generated Ed25519 keys, Task 1 artifacts, Task 8 backup/restore, and a separately verified Baby Local checkout.
 - Produces: four ordered M5 smoke markers, cross-repository schema/corpus digest evidence and exact-head CI acceptance.
 
-- [ ] **Step 1: Write static smoke/privacy RED tests**
+- [x] **Step 1: Write static smoke/privacy RED tests**
 
 ```ts
 const M5_MARKERS = [
@@ -1118,7 +1120,7 @@ it('emits each fixed M5 marker once and never logs semantic values', () => {
 
 Also require existing M1-M4 markers; production mode; generated key only; exact semantic response order; duplicate confirmation one event; lease/device revocation; manual Nanny write after Voice Care failure; export/backup/restore; teardown ownership; bounded child output; and no raw payload/key/path/error in diagnostics.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pnpm --filter @baby-care/api test -- m5-compose-smoke-contract.test.ts
@@ -1127,7 +1129,7 @@ pnpm --filter @baby-care/observability test -- collect-diagnostics-privacy.test.
 
 Expected: FAIL because the M5 production script and markers do not exist.
 
-- [ ] **Step 3: Implement the fixed generated-data production script**
+- [x] **Step 3: Implement the fixed generated-data production script**
 
 ```js
 const M5_MARKERS = Object.freeze([
@@ -1142,7 +1144,7 @@ const generatedDevice = generateKeyPairSync('ed25519');
 
 Reuse the M4 script's bounded subprocess, private temporary directory, project ownership and exact marker discipline rather than weakening it. Build a fresh family, pair generated device, activate Dad lease/handoff, submit signed bottle start/update/end/confirm, verify one event and duplicate result, cancel a second session, reject expired/revoked authority, create manual Nanny care, export, backup, isolated restore and verify M5 sanitation. Output only fixed markers and closed failure codes.
 
-- [ ] **Step 4: Implement the read-only cross-repository verifier**
+- [x] **Step 4: Implement the read-only cross-repository verifier**
 
 ```js
 // Usage: node scripts/check-voice-care-consumer.mjs /absolute/path/to/baby-monitor-local
@@ -1169,6 +1171,13 @@ docker compose down --volumes --remove-orphans
 
 Expected: contracts match; M1-M5 markers appear exactly once in order; generated flow PASS; the final owned Compose project has no containers/volumes left. Do not run teardown against an unowned project or household database.
 
+Local evidence on 2026-08-23: the focused production/consumer contracts pass 10/10;
+observability privacy passes 17/17; the M5 generated-data production flow emits all four
+markers exactly once and exits 0; and its two owned Compose projects leave zero containers,
+volumes or networks. The current clean Baby Local Voice Care worktree has no vendored
+consumer artifacts, so the read-only verifier correctly returns
+`CONTRACT_FAIL code=consumer_missing`. Step 5 remains open.
+
 - [ ] **Step 6: Run the full software gate and exact-head CI**
 
 ```bash
@@ -1181,6 +1190,11 @@ git status --short
 ```
 
 After local review and separately authorized push, require exact remote-head jobs for static checks, unit tests, PostgreSQL integration, production build and production Compose smoke. Record the local implementation SHA and remote CI SHA separately if publication creates a different commit.
+
+Local Baby Care evidence at `594376b`: schema check, lint, six-workspace typecheck, build
+and 456 tests pass with 113 environment-opt-in skips. Five isolated PostgreSQL 16 restore
+tests pass; the separate fixed `baby-care` Compose integration refuses to run while the
+user-owned live project exists and was not stopped or deleted. Exact-head CI remains open.
 
 - [ ] **Step 7: Review and commit Task 9**
 
