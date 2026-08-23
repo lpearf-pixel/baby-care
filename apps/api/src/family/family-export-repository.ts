@@ -1,17 +1,17 @@
 import { isDeepStrictEqual } from 'node:util';
 import type pg from 'pg';
-import { EditCareEventInputSchema } from '@baby-care/contracts';
+import { EditCareEventInputSchema, VoiceCareFeedingProposalV1Schema } from '@baby-care/contracts';
 import type {
   CareEventType,
   CareSource,
   FeedingComponentInput,
   FeedingRelatedActionInput,
-  FamilyExportV1,
+  FamilyExportV2,
 } from '@baby-care/contracts';
 
 export type FamilyExportRows = Pick<
-  FamilyExportV1,
-  'family' | 'baby' | 'members' | 'careEvents' | 'careRevisions' | 'handoffCheckpoints' | 'handoffReminderRules'
+  FamilyExportV2,
+  'family' | 'baby' | 'members' | 'careEvents' | 'careRevisions' | 'handoffCheckpoints' | 'handoffReminderRules' | 'voiceCareSessions'
 >;
 
 export interface FamilyExportRepository {
@@ -164,6 +164,31 @@ interface ReminderRow extends pg.QueryResultRow {
   enabled: boolean;
   created_at: Date;
   updated_at: Date;
+}
+
+interface VoiceCareExportRow extends pg.QueryResultRow {
+  id: string;
+  family_id: string;
+  baby_id: string;
+  actor_user_id: string;
+  actor_membership_id: string;
+  actor_display_name: string | null;
+  membership_family_id: string | null;
+  membership_user_id: string | null;
+  state: string;
+  proposal_json: unknown;
+  final_care_event_id: string | null;
+  started_at: Date;
+  ended_at: Date | null;
+  confirmed_at: Date | null;
+  cancelled_at: Date | null;
+  final_event_family_id: string | null;
+  final_event_baby_id: string | null;
+  final_event_actor_user_id: string | null;
+  final_event_actor_membership_id: string | null;
+  final_event_source: string | null;
+  commit_audit_count: number;
+  confirmation_source: string | null;
 }
 
 type ExportEvent = FamilyExportRows['careEvents'][number];
@@ -630,6 +655,37 @@ async function readReminders(client: pg.PoolClient, familyId: string) {
   );
 }
 
+async function readVoiceCareSessions(client: pg.PoolClient, familyId: string) {
+  return client.query<VoiceCareExportRow>(
+    `select s.id, s.family_id, s.baby_id, s.actor_user_id, s.actor_membership_id,
+            u.display_name as actor_display_name,
+            am.family_id as membership_family_id, am.user_id as membership_user_id,
+            s.state, s.proposal_json, s.final_care_event_id, s.started_at,
+            s.ended_at, s.confirmed_at, s.cancelled_at,
+            ce.family_id as final_event_family_id, ce.baby_id as final_event_baby_id,
+            ce.actor_user_id as final_event_actor_user_id,
+            ce.actor_membership_id as final_event_actor_membership_id,
+            ce.source::text as final_event_source,
+            commit_audit.commit_audit_count, commit_audit.confirmation_source
+       from voice_care_feeding_sessions s
+       left join users u on u.id = s.actor_user_id
+       left join family_memberships am on am.id = s.actor_membership_id
+       left join care_events ce on ce.id = s.final_care_event_id
+       left join lateral (
+         select count(*)::int as commit_audit_count,
+                min(a.source::text) as confirmation_source
+           from audit_events a
+          where a.family_id = s.family_id
+            and a.action = 'voice_care.session_committed'
+            and a.target_type = 'voice_care_feeding_session'
+            and a.target_id = s.id
+       ) commit_audit on true
+      where s.family_id = $1
+      order by s.id`,
+    [familyId],
+  );
+}
+
 async function readFamilyExport(client: pg.PoolClient, familyId: string): Promise<FamilyExportRows> {
   const householdResult = await readHousehold(client, familyId);
   const householdRows = householdResult.rows;
@@ -689,6 +745,7 @@ async function readFamilyExport(client: pg.PoolClient, familyId: string): Promis
   const revisionRows = (await readRevisions(client, familyId)).rows;
   const handoffRows = (await readHandoffs(client, familyId)).rows;
   const reminderRows = (await readReminders(client, familyId)).rows;
+  const voiceCareRows = (await readVoiceCareSessions(client, familyId)).rows;
 
   const feeding = new Map<string, { sessionCount: number; components: unknown[]; relatedActions: unknown[] }>();
   const relatedChildrenByFeeding = new Map<string, string[]>();
@@ -890,6 +947,51 @@ async function readFamilyExport(client: pg.PoolClient, familyId: string): Promis
     };
   });
 
+  const voiceCareSessions: FamilyExportRows['voiceCareSessions'] = voiceCareRows.map((row) => {
+    if (
+      row.family_id !== familyId
+      || row.baby_id !== household.baby_id
+      || row.actor_display_name === null
+      || row.membership_family_id !== familyId
+      || row.membership_user_id !== row.actor_user_id
+    ) {
+      closed('voice care ownership mismatch');
+    }
+    const proposal = VoiceCareFeedingProposalV1Schema.safeParse(row.proposal_json);
+    if (!proposal.success) closed('voice care proposal invalid');
+    const committed = row.state === 'committed';
+    if (committed) {
+      if (
+        row.final_care_event_id === null
+        || row.final_event_family_id !== familyId
+        || row.final_event_baby_id !== household.baby_id
+        || row.final_event_actor_user_id !== row.actor_user_id
+        || row.final_event_actor_membership_id !== row.actor_membership_id
+        || row.final_event_source !== 'voice'
+        || row.commit_audit_count !== 1
+        || !['api', 'web'].includes(row.confirmation_source ?? '')
+      ) {
+        closed('voice care final event mismatch');
+      }
+    } else if (row.final_care_event_id !== null || row.commit_audit_count !== 0) {
+      closed('voice care nonterminal final link');
+    }
+    return {
+      id: row.id,
+      actorUserId: row.actor_user_id,
+      actorMembershipId: row.actor_membership_id,
+      actorDisplayName: row.actor_display_name,
+      state: row.state as FamilyExportRows['voiceCareSessions'][number]['state'],
+      proposal: proposal.data,
+      confirmationMethod: committed ? (row.confirmation_source === 'api' ? 'device' : 'browser') : null,
+      finalCareEventId: row.final_care_event_id,
+      startedAt: iso(row.started_at),
+      endedAt: row.ended_at ? iso(row.ended_at) : null,
+      confirmedAt: row.confirmed_at ? iso(row.confirmed_at) : null,
+      cancelledAt: row.cancelled_at ? iso(row.cancelled_at) : null,
+    };
+  });
+
   return {
     family: {
       id: household.family_id,
@@ -913,6 +1015,7 @@ async function readFamilyExport(client: pg.PoolClient, familyId: string): Promis
     careRevisions,
     handoffCheckpoints,
     handoffReminderRules,
+    voiceCareSessions,
   };
 }
 

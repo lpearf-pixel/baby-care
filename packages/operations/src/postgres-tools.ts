@@ -7,6 +7,7 @@ import {
   MigrationHistoryFactSchema,
   POSTGRES_MAJOR_VERSION,
   RestoreInvariantReportSchema,
+  RestoreSanitationReportSchema,
   type MigrationHistoryFact,
 } from './contracts.js';
 import type {
@@ -33,6 +34,11 @@ export const REQUIRED_CATALOGUE_RELATIONS = {
   careEventRevisions: ['public', 'care_event_revisions'],
   careHandoffCheckpoints: ['public', 'care_handoff_checkpoints'],
   careHandoffReminderRules: ['public', 'care_handoff_reminder_rules'],
+  voiceCareDevices: ['public', 'voice_care_devices'],
+  voiceCarePairingChallenges: ['public', 'voice_care_pairing_challenges'],
+  voiceCareLeases: ['public', 'voice_care_leases'],
+  voiceCareIntentReceipts: ['public', 'voice_care_intent_receipts'],
+  voiceCareFeedingSessions: ['public', 'voice_care_feeding_sessions'],
   drizzleMigrations: ['drizzle', '__drizzle_migrations'],
 } as const;
 
@@ -226,16 +232,96 @@ const VERIFY_INVARIANTS_REQUEST = Object.freeze({
        left join family_memberships fm on fm.id = r.actor_membership_id
          and fm.family_id = r.family_id and fm.user_id = r.actor_user_id
        where b.id is null or fm.id is null
-    )) as reminders_valid`,
+    )) as reminders_valid,
+    (select count(*)::int
+       from voice_care_feeding_sessions s
+       left join families f on f.id = s.family_id
+       left join babies b on b.id = s.baby_id and b.family_id = s.family_id
+       left join voice_care_devices d on d.id = s.device_id and d.family_id = s.family_id
+       left join family_memberships fm on fm.id = s.actor_membership_id
+         and fm.family_id = s.family_id and fm.user_id = s.actor_user_id
+       left join voice_care_leases l on l.id = s.lease_id and l.family_id = s.family_id
+         and l.device_id = s.device_id and l.baby_id = s.baby_id
+         and l.actor_membership_id = s.actor_membership_id and l.actor_user_id = s.actor_user_id
+      where f.id is null or b.id is null or d.id is null or fm.id is null or l.id is null
+    ) as voice_invalid_ownership_count,
+    (select count(*)::int
+       from voice_care_feeding_sessions s
+       left join care_events ce on ce.id = s.final_care_event_id
+         and ce.family_id = s.family_id and ce.baby_id = s.baby_id
+         and ce.actor_membership_id = s.actor_membership_id
+         and ce.actor_user_id = s.actor_user_id and ce.source = 'voice'
+      where (s.state = 'committed' and ce.id is null)
+         or (s.state <> 'committed' and s.final_care_event_id is not null)
+    ) as voice_invalid_final_link_count,
+    (select count(*)::int
+       from voice_care_feeding_sessions s
+      where jsonb_typeof(s.proposal_json) <> 'object'
+         or s.proposal_json->>'mode' not in ('unknown', 'bottle', 'direct_breastfeeding')
+         or jsonb_typeof(s.proposal_json->'startedAt') <> 'string'
+         or (s.proposal_json->'endedAt' is not null
+             and s.proposal_json->'endedAt' <> 'null'::jsonb
+             and jsonb_typeof(s.proposal_json->'endedAt') <> 'string')
+         or (s.proposal_json->>'mode' = 'unknown' and (
+              not (s.proposal_json ?& array['mode','startedAt','endedAt'])
+              or (select count(*) from jsonb_object_keys(s.proposal_json)) <> 3
+              or s.proposal_json->'endedAt' <> 'null'::jsonb))
+         or (s.proposal_json->>'mode' = 'bottle' and (
+              not (s.proposal_json ?& array['mode','startedAt','endedAt','liquidType','amountMl','bottleCapacityMl','amountValueOrigin'])
+              or (select count(*) from jsonb_object_keys(s.proposal_json)) <> 7
+              or (s.proposal_json->'liquidType' <> 'null'::jsonb
+               and s.proposal_json->>'liquidType' not in ('breast_milk', 'formula', 'mixed', 'other'))
+              or (s.proposal_json->'amountMl' <> 'null'::jsonb and (
+                   jsonb_typeof(s.proposal_json->'amountMl') <> 'number'
+                   or ((s.proposal_json->>'amountMl')::numeric % 1) <> 0
+                   or (s.proposal_json->>'amountMl')::numeric <= 0))
+              or (s.proposal_json->'bottleCapacityMl' <> 'null'::jsonb and (
+                   jsonb_typeof(s.proposal_json->'bottleCapacityMl') <> 'number'
+                   or ((s.proposal_json->>'bottleCapacityMl')::numeric % 1) <> 0
+                   or (s.proposal_json->>'bottleCapacityMl')::numeric <= 0))
+              or (s.proposal_json->'amountValueOrigin' <> 'null'::jsonb
+                  and s.proposal_json->>'amountValueOrigin' not in ('spoken', 'family_default'))))
+         or (s.proposal_json->>'mode' = 'direct_breastfeeding' and (
+              not (s.proposal_json ?& array['mode','startedAt','endedAt','durationMinutes'])
+              or (select count(*) from jsonb_object_keys(s.proposal_json)) <> 4
+              or (s.proposal_json->'durationMinutes' <> 'null'::jsonb and (
+                jsonb_typeof(s.proposal_json->'durationMinutes') <> 'number'
+                or ((s.proposal_json->>'durationMinutes')::numeric % 1) <> 0
+                or (s.proposal_json->>'durationMinutes')::numeric <= 0))))
+    ) as voice_invalid_proposal_count,
+    (select count(*)::int from voice_care_leases where revoked_at is null)
+      as voice_active_lease_count_before_sanitation`,
 });
-const REVOKE_SESSIONS_REQUEST = Object.freeze({
-  action: 'revoke-sessions' as const,
-  queryId: 'revoke-restored-sessions-v1' as const,
+const SANITIZE_AUTHORITY_REQUEST = Object.freeze({
+  action: 'sanitize-authority' as const,
+  queryId: 'sanitize-restored-authority-v1' as const,
   transaction: true as const,
-  sql: `update sessions
-           set revoked_at = statement_timestamp()
-         where revoked_at is null
-         returning id`,
+  sql: `with ordinary as (
+           update sessions set revoked_at = statement_timestamp()
+            where revoked_at is null returning id
+         ), voice_leases as (
+           update voice_care_leases set revoked_at = statement_timestamp()
+            where revoked_at is null returning id
+         ), voice_sessions as (
+           update voice_care_feeding_sessions
+              set state = 'needs_review',
+                  restore_invalidated_at = statement_timestamp(),
+                  version = version + 1,
+                  updated_at = statement_timestamp()
+            where state in ('pending', 'needs_confirmation', 'committing')
+            returning id
+         )
+         select (select count(*)::int from ordinary) as revoked_session_count,
+                (select count(*)::int from voice_leases) as revoked_voice_lease_count,
+                (select count(*)::int from voice_sessions) as invalidated_voice_session_count,
+                (select count(*)::int from voice_care_leases l
+                  where l.revoked_at is null
+                    and not exists (select 1 from voice_leases changed where changed.id = l.id))
+                  as active_voice_lease_count,
+                (select count(*)::int from voice_care_feeding_sessions s
+                  where s.state in ('pending', 'needs_confirmation', 'committing')
+                    and not exists (select 1 from voice_sessions changed where changed.id = s.id))
+                  as actionable_voice_session_count`,
 });
 
 export interface FixedPg16RestoreRunner {
@@ -261,8 +347,8 @@ export interface FixedPg16RestoreRunner {
     migrationFingerprint: string,
     signal: AbortSignal,
   ): Promise<unknown>;
-  revokeSessions(
-    request: typeof REVOKE_SESSIONS_REQUEST,
+  sanitizeAuthority(
+    request: typeof SANITIZE_AUTHORITY_REQUEST,
     signal: AbortSignal,
   ): Promise<unknown>;
 }
@@ -291,10 +377,14 @@ const RestoreTargetStateSchema = z
 const StructuralInvariantReportSchema = RestoreInvariantReportSchema.omit({
   summaryExecutable: true,
   timelineExecutable: true,
+  activeVoiceCareLeaseCount: true,
+  actionableVoiceCareSessionCount: true,
 });
 const ReadModelReportSchema = RestoreInvariantReportSchema.pick({
   summaryExecutable: true,
   timelineExecutable: true,
+  activeVoiceCareLeaseCount: true,
+  actionableVoiceCareSessionCount: true,
 });
 const MigrationFingerprintSchema = z.string().regex(/^[a-f0-9]{64}$/);
 
@@ -541,11 +631,11 @@ export function createPg16RestoreTools(
         (value) => StructuralInvariantReportSchema.parse(value),
       );
     },
-    revokeSessions(): Promise<number> {
+    sanitizeAuthority() {
       return run(
         'restore_sanitation_failed',
-        (signal) => runner.revokeSessions(REVOKE_SESSIONS_REQUEST, signal),
-        (value) => z.number().int().nonnegative().safe().parse(value),
+        (signal) => runner.sanitizeAuthority(SANITIZE_AUTHORITY_REQUEST, signal),
+        (value) => RestoreSanitationReportSchema.parse(value),
       );
     },
     probeReadModels() {

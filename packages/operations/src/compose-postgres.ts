@@ -252,30 +252,45 @@ commit;`,
           createdAt: integer(createdAt, 'restore_invariant_failed'),
         };
       });
-      const flags = lines(output)
+      const values = lines(output)
         .find((line) => line.startsWith('I\t'))
         ?.split('\t')
-        .slice(1)
-        .map((value) => value === 't') ?? [];
+        .slice(1) ?? [];
       return {
         migrationsMatch: canonicalMigrationFingerprint(facts) === expectedFingerprint,
-        singleActiveFamily: flags[0],
-        singleActiveBaby: flags[1],
-        ownershipValid: flags[2],
-        typedDetailsValid: flags[3],
-        revisionEdgesValid: flags[4],
-        handoffsValid: flags[5],
-        remindersValid: flags[6],
+        singleActiveFamily: values[0] === 't',
+        singleActiveBaby: values[1] === 't',
+        ownershipValid: values[2] === 't',
+        typedDetailsValid: values[3] === 't',
+        revisionEdgesValid: values[4] === 't',
+        handoffsValid: values[5] === 't',
+        remindersValid: values[6] === 't',
+        voiceCare: {
+          invalidOwnershipCount: integer(values[7], 'restore_invariant_failed'),
+          invalidFinalLinkCount: integer(values[8], 'restore_invariant_failed'),
+          invalidProposalCount: integer(values[9], 'restore_invariant_failed'),
+          activeLeaseCountBeforeSanitation: integer(values[10], 'restore_invariant_failed'),
+        },
       };
     },
-    async revokeSessions(request, signal) {
+    async sanitizeAuthority(request, signal) {
       const output = await psql(
         config.targetProject,
         config.targetService,
         `begin; ${request.sql}; commit;`,
         signal,
       );
-      return lines(output).filter((line) => /^[a-f0-9-]{36}$/.test(line)).length;
+      const row = lines(output).find((line) => /^\d+\t\d+\t\d+\t\d+\t\d+$/.test(line));
+      const values = row?.split('\t') ?? [];
+      if (
+        integer(values[3], 'restore_sanitation_failed') !== 0 ||
+        integer(values[4], 'restore_sanitation_failed') !== 0
+      ) throw new BackupError('restore_sanitation_failed');
+      return {
+        revokedSessionCount: integer(values[0], 'restore_sanitation_failed'),
+        revokedVoiceCareLeaseCount: integer(values[1], 'restore_sanitation_failed'),
+        invalidatedVoiceCareSessionCount: integer(values[2], 'restore_sanitation_failed'),
+      };
     },
   };
 
@@ -293,7 +308,12 @@ commit;`,
       if (output.toString('utf8').trim() !== 'restore_read_model_verified') {
         throw new BackupError('restore_read_model_failed');
       }
-      return { summaryExecutable: true, timelineExecutable: true };
+      return {
+        summaryExecutable: true,
+        timelineExecutable: true,
+        activeVoiceCareLeaseCount: 0,
+        actionableVoiceCareSessionCount: 0,
+      };
     },
   };
 }

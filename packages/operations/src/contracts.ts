@@ -47,12 +47,28 @@ export const RestoreInvariantReportSchema = z
     revisionEdgesValid: z.literal(true),
     handoffsValid: z.literal(true),
     remindersValid: z.literal(true),
+    voiceCare: z.object({
+      invalidOwnershipCount: z.literal(0),
+      invalidFinalLinkCount: z.literal(0),
+      invalidProposalCount: z.literal(0),
+      activeLeaseCountBeforeSanitation: z.number().int().nonnegative().safe(),
+    }).strict(),
     summaryExecutable: z.literal(true),
     timelineExecutable: z.literal(true),
+    activeVoiceCareLeaseCount: z.literal(0),
+    actionableVoiceCareSessionCount: z.literal(0),
   })
   .strict();
 
 export type RestoreInvariantReport = z.infer<typeof RestoreInvariantReportSchema>;
+
+export const RestoreSanitationReportSchema = z.object({
+  revokedSessionCount: z.number().int().nonnegative().safe(),
+  revokedVoiceCareLeaseCount: z.number().int().nonnegative().safe(),
+  invalidatedVoiceCareSessionCount: z.number().int().nonnegative().safe(),
+}).strict();
+
+export type RestoreSanitationReport = z.infer<typeof RestoreSanitationReportSchema>;
 
 export class BackupError extends Error {
   constructor(readonly code: string) {

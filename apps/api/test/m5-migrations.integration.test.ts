@@ -300,6 +300,45 @@ describeDatabase('M5 Voice Care migrations', () => {
     )).rejects.toMatchObject({ code: '23505', constraint: 'voice_care_feeding_sessions_final_event_idx' });
   });
 
+  it('records restore invalidation only on needs-review sessions and after their start', async () => {
+    database = await migratedDatabase();
+    await seedOwnership(database);
+    await seedDevice(database);
+    await seedLease(database);
+    await database.pool.query(
+      `insert into voice_care_feeding_sessions
+        (id, family_id, baby_id, device_id, lease_id, actor_user_id, actor_membership_id,
+         start_request_id, state, proposal_json, version, started_at, expires_at)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, 'pending',
+         '{"mode":"unknown","startedAt":"2026-08-23T08:00:00.000Z","endedAt":null}'::jsonb,
+         1, '2026-08-23T08:00:00Z', '2026-08-23T14:00:00Z')`,
+      [SESSION_ID, FAMILY_ID, BABY_ID, DEVICE_ID, LEASE_ID, USER_ID, MEMBERSHIP_ID, REQUEST_ID],
+    );
+    await expect(database.pool.query(
+      `update voice_care_feeding_sessions set restore_invalidated_at = '2026-08-23T09:00:00Z'
+        where id = $1`, [SESSION_ID],
+    )).rejects.toMatchObject({
+      code: '23514',
+      constraint: 'voice_care_feeding_sessions_restore_invalidation_shape',
+    });
+    await expect(database.pool.query(
+      `update voice_care_feeding_sessions set state = 'needs_review',
+         restore_invalidated_at = '2026-08-23T07:59:59Z' where id = $1`, [SESSION_ID],
+    )).rejects.toMatchObject({
+      code: '23514',
+      constraint: 'voice_care_feeding_sessions_timestamp_order',
+    });
+    await database.pool.query(
+      `update voice_care_feeding_sessions set state = 'needs_review', version = version + 1,
+         restore_invalidated_at = '2026-08-23T09:00:00Z' where id = $1`, [SESSION_ID],
+    );
+    const result = await database.pool.query(
+      `select state, version, restore_invalidated_at is not null as invalidated
+         from voice_care_feeding_sessions where id = $1`, [SESSION_ID],
+    );
+    expect(result.rows).toEqual([{ state: 'needs_review', version: 2, invalidated: true }]);
+  });
+
   it('requires server-owned actor provenance for manual and voice care/checkpoint rows', async () => {
     database = await migratedDatabase();
     await seedOwnership(database);

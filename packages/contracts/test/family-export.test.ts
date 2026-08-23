@@ -7,7 +7,9 @@ import {
   compareFamilyExportHandoffCheckpoints,
   compareFamilyExportHandoffReminderRules,
   compareFamilyExportMembers,
+  compareVoiceCareExportSessions,
   FAMILY_EXPORT_SCHEMA_VERSION,
+  FamilyExportSchemaV2,
   FamilyExportSchemaV1,
   familyExportFilename,
 } from '../src/index.js';
@@ -30,6 +32,7 @@ const ids = {
   revision: '88888888-8888-4888-8888-888888888888',
   checkpoint: '99999999-9999-4999-8999-999999999999',
   reminder: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  voiceSession: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
 };
 
 const occurredAt = '2026-08-17T23:59:59.000Z';
@@ -57,7 +60,7 @@ function event(eventType: string, payload: Record<string, unknown>, suffix: stri
 
 function validExport() {
   return {
-    schemaVersion: FAMILY_EXPORT_SCHEMA_VERSION,
+    schemaVersion: 1,
     generatedAt: createdAt,
     family: {
       id: ids.family,
@@ -135,6 +138,35 @@ function validExport() {
       enabled: true,
       createdAt,
       updatedAt: createdAt,
+    }],
+  };
+}
+
+function validExportV2() {
+  return {
+    ...validExport(),
+    schemaVersion: FAMILY_EXPORT_SCHEMA_VERSION,
+    voiceCareSessions: [{
+      id: ids.voiceSession,
+      actorUserId: ids.dadUser,
+      actorMembershipId: ids.dadMembership,
+      actorDisplayName: 'Dad',
+      state: 'committed',
+      proposal: {
+        mode: 'bottle',
+        startedAt: occurredAt,
+        endedAt: createdAt,
+        liquidType: 'formula',
+        amountMl: 90,
+        bottleCapacityMl: 150,
+        amountValueOrigin: 'spoken',
+      },
+      confirmationMethod: 'device',
+      finalCareEventId: ids.event,
+      startedAt: occurredAt,
+      endedAt: createdAt,
+      confirmedAt: createdAt,
+      cancelledAt: null,
     }],
   };
 }
@@ -255,5 +287,38 @@ describe('M4 family export contract', () => {
       { ...firstReminder!, id: ids.dadUser, actorMembershipId: ids.dadMembership, localTime: '08:00', weekdayMask: 1 },
     ];
     expect(reminders.sort(compareFamilyExportHandoffReminderRules).map((item) => item.id)).toEqual([ids.dadUser, ids.momUser, ids.event]);
+  });
+});
+
+describe('M5 family export v2 contract', () => {
+  it('keeps v1 readable and accepts typed Voice Care history in v2', () => {
+    expect(FAMILY_EXPORT_SCHEMA_VERSION).toBe(2);
+    expect(FamilyExportSchemaV1.parse(validExport()).schemaVersion).toBe(1);
+    const parsed = FamilyExportSchemaV2.parse(validExportV2());
+    expect(parsed.voiceCareSessions[0]).toMatchObject({
+      state: 'committed',
+      confirmationMethod: 'device',
+      proposal: { mode: 'bottle', liquidType: 'formula', amountMl: 90 },
+    });
+  });
+
+  it.each(['publicKey', 'signature', 'challenge', 'leaseId', 'requestId', 'modelVersion'])(
+    'rejects Voice Care security field %s',
+    (field) => {
+      const document = validExportV2();
+      document.voiceCareSessions[0] = { ...document.voiceCareSessions[0]!, [field]: 'private' };
+      expect(FamilyExportSchemaV2.safeParse(document).success).toBe(false);
+    },
+  );
+
+  it('sorts Voice Care sessions by start time and then id', () => {
+    const [item] = FamilyExportSchemaV2.parse(validExportV2()).voiceCareSessions;
+    const sessions = [
+      { ...item!, id: ids.voiceSession, startedAt: createdAt },
+      { ...item!, id: ids.event, startedAt: occurredAt },
+      { ...item!, id: ids.dadUser, startedAt: createdAt },
+    ];
+    expect(sessions.sort(compareVoiceCareExportSessions).map((session) => session.id))
+      .toEqual([ids.event, ids.dadUser, ids.voiceSession]);
   });
 });

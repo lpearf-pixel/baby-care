@@ -13,8 +13,9 @@ import {
   WeightTimelinePayloadSchema,
 } from './care/query.js';
 import { EditCareEventInputSchema } from './care/revisions.js';
+import { VoiceCareFeedingProposalV1Schema } from './voice-care.js';
 
-export const FAMILY_EXPORT_SCHEMA_VERSION = 1;
+export const FAMILY_EXPORT_SCHEMA_VERSION = 2;
 export const DEFAULT_FAMILY_EXPORT_MAX_BYTES = 33_554_432;
 
 const OffsetDateTimeSchema = z.string().datetime({ offset: true });
@@ -131,7 +132,7 @@ const ExportHandoffReminderRuleSchema = z.object({
 }).strict();
 
 const FamilyExportSchemaV1Implementation = z.object({
-  schemaVersion: z.literal(FAMILY_EXPORT_SCHEMA_VERSION),
+  schemaVersion: z.literal(1),
   generatedAt: OffsetDateTimeSchema,
   family: ExportFamilySchema,
   baby: ExportBabySchema,
@@ -150,6 +151,37 @@ export type FamilyExportHandoffCheckpoint = z.infer<typeof ExportHandoffCheckpoi
 export type FamilyExportHandoffReminderRule = z.infer<typeof ExportHandoffReminderRuleSchema>;
 
 export const FamilyExportSchemaV1: z.ZodType<FamilyExportV1> = FamilyExportSchemaV1Implementation;
+
+export const VoiceCareExportSessionSchemaV1 = z.object({
+  id: UuidSchema,
+  actorUserId: UuidSchema,
+  actorMembershipId: UuidSchema,
+  actorDisplayName: z.string().min(1),
+  state: z.enum(['pending', 'needs_confirmation', 'needs_review', 'cancelled', 'committed']),
+  proposal: VoiceCareFeedingProposalV1Schema,
+  confirmationMethod: z.enum(['device', 'browser']).nullable(),
+  finalCareEventId: UuidSchema.nullable(),
+  startedAt: OffsetDateTimeSchema,
+  endedAt: OffsetDateTimeSchema.nullable(),
+  confirmedAt: OffsetDateTimeSchema.nullable(),
+  cancelledAt: OffsetDateTimeSchema.nullable(),
+}).strict();
+
+const FamilyExportSchemaV2Implementation = FamilyExportSchemaV1Implementation
+  .omit({ schemaVersion: true })
+  .extend({
+    schemaVersion: z.literal(FAMILY_EXPORT_SCHEMA_VERSION),
+    voiceCareSessions: z.array(VoiceCareExportSessionSchemaV1),
+  })
+  .strict();
+
+export type VoiceCareExportSessionV1 = z.infer<typeof VoiceCareExportSessionSchemaV1>;
+export type FamilyExportV2 = z.infer<typeof FamilyExportSchemaV2Implementation>;
+export const FamilyExportSchemaV2: z.ZodType<FamilyExportV2> = FamilyExportSchemaV2Implementation;
+export const FamilyExportSchema = z.discriminatedUnion('schemaVersion', [
+  FamilyExportSchemaV1Implementation,
+  FamilyExportSchemaV2Implementation,
+]);
 
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -193,6 +225,13 @@ export function compareFamilyExportHandoffReminderRules(
     || compareText(left.localTime, right.localTime)
     || left.weekdayMask - right.weekdayMask
     || compareText(left.id, right.id);
+}
+
+export function compareVoiceCareExportSessions(
+  left: VoiceCareExportSessionV1,
+  right: VoiceCareExportSessionV1,
+): number {
+  return compareTime(left.startedAt, right.startedAt) || compareText(left.id, right.id);
 }
 
 export function familyExportFilename(generatedAt: Date): string {

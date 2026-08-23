@@ -1,8 +1,8 @@
 import type pg from 'pg';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  FamilyExportSchemaV1,
-  type FamilyExportV1,
+  FamilyExportSchemaV2,
+  type FamilyExportV2,
   type FeedingRelatedActionInput,
 } from '@baby-care/contracts';
 import type { AuthContext } from '../src/auth/auth-service.js';
@@ -122,6 +122,7 @@ function validRows(note = '宝宝的私密记录'): FamilyExportRows {
       createdAt: firstTime,
       updatedAt: firstTime,
     }],
+    voiceCareSessions: [],
   };
 }
 
@@ -148,9 +149,9 @@ function repositoryReturning(rows: FamilyExportRows): FamilyExportRepository {
   return { readFamilyExport: vi.fn(async () => rows) };
 }
 
-function expectedDocument(rows: FamilyExportRows): FamilyExportV1 {
+function expectedDocument(rows: FamilyExportRows): FamilyExportV2 {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt,
     ...rows,
   };
@@ -380,7 +381,7 @@ describe('family export snapshot service', () => {
 
   it('measures UTF-8 bytes, accepts the exact bound, and rejects one byte over without truncation', async () => {
     const rows = validRows('宝宝');
-    const expected = FamilyExportSchemaV1.parse(expectedDocument(rows));
+    const expected = FamilyExportSchemaV2.parse(expectedDocument(rows));
     const exactBytes = Buffer.byteLength(JSON.stringify(expected), 'utf8');
     expect(JSON.stringify(expected).length).toBeLessThan(exactBytes);
 
@@ -542,6 +543,7 @@ function repositoryClient(scenario: RepositoryScenario): pg.PoolClient {
     if (sql.includes('from care_event_revisions cr')) return { rows: scenario.revisions ?? [] };
     if (sql.includes('from care_handoff_checkpoints hc')) return { rows: [] };
     if (sql.includes('from care_handoff_reminder_rules hr')) return { rows: [] };
+    if (sql.includes('from voice_care_feeding_sessions s')) return { rows: [] };
     throw new Error(`Unexpected family export repository query: ${sql}`);
   });
   return { query } as unknown as pg.PoolClient;

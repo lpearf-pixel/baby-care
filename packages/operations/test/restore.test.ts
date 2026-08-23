@@ -78,11 +78,23 @@ function restoreTools(order: string[], overrides: Partial<PostgresRestoreTools> 
       revisionEdgesValid: true,
       handoffsValid: true,
       remindersValid: true,
+      voiceCare: {
+        invalidOwnershipCount: 0,
+        invalidFinalLinkCount: 0,
+        invalidProposalCount: 0,
+        activeLeaseCountBeforeSanitation: 1,
+      },
     }),
-    revokeSessions: mark('revokeSessions', 2),
+    sanitizeAuthority: mark('sanitizeAuthority', {
+      revokedSessionCount: 2,
+      revokedVoiceCareLeaseCount: 1,
+      invalidatedVoiceCareSessionCount: 1,
+    }),
     probeReadModels: mark('probeReadModels', {
       summaryExecutable: true,
       timelineExecutable: true,
+      activeVoiceCareLeaseCount: 0,
+      actionableVoiceCareSessionCount: 0,
     }),
     ...overrides,
   };
@@ -108,6 +120,8 @@ describe('restoreBackup', () => {
     await expect(restoreBackup({ outputParent, bundleName }, tools)).resolves.toEqual({
       code: 'restore_verified',
       revokedSessionCount: 2,
+      revokedVoiceCareLeaseCount: 1,
+      invalidatedVoiceCareSessionCount: 1,
     });
     expect(await readdir(outputParent)).toEqual([bundleName]);
   }, 120_000);
@@ -120,6 +134,8 @@ describe('restoreBackup', () => {
     await expect(restoreBackup({ outputParent, bundleName }, tools)).resolves.toEqual({
       code: 'restore_verified',
       revokedSessionCount: 2,
+      revokedVoiceCareLeaseCount: 1,
+      invalidatedVoiceCareSessionCount: 1,
     });
     expect(order).toEqual([
       'sourceIdentity',
@@ -127,7 +143,7 @@ describe('restoreBackup', () => {
       'targetState',
       'restore',
       'verifyInvariants',
-      'revokeSessions',
+      'sanitizeAuthority',
       'probeReadModels',
     ]);
   });
@@ -147,14 +163,14 @@ describe('restoreBackup', () => {
     await expect(restoreBackup({ outputParent, bundleName }, tools)).rejects.toMatchObject({ code });
     expect(tools.restore).not.toHaveBeenCalled();
     expect(tools.verifyInvariants).not.toHaveBeenCalled();
-    expect(tools.revokeSessions).not.toHaveBeenCalled();
+    expect(tools.sanitizeAuthority).not.toHaveBeenCalled();
     expect(tools.probeReadModels).not.toHaveBeenCalled();
   });
 
   test.each([
-    ['restore', { restore: async () => { throw new Error('private database URL'); } }, 'restore_failed', ['verifyInvariants', 'revokeSessions', 'probeReadModels']],
-    ['invariants', { verifyInvariants: async () => { throw new Error('row value'); } }, 'restore_invariant_failed', ['revokeSessions', 'probeReadModels']],
-    ['sanitation', { revokeSessions: async () => { throw new Error('token hash'); } }, 'restore_sanitation_failed', ['probeReadModels']],
+    ['restore', { restore: async () => { throw new Error('private database URL'); } }, 'restore_failed', ['verifyInvariants', 'sanitizeAuthority', 'probeReadModels']],
+    ['invariants', { verifyInvariants: async () => { throw new Error('row value'); } }, 'restore_invariant_failed', ['sanitizeAuthority', 'probeReadModels']],
+    ['sanitation', { sanitizeAuthority: async () => { throw new Error('token hash'); } }, 'restore_sanitation_failed', ['probeReadModels']],
     ['read models', { probeReadModels: async () => { throw new Error('care value'); } }, 'restore_read_model_failed', []],
   ] as const)('redacts %s failure and prevents later calls', async (_label, overrides, code, forbidden) => {
     const outputParent = await validBundle();
@@ -190,6 +206,12 @@ describe('restoreBackup', () => {
             revisionEdgesValid: true,
             handoffsValid: true,
             remindersValid: true,
+            voiceCare: {
+              invalidOwnershipCount: 0,
+              invalidFinalLinkCount: 0,
+              invalidProposalCount: 0,
+              activeLeaseCountBeforeSanitation: 0,
+            },
           }) as never,
         }),
       ),
@@ -203,6 +225,8 @@ describe('restoreBackup', () => {
           probeReadModels: async () => ({
             summaryExecutable: true,
             timelineExecutable: false,
+            activeVoiceCareLeaseCount: 0,
+            actionableVoiceCareSessionCount: 0,
           }) as never,
         }),
       ),
@@ -271,8 +295,18 @@ describe('createPg16RestoreTools', () => {
         revisionEdgesValid: true,
         handoffsValid: true,
         remindersValid: true,
+        voiceCare: {
+          invalidOwnershipCount: 0,
+          invalidFinalLinkCount: 0,
+          invalidProposalCount: 0,
+          activeLeaseCountBeforeSanitation: 1,
+        },
       })),
-      revokeSessions: vi.fn(async () => 2),
+      sanitizeAuthority: vi.fn(async () => ({
+        revokedSessionCount: 2,
+        revokedVoiceCareLeaseCount: 1,
+        invalidatedVoiceCareSessionCount: 1,
+      })),
       ...overrides,
     };
   }
@@ -282,7 +316,7 @@ describe('createPg16RestoreTools', () => {
     const tools = createPg16RestoreTools(
       backupTools(),
       fixedRunner,
-      async () => ({ summaryExecutable: true, timelineExecutable: true }),
+      async () => ({ summaryExecutable: true, timelineExecutable: true, activeVoiceCareLeaseCount: 0, actionableVoiceCareSessionCount: 0 }),
     );
 
     await tools.sourceIdentity();
@@ -290,7 +324,7 @@ describe('createPg16RestoreTools', () => {
     await tools.targetState();
     await tools.restore(Readable.from([Buffer.from('fixture')]));
     await tools.verifyInvariants('a'.repeat(64));
-    await tools.revokeSessions();
+    await tools.sanitizeAuthority();
     await tools.probeReadModels();
 
     expect(fixedRunner.restore).toHaveBeenCalledWith(
@@ -316,12 +350,12 @@ describe('createPg16RestoreTools', () => {
       'a'.repeat(64),
       expect.any(AbortSignal),
     );
-    expect(fixedRunner.revokeSessions).toHaveBeenCalledWith(
+    expect(fixedRunner.sanitizeAuthority).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: 'revoke-sessions',
-        queryId: 'revoke-restored-sessions-v1',
+        action: 'sanitize-authority',
+        queryId: 'sanitize-restored-authority-v1',
         transaction: true,
-        sql: expect.stringMatching(/^update sessions/),
+        sql: expect.stringContaining('voice_care_leases'),
       }),
       expect.any(AbortSignal),
     );

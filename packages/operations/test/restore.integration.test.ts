@@ -130,6 +130,8 @@ async function migrateAndSeed(
     '0001_m2_care_recording.sql',
     '0002_m3_care_workspace.sql',
     '0003_m3_care_revision_versions.sql',
+    '0004_m5_voice_care.sql',
+    '0005_m5_restore_invalidation.sql',
   ]) {
     try {
       await executeSql(name, await readFile(join(repositoryRoot, 'migrations', migration), 'utf8'));
@@ -231,6 +233,77 @@ async function migrateAndSeed(
       '22222222-2222-4222-8222-222222222222', '33333333-3333-4333-8333-333333333333',
       '44444444-4444-4444-8444-444444444444', '08:00', 127, true
     );
+    insert into voice_care_devices (
+      id, family_id, public_key, capability, status
+    ) values (
+      '10101010-1010-4010-8010-101010101010',
+      '11111111-1111-4111-8111-111111111111', decode(repeat('11', 32), 'hex'),
+      'voice_care.intent.submit', 'active'
+    );
+    insert into voice_care_leases (
+      id, family_id, baby_id, device_id, actor_user_id, actor_membership_id,
+      client_request_id, issued_at, expires_at
+    ) values (
+      '11111112-1111-4111-8111-111111111112',
+      '11111111-1111-4111-8111-111111111111',
+      '22222222-2222-4222-8222-222222222222',
+      '10101010-1010-4010-8010-101010101010',
+      '33333333-3333-4333-8333-333333333333',
+      '44444444-4444-4444-8444-444444444444',
+      '16161616-1616-4616-8616-161616161616', now(), now() + interval '1 hour'
+    );
+    insert into care_events (
+      id, family_id, baby_id, actor_user_id, actor_membership_id, source, event_type,
+      occurred_at, client_request_id, trace_id
+    ) values (
+      '14141414-1414-4414-8414-141414141414',
+      '11111111-1111-4111-8111-111111111111',
+      '22222222-2222-4222-8222-222222222222',
+      '33333333-3333-4333-8333-333333333333',
+      '44444444-4444-4444-8444-444444444444', 'voice', 'feeding', now(),
+      '17171717-1717-4717-8717-171717171717', 'synthetic-voice-commit'
+    );
+    insert into feeding_sessions (event_id)
+      values ('14141414-1414-4414-8414-141414141414');
+    insert into feeding_components (
+      id, session_event_id, component_type, liquid_type, amount_ml, bottle_capacity_ml, occurred_at
+    ) values (
+      '15151515-1515-4515-8515-151515151515',
+      '14141414-1414-4414-8414-141414141414', 'bottle', 'formula', 90, 150, now()
+    );
+    insert into voice_care_feeding_sessions (
+      id, family_id, baby_id, device_id, lease_id, actor_user_id, actor_membership_id,
+      start_request_id, state, proposal_json, started_at, expires_at
+    ) values (
+      '12121212-1212-4212-8212-121212121212',
+      '11111111-1111-4111-8111-111111111111',
+      '22222222-2222-4222-8222-222222222222',
+      '10101010-1010-4010-8010-101010101010',
+      '11111112-1111-4111-8111-111111111112',
+      '33333333-3333-4333-8333-333333333333',
+      '44444444-4444-4444-8444-444444444444',
+      '18181818-1818-4818-8818-181818181818', 'pending',
+      '{"mode":"unknown","startedAt":"2026-08-17T12:00:00.000Z","endedAt":null}'::jsonb,
+      now(), now() + interval '2 hours'
+    );
+    insert into voice_care_feeding_sessions (
+      id, family_id, baby_id, device_id, lease_id, actor_user_id, actor_membership_id,
+      start_request_id, state, proposal_json, started_at, expires_at, ended_at,
+      confirmed_at, proposal_digest, final_care_event_id
+    ) values (
+      '13131313-1313-4313-8313-131313131313',
+      '11111111-1111-4111-8111-111111111111',
+      '22222222-2222-4222-8222-222222222222',
+      '10101010-1010-4010-8010-101010101010',
+      '11111112-1111-4111-8111-111111111112',
+      '33333333-3333-4333-8333-333333333333',
+      '44444444-4444-4444-8444-444444444444',
+      '19191919-1919-4919-8919-191919191919', 'committed',
+      '{"mode":"bottle","startedAt":"2026-08-17T11:00:00.000Z","endedAt":"2026-08-17T11:10:00.000Z","liquidType":"formula","amountMl":90,"bottleCapacityMl":150,"amountValueOrigin":"spoken"}'::jsonb,
+      now() - interval '1 hour', now() + interval '1 hour', now() - interval '50 minutes',
+      now() - interval '49 minutes', decode(repeat('22', 32), 'hex'),
+      '14141414-1414-4414-8414-141414141414'
+    );
     `);
   } catch (error) {
     throw new Error('synthetic_seed_failed_data', { cause: error });
@@ -317,21 +390,32 @@ function realRestoreRunner(sourceName: string, targetName: string): FixedPg16Res
         return { id: Number(id), hash: hash ?? '', createdAt: Number(createdAt) };
       });
       const invariant = lines.find((line) => line.startsWith('I\t'))?.split('\t').slice(1) ?? [];
-      const flags = invariant.map((value) => value === 't');
       return {
         migrationsMatch: canonicalMigrationFingerprint(facts) === expectedFingerprint,
-        singleActiveFamily: flags[0],
-        singleActiveBaby: flags[1],
-        ownershipValid: flags[2],
-        typedDetailsValid: flags[3],
-        revisionEdgesValid: flags[4],
-        handoffsValid: flags[5],
-        remindersValid: flags[6],
+        singleActiveFamily: invariant[0] === 't',
+        singleActiveBaby: invariant[1] === 't',
+        ownershipValid: invariant[2] === 't',
+        typedDetailsValid: invariant[3] === 't',
+        revisionEdgesValid: invariant[4] === 't',
+        handoffsValid: invariant[5] === 't',
+        remindersValid: invariant[6] === 't',
+        voiceCare: {
+          invalidOwnershipCount: Number(invariant[7]),
+          invalidFinalLinkCount: Number(invariant[8]),
+          invalidProposalCount: Number(invariant[9]),
+          activeLeaseCountBeforeSanitation: Number(invariant[10]),
+        },
       };
     },
-    revokeSessions: async (request) => {
+    sanitizeAuthority: async (request) => {
       const output = await psql(targetName, `begin; ${request.sql}; commit;`);
-      return output.split('\n').filter((line) => /^[0-9a-f-]{36}$/.test(line)).length;
+      const values = output.split('\n').find((line) => /^\d+\t\d+\t\d+\t\d+\t\d+$/.test(line))?.split('\t') ?? [];
+      if (Number(values[3]) !== 0 || Number(values[4]) !== 0) throw new Error('authority remained');
+      return {
+        revokedSessionCount: Number(values[0]),
+        revokedVoiceCareLeaseCount: Number(values[1]),
+        invalidatedVoiceCareSessionCount: Number(values[2]),
+      };
     },
   };
 }
@@ -533,6 +617,12 @@ describePg16('real isolated PostgreSQL 16 restore', () => {
     await withPg16Pair(async (source, target) => {
       await migrateAndSeed(source);
       const sourceBefore = await containerDump(source, ['--data-only', '--column-inserts']);
+      const committedVoiceFactBefore = await psql(source, `select jsonb_build_object(
+        'event', to_jsonb(ce) - 'created_at' - 'updated_at',
+        'feeding', to_jsonb(fs), 'components', coalesce(jsonb_agg(to_jsonb(fc) order by fc.id), '[]'::jsonb)
+      ) from care_events ce join feeding_sessions fs on fs.event_id = ce.id
+        left join feeding_components fc on fc.session_event_id = ce.id
+      where ce.id = '14141414-1414-4414-8414-141414141414' group by ce.id, fs.event_id`);
       const root = await privateRoot();
       const sourceTools = realBackupTools(source);
       expect(
@@ -550,14 +640,15 @@ describePg16('real isolated PostgreSQL 16 restore', () => {
         observedInvariantReport = await originalVerifyInvariants(request, fingerprint, signal);
         return observedInvariantReport;
       };
-      const originalRevoke = runner.revokeSessions.bind(runner);
-      runner.revokeSessions = async (request, signal) => {
+      const originalSanitize = runner.sanitizeAuthority.bind(runner);
+      runner.sanitizeAuthority = async (request, signal) => {
         targetBeforeSanitation = await containerDump(target, [
           '--data-only', '--column-inserts', '--exclude-table=sessions',
+          '--exclude-table=voice_care_leases', '--exclude-table=voice_care_feeding_sessions',
         ]);
         sessionsBeforeSanitation = await psql(target, `select id, family_id, user_id, token_hash,
           created_at, expires_at, last_seen_at from sessions order by id`);
-        return originalRevoke(request, signal);
+        return originalSanitize(request, signal);
       };
       const tools = createPg16RestoreTools(sourceTools, runner, async () => {
         const databaseUrl = databaseUrls.get(target);
@@ -574,7 +665,12 @@ describePg16('real isolated PostgreSQL 16 restore', () => {
         await expect(restoreBackup({
           outputParent: root,
           bundleName: 'baby-care-backup-20260817T123456Z',
-        }, tools)).resolves.toEqual({ code: 'restore_verified', revokedSessionCount: 1 });
+        }, tools)).resolves.toEqual({
+          code: 'restore_verified',
+          revokedSessionCount: 1,
+          revokedVoiceCareLeaseCount: 1,
+          invalidatedVoiceCareSessionCount: 1,
+        });
       } catch (error) {
         expect(observedInvariantReport).toEqual({
           migrationsMatch: true,
@@ -585,6 +681,12 @@ describePg16('real isolated PostgreSQL 16 restore', () => {
           revisionEdgesValid: true,
           handoffsValid: true,
           remindersValid: true,
+          voiceCare: {
+            invalidOwnershipCount: 0,
+            invalidFinalLinkCount: 0,
+            invalidProposalCount: 0,
+            activeLeaseCountBeforeSanitation: 1,
+          },
         });
         throw error;
       }
@@ -593,11 +695,27 @@ describePg16('real isolated PostgreSQL 16 restore', () => {
       expect(stableDump(sourceAfter)).toBe(stableDump(sourceBefore));
       const targetAfterSanitation = await containerDump(target, [
         '--data-only', '--column-inserts', '--exclude-table=sessions',
+        '--exclude-table=voice_care_leases', '--exclude-table=voice_care_feeding_sessions',
       ]);
       expect(stableDump(targetAfterSanitation)).toBe(stableDump(targetBeforeSanitation));
       expect(await psql(target, `select id, family_id, user_id, token_hash,
         created_at, expires_at, last_seen_at from sessions order by id`)).toBe(sessionsBeforeSanitation);
       expect(await psql(target, 'select count(*) from sessions where revoked_at is null')).toBe('0');
+      expect(await psql(target, 'select count(*) from voice_care_leases where revoked_at is null')).toBe('0');
+      expect(await psql(target, `select count(*) from voice_care_feeding_sessions
+        where state in ('pending','needs_confirmation','committing')`)).toBe('0');
+      expect(await psql(target, `select count(*) from voice_care_feeding_sessions
+        where id = '12121212-1212-4212-8212-121212121212'
+          and state = 'needs_review' and restore_invalidated_at is not null and version = 2`)).toBe('1');
+      expect(await psql(target, `select count(*) from voice_care_feeding_sessions
+        where id = '13131313-1313-4313-8313-131313131313'
+          and state = 'committed' and restore_invalidated_at is null and version = 1`)).toBe('1');
+      expect(await psql(target, `select jsonb_build_object(
+        'event', to_jsonb(ce) - 'created_at' - 'updated_at',
+        'feeding', to_jsonb(fs), 'components', coalesce(jsonb_agg(to_jsonb(fc) order by fc.id), '[]'::jsonb)
+      ) from care_events ce join feeding_sessions fs on fs.event_id = ce.id
+        left join feeding_components fc on fc.session_event_id = ce.id
+      where ce.id = '14141414-1414-4414-8414-141414141414' group by ce.id, fs.event_id`)).toBe(committedVoiceFactBefore);
       const rawCookieHash = createHash('sha256').update('restored-cookie-test-only').digest('hex');
       expect(await psql(target, `select count(*) from sessions
         where token_hash = '${rawCookieHash}' and revoked_at is null`)).toBe('0');
@@ -669,7 +787,7 @@ describePg16('real isolated PostgreSQL 16 restore', () => {
       const tools = createPg16RestoreTools(
         sourceTools,
         realRestoreRunner(source, target),
-        async () => ({ summaryExecutable: true, timelineExecutable: true }),
+        async () => ({ summaryExecutable: true, timelineExecutable: true, activeVoiceCareLeaseCount: 0, actionableVoiceCareSessionCount: 0 }),
         { timeoutMs: 60_000 },
       );
       await expect(restoreBackup({
@@ -693,14 +811,14 @@ describePg16('real isolated PostgreSQL 16 restore', () => {
       const sourceTools = realBackupTools(source);
       await createRealBackup(root, sourceTools);
       const runner = realRestoreRunner(source, target);
-      runner.revokeSessions = async (request) => {
+      runner.sanitizeAuthority = async (request) => {
         await psql(target, `begin; ${request.sql}; rollback;`);
         throw new Error('synthetic_sanitation_failure');
       };
       const tools = createPg16RestoreTools(
         sourceTools,
         runner,
-        async () => ({ summaryExecutable: true, timelineExecutable: true }),
+        async () => ({ summaryExecutable: true, timelineExecutable: true, activeVoiceCareLeaseCount: 0, actionableVoiceCareSessionCount: 0 }),
         { timeoutMs: 60_000 },
       );
 
@@ -709,6 +827,10 @@ describePg16('real isolated PostgreSQL 16 restore', () => {
         bundleName: 'baby-care-backup-20260817T123456Z',
       }, tools)).rejects.toMatchObject({ code: 'restore_sanitation_failed' });
       expect(await psql(target, 'select count(*) from sessions where revoked_at is null')).toBe('1');
+      expect(await psql(target, 'select count(*) from voice_care_leases where revoked_at is null')).toBe('1');
+      expect(await psql(target, `select count(*) from voice_care_feeding_sessions
+        where id = '12121212-1212-4212-8212-121212121212'
+          and state = 'pending' and restore_invalidated_at is null and version = 1`)).toBe('1');
       expect(stableDump(await containerDump(source, ['--data-only', '--column-inserts']))).toBe(
         stableDump(sourceBefore),
       );
@@ -780,8 +902,14 @@ describe('restore library integration', () => {
         revisionEdgesValid: true,
         handoffsValid: true,
         remindersValid: true,
+        voiceCare: {
+          invalidOwnershipCount: 0,
+          invalidFinalLinkCount: 0,
+          invalidProposalCount: 0,
+          activeLeaseCountBeforeSanitation: 0,
+        },
       }),
-      revokeSessions: async () => {
+      sanitizeAuthority: async () => {
         if (!target) throw new Error('target absent');
         targetBeforeSanitation = structuredClone(target);
         let count = 0;
@@ -790,7 +918,11 @@ describe('restore library integration', () => {
           count += 1;
           return { ...session, revokedAt: '2026-08-17T12:34:57.000Z' };
         });
-        return count;
+        return {
+          revokedSessionCount: count,
+          revokedVoiceCareLeaseCount: 0,
+          invalidatedVoiceCareSessionCount: 0,
+        };
       },
     };
     const root = await privateRoot();
@@ -801,6 +933,8 @@ describe('restore library integration', () => {
     const tools = createPg16RestoreTools(backupTools(source), fixedRunner, async () => ({
       summaryExecutable: target?.careVersion === 3,
       timelineExecutable: target?.timelineCount === 4,
+      activeVoiceCareLeaseCount: 0,
+      actionableVoiceCareSessionCount: 0,
     }));
 
     await expect(
@@ -808,7 +942,12 @@ describe('restore library integration', () => {
         { outputParent: root, bundleName: 'baby-care-backup-20260817T123456Z' },
         tools,
       ),
-    ).resolves.toEqual({ code: 'restore_verified', revokedSessionCount: 1 });
+    ).resolves.toEqual({
+      code: 'restore_verified',
+      revokedSessionCount: 1,
+      revokedVoiceCareLeaseCount: 0,
+      invalidatedVoiceCareSessionCount: 0,
+    });
 
     expect(JSON.stringify(source)).toBe(sourceBefore);
     expect(targetBeforeSanitation).toEqual(source);
@@ -831,7 +970,7 @@ describe('restore library integration', () => {
       targetState: async () => ({ userObjectCount: 1, migrationHistoryCount: 0 }),
       restore,
       verifyInvariants: vi.fn(),
-      revokeSessions: vi.fn(),
+      sanitizeAuthority: vi.fn(),
     };
     const root = await privateRoot();
     await createBackup(
@@ -841,6 +980,8 @@ describe('restore library integration', () => {
     const tools = createPg16RestoreTools(backupTools(source), fixedRunner, async () => ({
       summaryExecutable: true,
       timelineExecutable: true,
+      activeVoiceCareLeaseCount: 0,
+      actionableVoiceCareSessionCount: 0,
     }));
 
     await expect(

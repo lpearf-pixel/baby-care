@@ -34,6 +34,18 @@ select f.id as family_id,
           fm.id
  limit 1`;
 
+const RESTORE_VOICE_AUTHORITY_QUERY = `/* restore-verifier-voice-authority-v1 */
+select (select count(*)::int from voice_care_leases where revoked_at is null)
+         as active_voice_lease_count,
+       (select count(*)::int from voice_care_feeding_sessions
+         where state in ('pending', 'needs_confirmation', 'committing'))
+         as actionable_voice_session_count`;
+
+const RestoreVoiceAuthorityRowSchema = z.object({
+  active_voice_lease_count: z.coerce.number().int().nonnegative(),
+  actionable_voice_session_count: z.coerce.number().int().nonnegative(),
+}).strict();
+
 export class RestoredDatabaseVerifierError extends Error {
   readonly code = 'restore_read_model_failed';
 
@@ -46,6 +58,8 @@ export class RestoredDatabaseVerifierError extends Error {
 export async function verifyRestoredDatabase(database: DatabaseContext): Promise<{
   summaryExecutable: true;
   timelineExecutable: true;
+  activeVoiceCareLeaseCount: 0;
+  actionableVoiceCareSessionCount: 0;
 }> {
   try {
     return await inReadSnapshot(database, async (client) => {
@@ -67,7 +81,19 @@ export async function verifyRestoredDatabase(database: DatabaseContext): Promise
         CareTimelineQuerySchema.parse({ category: 'all', limit: 1 }),
         client,
       );
-      return { summaryExecutable: true, timelineExecutable: true };
+      const authority = RestoreVoiceAuthorityRowSchema.parse(
+        (await client.query(RESTORE_VOICE_AUTHORITY_QUERY)).rows[0],
+      );
+      if (
+        authority.active_voice_lease_count !== 0 ||
+        authority.actionable_voice_session_count !== 0
+      ) throw new RestoredDatabaseVerifierError();
+      return {
+        summaryExecutable: true,
+        timelineExecutable: true,
+        activeVoiceCareLeaseCount: 0,
+        actionableVoiceCareSessionCount: 0,
+      };
     });
   } catch {
     throw new RestoredDatabaseVerifierError();

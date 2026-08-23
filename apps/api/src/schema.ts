@@ -625,6 +625,7 @@ export const voiceCareFeedingSessions = pgTable(
     endedAt: timestamp('ended_at', { withTimezone: true }),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    restoreInvalidatedAt: timestamp('restore_invalidated_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -680,7 +681,11 @@ export const voiceCareFeedingSessions = pgTable(
     ),
     check(
       'voice_care_feeding_sessions_timestamp_order',
-      sql`(${table.endedAt} is null or ${table.endedAt} >= ${table.startedAt}) and (${table.confirmedAt} is null or (${table.endedAt} is not null and ${table.confirmedAt} >= ${table.endedAt})) and (${table.cancelledAt} is null or ${table.cancelledAt} >= ${table.startedAt})`,
+      sql`(${table.endedAt} is null or ${table.endedAt} >= ${table.startedAt}) and (${table.confirmedAt} is null or (${table.endedAt} is not null and ${table.confirmedAt} >= ${table.endedAt})) and (${table.cancelledAt} is null or ${table.cancelledAt} >= ${table.startedAt}) and (${table.restoreInvalidatedAt} is null or ${table.restoreInvalidatedAt} >= ${table.startedAt})`,
+    ),
+    check(
+      'voice_care_feeding_sessions_restore_invalidation_shape',
+      sql`${table.restoreInvalidatedAt} is null or ${table.state} = 'needs_review'`,
     ),
     check(
       'voice_care_feeding_sessions_state_shape',

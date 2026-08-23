@@ -10,8 +10,10 @@ import {
   BackupManifestV1Schema,
   POSTGRES_MAJOR_VERSION,
   RestoreInvariantReportSchema,
+  RestoreSanitationReportSchema,
   type BackupManifestV1,
   type RestoreInvariantReport,
+  type RestoreSanitationReport,
 } from './contracts.js';
 import {
   assertOpenFileIdentity,
@@ -46,7 +48,10 @@ export interface RestoreTargetState {
 
 export type StructuralInvariantReport = Omit<
   RestoreInvariantReport,
-  'summaryExecutable' | 'timelineExecutable'
+  | 'summaryExecutable'
+  | 'timelineExecutable'
+  | 'activeVoiceCareLeaseCount'
+  | 'actionableVoiceCareSessionCount'
 >;
 
 export interface PostgresRestoreTools extends PostgresBackupTools {
@@ -55,8 +60,14 @@ export interface PostgresRestoreTools extends PostgresBackupTools {
   targetState(): Promise<RestoreTargetState>;
   restore(source: Readable): Promise<void>;
   verifyInvariants(migrationFingerprint: string): Promise<StructuralInvariantReport>;
-  revokeSessions(): Promise<number>;
-  probeReadModels(): Promise<Pick<RestoreInvariantReport, 'summaryExecutable' | 'timelineExecutable'>>;
+  sanitizeAuthority(): Promise<RestoreSanitationReport>;
+  probeReadModels(): Promise<Pick<
+    RestoreInvariantReport,
+    | 'summaryExecutable'
+    | 'timelineExecutable'
+    | 'activeVoiceCareLeaseCount'
+    | 'actionableVoiceCareSessionCount'
+  >>;
 }
 
 export type RestoreBackupConfig = BackupVerifyConfig;
@@ -318,7 +329,7 @@ async function assertDumpMatches(
 export async function restoreBackup(
   config: RestoreBackupConfig,
   postgresTools: PostgresRestoreTools,
-): Promise<{ code: 'restore_verified'; revokedSessionCount: number }> {
+): Promise<{ code: 'restore_verified' } & RestoreSanitationReport> {
   const artifact = await openVerifiedDump(config, postgresTools);
   try {
     const source = await stage('restore_identity_unknown', () => postgresTools.sourceIdentity());
@@ -359,21 +370,22 @@ export async function restoreBackup(
     const structuralResult = RestoreInvariantReportSchema.omit({
       summaryExecutable: true,
       timelineExecutable: true,
+      activeVoiceCareLeaseCount: true,
+      actionableVoiceCareSessionCount: true,
     }).safeParse(structural);
     if (!structuralResult.success) throw closed('restore_invariant_failed');
 
-    const revokedSessionCount = await stage('restore_sanitation_failed', () =>
-      postgresTools.revokeSessions(),
+    const sanitation = await stage('restore_sanitation_failed', () =>
+      postgresTools.sanitizeAuthority(),
     );
-    if (!Number.isSafeInteger(revokedSessionCount) || revokedSessionCount < 0) {
-      throw closed('restore_sanitation_failed');
-    }
+    const sanitationResult = RestoreSanitationReportSchema.safeParse(sanitation);
+    if (!sanitationResult.success) throw closed('restore_sanitation_failed');
 
     const readModels = await stage('restore_read_model_failed', () => postgresTools.probeReadModels());
     const complete = RestoreInvariantReportSchema.safeParse({ ...structuralResult.data, ...readModels });
     if (!complete.success) throw closed('restore_read_model_failed');
 
-    return { code: 'restore_verified', revokedSessionCount };
+    return { code: 'restore_verified', ...sanitationResult.data };
   } finally {
     await artifact.snapshotHandle.close().catch(() => undefined);
     await artifact.dumpHandle.close().catch(() => undefined);

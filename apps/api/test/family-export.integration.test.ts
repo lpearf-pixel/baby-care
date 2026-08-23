@@ -269,6 +269,75 @@ function exportActor(seed: SeededExport) {
   };
 }
 
+async function seedVoiceCareHistory(database: DatabaseContext, seed: SeededExport) {
+  const deviceId = randomUUID();
+  const leaseId = randomUUID();
+  const committedSessionId = randomUUID();
+  const committedEventId = randomUUID();
+  await database.pool.query(
+    `insert into voice_care_devices (id, family_id, public_key, capability, status)
+     values ($1, $2, $3, 'voice_care.intent.submit', 'active')`,
+    [deviceId, seed.familyId, Buffer.alloc(32, 7)],
+  );
+  await database.pool.query(
+    `insert into voice_care_leases (
+       id, family_id, baby_id, device_id, actor_user_id, actor_membership_id,
+       client_request_id, issued_at, expires_at, revoked_at
+     ) values ($1,$2,$3,$4,$5,$6,$7,'2026-08-17T02:00:00.000Z','2026-08-17T10:00:00.000Z',null)`,
+    [leaseId, seed.familyId, seed.babyId, deviceId, seed.dadUserId, seed.dadMembershipId, randomUUID()],
+  );
+  await database.pool.query(
+    `insert into care_events (
+       id, family_id, baby_id, actor_user_id, actor_membership_id, source,
+       event_type, occurred_at, created_at, updated_at, status, version,
+       client_request_id, note, trace_id
+     ) values ($1,$2,$3,$4,$5,'voice','feeding','2026-08-17T06:12:00.000Z',
+       '2026-08-17T06:15:00.000Z','2026-08-17T06:15:00.000Z','active',1,$6,null,$7)`,
+    [committedEventId, seed.familyId, seed.babyId, seed.dadUserId, seed.dadMembershipId, randomUUID(), 'synthetic-voice-event'],
+  );
+  await database.pool.query('insert into feeding_sessions (event_id) values ($1)', [committedEventId]);
+  await database.pool.query(
+    `insert into feeding_components (
+       id, session_event_id, component_type, liquid_type, amount_ml,
+       duration_minutes, bottle_capacity_ml, occurred_at
+     ) values ($1,$2,'bottle','formula',90,null,150,'2026-08-17T06:12:00.000Z')`,
+    [randomUUID(), committedEventId],
+  );
+  const sessions = [
+    [randomUUID(), 'pending', { mode: 'unknown', startedAt: '2026-08-17T03:00:00.000Z', endedAt: null }, null, null, null, null],
+    [randomUUID(), 'needs_review', { mode: 'unknown', startedAt: '2026-08-17T04:00:00.000Z', endedAt: null }, null, null, null, null],
+    [randomUUID(), 'cancelled', { mode: 'unknown', startedAt: '2026-08-17T05:00:00.000Z', endedAt: null }, null, null, null, '2026-08-17T05:05:00.000Z'],
+    [committedSessionId, 'committed', {
+      mode: 'bottle', startedAt: '2026-08-17T06:00:00.000Z', endedAt: '2026-08-17T06:12:00.000Z',
+      liquidType: 'formula', amountMl: 90, bottleCapacityMl: 150, amountValueOrigin: 'spoken',
+    }, Buffer.alloc(32, 8), committedEventId, '2026-08-17T06:12:00.000Z', null],
+  ] as const;
+  for (const [id, state, proposal, proposalDigest, finalEventId, endedAt, cancelledAt] of sessions) {
+    const startedAt = proposal.startedAt;
+    await database.pool.query(
+      `insert into voice_care_feeding_sessions (
+         id, family_id, baby_id, device_id, lease_id, actor_user_id,
+         actor_membership_id, start_request_id, state, proposal_json, version,
+         proposal_digest, final_care_event_id, started_at, expires_at, ended_at,
+         confirmed_at, cancelled_at
+       ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,1,$11,$12,$13,
+         $13::timestamptz + interval '6 hours',$14,
+         case when $9 = 'committed' then '2026-08-17T06:15:00.000Z'::timestamptz else null end,$15)`,
+      [id, seed.familyId, seed.babyId, deviceId, leaseId, seed.dadUserId, seed.dadMembershipId,
+        randomUUID(), state, JSON.stringify(proposal), proposalDigest, finalEventId, startedAt, endedAt, cancelledAt],
+    );
+  }
+  await database.pool.query(
+    `insert into audit_events (
+       family_id, actor_user_id, actor_membership_id, action, target_type,
+       target_id, source, trace_id, metadata_json, occurred_at
+     ) values ($1,$2,$3,'voice_care.session_committed','voice_care_feeding_session',
+       $4,'api',$5,null,'2026-08-17T06:15:00.000Z')`,
+    [seed.familyId, seed.dadUserId, seed.dadMembershipId, committedSessionId, 'synthetic-voice-audit'],
+  );
+  return { committedSessionId, committedEventId };
+}
+
 function trackedSnapshotDatabase(
   database: DatabaseContext,
   afterEventEnvelope?: () => Promise<void>,
@@ -378,6 +447,7 @@ describeDatabase('family export PostgreSQL snapshot', () => {
     const fixture = await createM2TestApp(testDatabaseUrl!);
     try {
       const seed = await seedCompleteExport(fixture.database);
+      const voice = await seedVoiceCareHistory(fixture.database, seed);
       const tracked = trackedSnapshotDatabase(fixture.database);
       const result = await createFamilyExportService(
         tracked.context,
@@ -385,7 +455,8 @@ describeDatabase('family export PostgreSQL snapshot', () => {
         4 * 1024 * 1024,
       ).exportFamily(exportActor(seed), generatedAt);
 
-      expect(tracked.applicationQueries()).toBeLessThanOrEqual(10);
+      expect(tracked.applicationQueries()).toBeLessThanOrEqual(11);
+      expect(result.document.schemaVersion).toBe(2);
       expect(result.document.generatedAt).toBe(generatedAt.toISOString());
       expect(result.document.family.id).toBe(seed.familyId);
       expect(result.document.baby.id).toBe(seed.babyId);
@@ -403,7 +474,7 @@ describeDatabase('family export PostgreSQL snapshot', () => {
         'feeding', 'diaper', 'sleep', 'burping', 'spit_up',
         'crying', 'bathing', 'medication', 'temperature', 'weight',
       ]));
-      const feeding = result.document.careEvents.find((event) => event.eventType === 'feeding');
+      const feeding = result.document.careEvents.find((event) => event.id === seed.feedingEventId);
       expect(feeding).toMatchObject({
         id: seed.feedingEventId,
         status: 'active',
@@ -432,11 +503,22 @@ describeDatabase('family export PostgreSQL snapshot', () => {
         actorDisplayName: 'Nanny',
         localTime: '08:30',
       });
+      expect(result.document.voiceCareSessions.map((session) => session.state)).toEqual([
+        'pending', 'needs_review', 'cancelled', 'committed',
+      ]);
+      expect(result.document.voiceCareSessions.at(-1)).toMatchObject({
+        id: voice.committedSessionId,
+        state: 'committed',
+        confirmationMethod: 'device',
+        finalCareEventId: voice.committedEventId,
+        proposal: { mode: 'bottle', liquidType: 'formula', amountMl: 90 },
+      });
 
       const forbidden = [
         'passwordHash', 'password_hash', 'loginName', 'login_name', 'tokenHash', 'token_hash',
         'traceId', 'trace_id', 'clientRequestId', 'client_request_id', 'databaseUrl',
-        'evidenceUrl', 'mediaUrl', 'modelOutput',
+        'evidenceUrl', 'mediaUrl', 'modelOutput', 'publicKey', 'signature', 'challenge',
+        'leaseId', 'requestId', 'modelVersion',
       ];
       const keys = collectKeys(result.document);
       for (const key of forbidden) expect(keys.has(key), key).toBe(false);
@@ -537,7 +619,7 @@ describeDatabase('family export PostgreSQL snapshot', () => {
         note: 'concurrent complete edit',
         revision_count: 2,
       });
-      expect(tracked.applicationQueries()).toBeLessThanOrEqual(10);
+      expect(tracked.applicationQueries()).toBeLessThanOrEqual(11);
     } finally {
       await fixture.app.close();
       await fixture.database.close();

@@ -26,8 +26,8 @@ function injectChildStderr(...stderrValues: string[]) {
   )).join('\n');
   const instrumented = source()
     .replace(
-      "import { FamilyExportSchemaV1 } from '../packages/contracts/src/index.ts';",
-      'const FamilyExportSchemaV1 = {};',
+      "import { FamilyExportSchemaV2 } from '../packages/contracts/src/index.ts';",
+      'const FamilyExportSchemaV2 = {};',
     )
     .replace(
       '  await main();',
@@ -45,8 +45,8 @@ function injectChildStderr(...stderrValues: string[]) {
 function injectRepositoryTmpdir() {
   const instrumented = source()
     .replace(
-      "import { FamilyExportSchemaV1 } from '../packages/contracts/src/index.ts';",
-      'const FamilyExportSchemaV1 = {};',
+      "import { FamilyExportSchemaV2 } from '../packages/contracts/src/index.ts';",
+      'const FamilyExportSchemaV2 = {};',
     )
     .replace(
       '  await main();',
@@ -121,7 +121,7 @@ describe('M4 birth-ready production Compose smoke contract', () => {
   it('validates both administrator exports and the required authorization lifecycle', () => {
     const script = source();
 
-    expect(script).toContain('FamilyExportSchemaV1');
+    expect(script).toContain('FamilyExportSchemaV2');
     expect(script).toMatch(/const dadExport\s*=\s*await request\('\/api\/family\/export'/);
     expect(script).toMatch(/const momExport\s*=\s*await request\('\/api\/family\/export'/);
     expect(script).toMatch(/const nannyExportDenied\s*=\s*await request\('\/api\/family\/export',[\s\S]*?expectedStatus:\s*403/);

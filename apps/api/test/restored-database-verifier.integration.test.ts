@@ -23,6 +23,9 @@ function fakeDatabase(failPattern?: RegExp): { database: DatabaseContext; querie
       queries.push(sql);
       if (failPattern?.test(sql)) throw new Error('postgres://secret@private/household row-value');
       if (/restore-verifier-actor-v1/.test(sql)) return { rows: [actorRow] };
+      if (/restore-verifier-voice-authority-v1/.test(sql)) {
+        return { rows: [{ active_voice_lease_count: 0, actionable_voice_session_count: 0 }] };
+      }
       if (/coalesce\(sum\(fc\.amount_ml\)/.test(sql)) {
         return {
           rows: [{
@@ -54,12 +57,15 @@ describe('verifyRestoredDatabase', () => {
     await expect(verifyRestoredDatabase(database)).resolves.toEqual({
       summaryExecutable: true,
       timelineExecutable: true,
+      activeVoiceCareLeaseCount: 0,
+      actionableVoiceCareSessionCount: 0,
     });
 
     expect(queries[0]).toBe('begin isolation level repeatable read read only');
     expect(queries.some((sql) => sql.includes('restore-verifier-actor-v1'))).toBe(true);
     expect(queries.find((sql) => sql.includes('restore-verifier-actor-v1'))).toContain('limit 1');
     expect(queries.some((sql) => /limit \$\d+/.test(sql))).toBe(true);
+    expect(queries.some((sql) => sql.includes('restore-verifier-voice-authority-v1'))).toBe(true);
     expect(queries.at(-1)).toBe('commit');
   });
 
@@ -67,6 +73,7 @@ describe('verifyRestoredDatabase', () => {
     ['actor derivation', /restore-verifier-actor-v1/],
     ['summary query', /coalesce\(sum\(fc\.amount_ml\)/],
     ['timeline query', /from care_events ce/],
+    ['voice authority query', /restore-verifier-voice-authority-v1/],
   ])('fails closed without exposing details for %s failure', async (_label, failPattern) => {
     const { database } = fakeDatabase(failPattern);
     let caught: unknown;
@@ -87,6 +94,23 @@ describe('verifyRestoredDatabase', () => {
       ),
       release: vi.fn(),
     });
+    await expect(verifyRestoredDatabase(database)).rejects.toEqual(
+      new RestoredDatabaseVerifierError(),
+    );
+  });
+
+  test('fails closed when restored Voice Care authority remains actionable', async () => {
+    const { database } = fakeDatabase();
+    const client = await database.pool.connect();
+    vi.mocked(database.pool.connect).mockResolvedValueOnce({
+      ...client,
+      query: vi.fn(async (sql: string) => {
+        if (/restore-verifier-voice-authority-v1/.test(sql)) {
+          return { rows: [{ active_voice_lease_count: 1, actionable_voice_session_count: 0 }] };
+        }
+        return client.query(sql);
+      }),
+    } as never);
     await expect(verifyRestoredDatabase(database)).rejects.toEqual(
       new RestoredDatabaseVerifierError(),
     );

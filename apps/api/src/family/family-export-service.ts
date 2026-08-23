@@ -4,10 +4,11 @@ import {
   compareFamilyExportHandoffCheckpoints,
   compareFamilyExportHandoffReminderRules,
   compareFamilyExportMembers,
+  compareVoiceCareExportSessions,
   FAMILY_EXPORT_SCHEMA_VERSION,
-  FamilyExportSchemaV1,
+  FamilyExportSchemaV2,
 } from '@baby-care/contracts';
-import type { FamilyExportV1 } from '@baby-care/contracts';
+import type { FamilyExportV2 } from '@baby-care/contracts';
 import type { AuthContext } from '../auth/auth-service.js';
 import { DATABASE_OPERATION_DEADLINE_MS, type DatabaseContext } from '../db.js';
 import type { FamilyExportRepository } from './family-export-repository.js';
@@ -32,7 +33,7 @@ export class FamilyExportCancelledError extends Error {
 
 export interface FamilyExportService {
   exportFamily(actor: AuthContext, generatedAt: Date, signal?: AbortSignal): Promise<{
-    document: FamilyExportV1;
+    document: FamilyExportV2;
     serialized: Buffer;
   }>;
 }
@@ -40,8 +41,8 @@ export interface FamilyExportService {
 function stableDocument(
   rows: Awaited<ReturnType<FamilyExportRepository['readFamilyExport']>>,
   generatedAt: string,
-): FamilyExportV1 {
-  return FamilyExportSchemaV1.parse({
+): FamilyExportV2 {
+  return FamilyExportSchemaV2.parse({
     schemaVersion: FAMILY_EXPORT_SCHEMA_VERSION,
     generatedAt,
     family: rows.family,
@@ -51,6 +52,7 @@ function stableDocument(
     careRevisions: [...rows.careRevisions].sort(compareFamilyExportCareRevisions),
     handoffCheckpoints: [...rows.handoffCheckpoints].sort(compareFamilyExportHandoffCheckpoints),
     handoffReminderRules: [...rows.handoffReminderRules].sort(compareFamilyExportHandoffReminderRules),
+    voiceCareSessions: [...rows.voiceCareSessions].sort(compareVoiceCareExportSessions),
   });
 }
 

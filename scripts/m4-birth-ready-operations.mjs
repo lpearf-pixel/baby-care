@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { isAbsolute, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { FamilyExportSchemaV1 } from '../packages/contracts/src/index.ts';
+import { FamilyExportSchemaV2 } from '../packages/contracts/src/index.ts';
 
 const BASE_URL = 'http://127.0.0.1:8080';
 const APP_ORIGIN = 'http://127.0.0.1:8080';
@@ -746,7 +746,7 @@ async function main() {
   });
   let dadExportDocument;
   try {
-    dadExportDocument = FamilyExportSchemaV1.parse(JSON.parse(dadExport.payload.toString('utf8')));
+    dadExportDocument = FamilyExportSchemaV2.parse(JSON.parse(dadExport.payload.toString('utf8')));
   } finally {
     dadExport.payload.fill(0);
   }
@@ -757,7 +757,7 @@ async function main() {
   });
   let momExportDocument;
   try {
-    momExportDocument = FamilyExportSchemaV1.parse(JSON.parse(momExport.payload.toString('utf8')));
+    momExportDocument = FamilyExportSchemaV2.parse(JSON.parse(momExport.payload.toString('utf8')));
   } finally {
     momExport.payload.fill(0);
   }

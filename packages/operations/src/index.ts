@@ -6,11 +6,13 @@ export {
   POSTGRES_MAJOR_VERSION,
   canonicalMigrationFingerprint,
   RestoreInvariantReportSchema,
+  RestoreSanitationReportSchema,
 } from './contracts.js';
 export type {
   BackupManifestV1,
   MigrationHistoryFact,
   RestoreInvariantReport,
+  RestoreSanitationReport,
 } from './contracts.js';
 export { createBackup, verifyBackup } from './backup.js';
 export type { BackupCreateConfig, BackupVerifyConfig } from './backup.js';
