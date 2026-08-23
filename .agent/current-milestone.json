@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "milestone": "M5 Voice Care Adapter and Feeding Pilot",
-  "status": "implementation_in_progress_task_9_consumer_gate_pending",
+  "status": "implementation_in_progress_task_9_exact_head_ci_pending",
   "branch": "codex/m5-voice-care-adapter-implementation",
   "m5_baseline_head": "cebd5d35c6095b08982216ccc706f0226e710dbc",
   "m5_design": "docs/superpowers/specs/2026-08-23-m5-voice-care-adapter-feeding-pilot-design.md",
@@ -9,10 +9,10 @@
   "m5_implementation_plan": "docs/superpowers/plans/2026-08-23-m5-voice-care-adapter-feeding-pilot.md",
   "m5_implementation_plan_state": "approved_2026_08_23",
   "m5_implementation_baseline_head": "579122fdd3147704c107fe811e0e04013dfd1faa",
-  "m5_business_implementation_state": "tasks_1_through_8_complete_task_9_local_at_594376bb2c77a737d32f7d43c27ed402fa5e96ad_consumer_and_exact_head_ci_pending",
-  "m5_task_9_local_implementation_head": "594376bb2c77a737d32f7d43c27ed402fa5e96ad",
+  "m5_business_implementation_state": "tasks_1_through_8_complete_task_9_local_at_73e388abe2e86f65ffd844c3d33eae1497cf8697_consumer_pass_exact_head_ci_pending",
+  "m5_task_9_local_implementation_head": "73e388abe2e86f65ffd844c3d33eae1497cf8697",
   "m5_task_9_local_result": "four_markers_pass_zero_owned_docker_residue_full_workspace_456_pass_113_opt_in_skip",
-  "m5_task_9_consumer_gate": "blocked_consumer_missing_in_current_baby_local_voice_care_worktree",
+  "m5_task_9_consumer_gate": "pass_contract_ok_baby_local_artifact_84e9a17bd8349d89cf42fabb1546827cbde78858_docs_head_2cc2a495444f48620bd252d9688fff3390b679ef",
   "m5_task_9_exact_head_ci": "not_run_unpushed",
   "m5_completed_tasks": [
     {
@@ -199,8 +199,8 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "implement separately approved Baby Local vendored Voice Care consumer artifacts",
-    "rerun cross repository verifier then push Task 9 and require exact head CI",
+    "push the approved Baby Local and Baby Care feature branches",
+    "require exact head CI for Baby Care Task 9",
     "begin adult only Task 10 only after Task 9 consumer and CI gates pass",
     "preserve completed M4 and do not modify main"
   ],

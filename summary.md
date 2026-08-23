@@ -48,14 +48,16 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   authority while preserving committed care facts. Fresh evidence is Contracts 52/52,
   Task 8 API 79/79, Operations 56 passed / 4 opt-in skipped, real PostgreSQL 16 restore
   3/3, and workspace typecheck PASS.
-- M5 Task 9 Baby Care implementation is locally committed at `594376b`: generated
+- M5 Task 9 Baby Care implementation is locally committed through `73e388a`: generated
   Ed25519 authority and generated synthetic credentials drive the production Compose
   feeding/confirmation/revocation/manual-fallback/export/backup/isolated-restore flow;
   all four M5 markers pass in order with zero owned Docker residue. Fresh local evidence
   is focused contracts 10/10, observability 17/17, operations 148 pass / 4 opt-in skip,
-  full workspace 456 pass / 113 opt-in skip, lint/typecheck/build PASS. Task 9 is not
-  complete: the current Baby Local Voice Care worktree returns
-  `CONTRACT_FAIL code=consumer_missing`, and this unpushed head has no exact-head CI.
+  full workspace 456 pass / 113 opt-in skip, lint/typecheck/build PASS. Baby Local
+  contract commit `84e9a17` vendors the exact source bytes; the consumer verifier now
+  also requires tracked artifacts, passes 4/4 focused tests and returns `CONTRACT_OK`
+  against clean Baby Local head `2cc2a49`. Task 9 still lacks exact-head CI because both
+  feature heads remain unpushed.
 - Host-only test note: the existing M1 birth-date integration test shifts one calendar
   day under macOS `Asia/Shanghai`; it passes 2/2 with the CI `TZ=UTC` baseline. M5
   migration compatibility is 15/15 and the full UTC API suite is 176/176.
@@ -335,9 +337,9 @@ Recommended first sequence:
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
 3. Preserve the M4 accepted pair `3f6676f2c7bf65d11efedecce6ac57e261d1545d` /
    `32611502497`; supervised family acceptance completed on 2026-08-23.
-4. Continue M5 Task 9 from local checkpoint `594376b`: implement the separately approved
-   Baby Local vendored consumer artifacts, rerun the read-only cross-repository verifier,
-   then push this branch and require exact-head CI. Do not begin Task 10 until both pass.
+4. Continue M5 Task 9 from local checkpoint `73e388a`: push the approved Baby Local and
+   Baby Care feature branches, then require exact-head CI. The cross-repository consumer
+   gate is already `CONTRACT_OK`; do not begin Task 10 until CI also passes.
 
 ## 10. Copy/paste prompt after M4 acceptance
 

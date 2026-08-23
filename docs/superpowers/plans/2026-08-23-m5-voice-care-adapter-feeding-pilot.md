@@ -1086,9 +1086,9 @@ Voice feeding fact. Task 9 synthetic production and consumer-contract gate is ne
 
 ### Task 9: M5.7 Synthetic Production And Cross-Repository Contract Gate
 
-**Status:** Baby Care local implementation committed at `594376b`; synthetic production
-4/4 markers and local software gates pass. Completion remains blocked by the separately
-implemented Baby Local consumer (`CONTRACT_FAIL code=consumer_missing`) and exact-head CI.
+**Status:** Baby Care local implementation is committed through `73e388a`; synthetic
+production 4/4 markers, local software gates and the separately committed Baby Local
+consumer gate pass. Exact-head CI remains pending on the unpushed feature heads.
 
 **Files:**
 
@@ -1155,7 +1155,7 @@ Reuse the M4 script's bounded subprocess, private temporary directory, project o
 
 Resolve the supplied directory, reject symlinks and dirty tracked consumer state, read only the fixed Baby Local vendored schema/corpus/source-commit files, compare bytes/digests, and never print either absolute path or digest. This script does not modify Baby Local. If CI can authenticate to both repositories, check out Baby Local as a sibling at its recorded exact commit; otherwise M5.7 remains pending until the same command is recorded locally against both clean exact heads.
 
-- [ ] **Step 5: Run production and cross-repository GREEN**
+- [x] **Step 5: Run production and cross-repository GREEN**
 
 ```bash
 pnpm --filter @baby-care/api test -- m5-compose-smoke-contract.test.ts
@@ -1174,9 +1174,10 @@ Expected: contracts match; M1-M5 markers appear exactly once in order; generated
 Local evidence on 2026-08-23: the focused production/consumer contracts pass 10/10;
 observability privacy passes 17/17; the M5 generated-data production flow emits all four
 markers exactly once and exits 0; and its two owned Compose projects leave zero containers,
-volumes or networks. The current clean Baby Local Voice Care worktree has no vendored
-consumer artifacts, so the read-only verifier correctly returns
-`CONTRACT_FAIL code=consumer_missing`. Step 5 remains open.
+volumes or networks. Baby Local contract commit `84e9a17` (clean documentation head
+`2cc2a49`) vendors the exact producer bytes and source identity; the hardened read-only
+verifier at `73e388a` also requires all three artifacts to be Git-tracked and returns
+`CONTRACT_OK schema=voice-care-intent.v1 corpus=voice-care-v1`.
 
 - [ ] **Step 6: Run the full software gate and exact-head CI**
 
@@ -1196,7 +1197,7 @@ and 456 tests pass with 113 environment-opt-in skips. Five isolated PostgreSQL 1
 tests pass; the separate fixed `baby-care` Compose integration refuses to run while the
 user-owned live project exists and was not stopped or deleted. Exact-head CI remains open.
 
-- [ ] **Step 7: Review and commit Task 9**
+- [x] **Step 7: Review and commit Task 9**
 
 ```bash
 git add scripts/m5-voice-care-feeding-pilot.mjs scripts/check-voice-care-consumer.mjs apps/api/test/m5-compose-smoke-contract.test.ts compose.yaml .github/workflows/ci.yml scripts/collect-diagnostics.mjs packages/observability/test README.md docs/PLAN.md summary.md .agent/current-milestone.json
