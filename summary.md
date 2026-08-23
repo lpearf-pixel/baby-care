@@ -1,18 +1,18 @@
 # Baby Care Work Handoff Summary
 
-Updated: 2026-08-22
+Updated: 2026-08-23
 Repository: `lpearf-pixel/baby-care`
 
 This file is the short handoff for a fresh Work/chat. Read it together with `agent.md`, `docs/PLAN.md`, and `.agent/current-milestone.json` before planning or coding.
 
 ## 1. Current authoritative state
 
-- Current completed milestone: **M4 — Birth Ready Operations and Data Safety**, software
-  `verified_complete`. The separate supervised family acceptance gate remains pending.
-- M4 authoritative implementation head: `debabe0018ed17e65ebf7959ca237e8770cbacd0`.
-- M4 authoritative CI: `32562168081` — static / unit / PostgreSQL integration /
+- Current completed milestone: **M4 — Birth Ready Operations and Data Safety**, including
+  supervised family acceptance, `verified_complete`.
+- M4 accepted product head: `3f6676f2c7bf65d11efedecce6ac57e261d1545d`.
+- M4 authoritative CI: `32611502497` — static / unit / PostgreSQL integration /
   production build / production Compose smoke 5/5 PASS.
-- M4 production Compose job: `97005337160` — all four required M4 markers emitted exactly once.
+- M4 production Compose job: `97125224186` — export, backup and isolated restore smoke PASS.
 - Previous completed milestone: **M3 — Care Workspace**, verified complete.
 - M3 authoritative final head: `52b042a66122464af338a2b4931315d92dff0965`.
 - M3 authoritative CI: `31959895049` — static / unit / PostgreSQL integration / production build / production Compose smoke 5/5 PASS.
@@ -52,8 +52,8 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   filename, one-flight request and transient Blob URL lifecycle. Nanny receives no
   export DOM. Independent review approved after non-vacuous no-preview, Mom visibility,
   reject-then-retry and anchor-removal coverage. Fresh Web evidence is 87 passed with
-  typecheck, production build and repository lint passing. Real-family download remains
-  a human gate and was not exercised.
+  typecheck, production build and repository lint passing. The separate real-family
+  download interaction passed during supervised acceptance on 2026-08-23.
 - M4 Task 5 implementation: `fd1d014` through `df43b93` — strict manifest v1,
   streamed private custom-format dump, bounded catalogue checks, PG16/migration gates,
   owner-private storage and kernel-enforced no-replace publication are implemented.
@@ -79,8 +79,8 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   API probes run read-only only after Task 6 verification. Fresh evidence is 130 focused
   tests passed / 4 opt-in skipped, one real generated-data Compose flow passed in
   121.817 seconds, full lint/typecheck/build/help/privacy gates passed, and independent
-  review found no Critical/Important findings. Real-family backup usability remains a
-  human gate.
+  review found no Critical/Important findings. Real-family backup create/verify and
+  isolated restore-verify usability passed during supervised acceptance on 2026-08-23.
 - M4 Task 8 implementation: `e97aa38` — a generated Dad/Mom/Nanny
   production simulation now covers the family-local-midnight care flow, both admin
   exports, stable Nanny denial, warning/revision/handoff/reminder behavior, private
@@ -91,8 +91,13 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   `e97aa38`; scoped re-review is clean for underlying PostgreSQL cancellation settlement
   and restore/restoreVerify pre-lifecycle storage preflight. Linux native-helper
   compatibility closed at `debabe0`; exact-head CI `32562168081` passed 5/5 and Compose
-  job `97005337160` emitted all four M4 markers exactly once. Supervised real-family
-  acceptance remains pending.
+  job `97005337160` emitted all four M4 markers exactly once. Supervised family acceptance
+  then completed on 2026-08-23 at accepted product head `3f6676f`: Dad/Mom export,
+  Git-external owner-private backup create/verify, isolated restore-verify, Nanny export
+  denial, attributed care entry, takeover, detail and void-based undo passed. Acceptance
+  found and closed the LAN request-ID defect at `f0d634d` and detail-navigation defect at
+  `3f6676f`; exact-head CI `32611502497` passed 5/5. No private content or live restore was
+  used as tracked evidence.
 
 Release-gate history:
 
@@ -164,8 +169,9 @@ the deterministic repeatable-read export service exists, and Dad/Mom can request
 private audited attachment through the bounded Web download surface. Private atomic backup
 and fail-closed isolated restore libraries now exist; the guarded operator CLI,
 disposable PostgreSQL 16 practice path, and Task 8 synthetic production-mode operations
-simulation are software verified complete at `debabe0` by CI `32562168081` 5/5. This
-does not satisfy the separate supervised family acceptance gate or authorize a live restore.
+simulation were software verified complete at `debabe0` by CI `32562168081` 5/5. The
+separate supervised family acceptance is now complete at `3f6676f` with CI `32611502497`
+5/5; this still does not authorize a restore into the live family database.
 
 ## 5. Baby Guardian / baby-monitor-local boundary
 
@@ -265,19 +271,19 @@ This remains separate from verified M3 Care Workspace. The first code work belon
 
 ## 9. Fresh Work entry point
 
-The next Work should preserve verified M4 and run only the supervised family acceptance
-workflow when a human is available, without redesigning M2/M3 or implicitly beginning
-Guardian coding.
+The next Work should preserve the accepted M4 product head and must not redesign M2/M3,
+repeat the completed family acceptance, or implicitly begin Guardian coding.
 
 Recommended first sequence:
 
 1. Read the authoritative state files and the M4 design.
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
-3. Preserve the M4 verified pair `debabe0018ed17e65ebf7959ca237e8770cbacd0` /
-   `32562168081`; the next product gate is supervised family acceptance.
-4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary.
+3. Preserve the M4 accepted pair `3f6676f2c7bf65d11efedecce6ac57e261d1545d` /
+   `32611502497`; supervised family acceptance completed on 2026-08-23.
+4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary; await
+   an explicit next-milestone or branch-integration decision without modifying `main`.
 
-## 10. Copy/paste prompt for M4 supervised family acceptance
+## 10. Copy/paste prompt after M4 acceptance
 
 ```text
 读取 `agent.md`、`summary.md`、`docs/PLAN.md`、
@@ -288,14 +294,10 @@ Recommended first sequence:
 基线为 `codex/m4-birth-ready-operations`，来源是已通过 CI `31959895049`
 五项门禁的 M3 精确头 `52b042a66122464af338a2b4931315d92dff0965`。
 
-M4 软件基线为 `debabe0018ed17e65ebf7959ca237e8770cbacd0`，精确头 CI
-`32562168081` 五项全部 PASS，Compose job `97005337160` 的四个 M4 marker
-各出现一次。不要重跑或重做已完成的软件功能。
-
-按正式 Task 9 清单一次只指导一个受监督的家庭验收步骤：Dad/Mom 私有导出交互、
-Git 外 owner-private 目的地、backup create/verify、isolated restore-verify、Nanny
-不可见导出、正常护理 walkthrough。不要读取私人导出内容，不要恢复到 live 数据库。
+M4 已接受产品头为 `3f6676f2c7bf65d11efedecce6ac57e261d1545d`，精确头 CI
+`32611502497` 五项全部 PASS。2026-08-23 的受监督家庭验收已经完成；不要重复执行、
+读取私人导出内容或恢复到 live 数据库。
 
 不要开发 Guardian/语音、完整离线同步、云备份、医疗功能或 in-place restore；
-不要修改/合并 main，未经明确批准不得 push。baby-monitor-local 当前训练不阻塞本项目。
+不要修改/合并 main。等待明确的下一里程碑或分支集成决定。
 ```

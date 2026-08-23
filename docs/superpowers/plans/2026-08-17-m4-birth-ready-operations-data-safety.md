@@ -28,7 +28,9 @@
 - CLI output and compact diagnostics contain stable codes/aggregate markers only: no care values, names, notes, medication facts, paths, filenames, database coordinates, connection strings, hashes from live artifacts, raw commands, catalogues, SQL output, or raw errors.
 - Every implementation task follows RED -> observed expected failure -> minimal GREEN -> focused regression -> review -> local commit. Do not weaken assertions or skip enabled PostgreSQL/Compose tests to get GREEN.
 - If local PostgreSQL 16 or Docker is unavailable, keep integration tests enabled, record the environment limitation, and require exact-head CI before the dependent gate is accepted.
-- A real-family export, real backup destination, real restore, hardware test, and family walkthrough remain human-gated. Automated work uses generated data and disposable directories/databases only.
+- Real-family export, backup destination, isolated restore-verify and family walkthrough
+  are human-gated and their completed evidence is recorded under Task 9. Automated work
+  uses generated data and disposable directories/databases only; live restore remains forbidden.
 
 ---
 
@@ -693,7 +695,7 @@ SMOKE_OK component=m4-birth-ready-operations
   - implementation complete locally, not verified complete until exact-head CI;
   - authoritative M3 head/CI unchanged;
   - M4 plan/spec/branch and local implementation head recorded;
-  - human family acceptance remains pending;
+  - human family acceptance state matches the latest supervised evidence;
   - Guardian/audio and `baby-monitor-local` remain independent and non-blocking.
 - [x] Review the complete M4 diff against every spec section and resolve all Critical/Important findings before commit.
 - [x] Commit locally:
@@ -708,6 +710,10 @@ SMOKE_OK component=m4-birth-ready-operations
 ---
 
 ### Task 9: Exact-Head Release Evidence And Human Handoff
+
+**Status:** Complete. Software exact-head evidence closed at `debabe0`; supervised family
+acceptance completed on 2026-08-23 at accepted product head `3f6676f`, with exact-head CI
+`32611502497` passing 5/5.
 
 **Files:**
 
@@ -732,9 +738,24 @@ SMOKE_OK component=m4-birth-ready-operations
   4. runs isolated restore-verify;
   5. confirms Nanny cannot see export;
   6. completes a supervised normal-care walkthrough.
+- [x] Execute the supervised acceptance without inspecting private payloads or restoring
+  into the live family database:
+  1. Dad/Mom private export interaction passed;
+  2. an owner-private destination outside Git was used for backup create/verify;
+  3. isolated restore-verify passed and left the source service healthy;
+  4. Nanny had no export control;
+  5. Nanny recorded routine care, Dad saw the Nanny attribution and completed takeover;
+  6. Dad opened detail and completed void-based undo; bounded access evidence confirmed
+     successful detail/revision reads, undo and subsequent timeline/summary refreshes.
+- [x] Close both reproducible LAN Web defects found during the walkthrough through TDD:
+  `f0d634d` provides secure request IDs when `randomUUID` is unavailable on plain LAN HTTP,
+  and `3f6676f` focuses/scrolls the selected timeline detail into view. Exact-head CI
+  `32611502497` passed static, unit, PostgreSQL integration, build and Compose smoke 5/5.
 - [x] Do not restore into the live family database, inspect private export contents, merge PRs, modify `main`, tag a release, or start Guardian/voice work.
 
-**Completion:** One exact Git head has all five CI jobs and four M4 markers verified, durable state is accurate, and the remaining human acceptance gate is explicit. M4 software completion does not imply household acceptance or a live restore.
+**Completion:** One accepted product head has all five CI jobs verified, the supervised
+family acceptance checklist passed, and durable state is accurate. This does not authorize
+an in-place/live restore, merge, tag or `main` modification.
 
 ---
 
@@ -755,7 +776,7 @@ SMOKE_OK component=m4-birth-ready-operations
 | Revoked old sessions/fresh login | 6, 8 | API/DB integration + Compose |
 | Source unchanged on restore failure | 6 | before/after source digest/count assertions |
 | Four exact M4 markers/privacy-safe diagnostics | 8–9 | static contract + exact-head Compose/CI |
-| Human operational acceptance separated | 9 | explicit pending checklist, no automated claim |
+| Human operational acceptance separated | 9 | explicit completed checklist, no automated claim |
 
 ## Plan Self-Review Checklist
 

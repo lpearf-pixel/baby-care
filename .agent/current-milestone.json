@@ -94,16 +94,16 @@
     },
     {
       "task": "Task 9 Exact-Head Release Evidence And Human Handoff",
-      "commit": "debabe0018ed17e65ebf7959ca237e8770cbacd0",
-      "review": "exact_head_ci_5_of_5_pass"
+      "commit": "3f6676f2c7bf65d11efedecce6ac57e261d1545d",
+      "review": "supervised_family_acceptance_and_exact_head_ci_5_of_5_pass"
     }
   ],
-  "m4_current_task": "M4 Software Complete; Supervised Human Family Acceptance Pending",
+  "m4_current_task": "M4 Complete Including Supervised Human Family Acceptance",
   "m4_local_compose_result": "m1_m2_m3_and_four_m4_markers_passed_exactly_once",
-  "m4_verified_head": "debabe0018ed17e65ebf7959ca237e8770cbacd0",
+  "m4_verified_head": "3f6676f2c7bf65d11efedecce6ac57e261d1545d",
   "m4_exact_head_ci": "verified_5_of_5",
-  "m4_exact_head_ci_run": 32562168081,
-  "m4_production_compose_job": 97005337160,
+  "m4_exact_head_ci_run": 32611502497,
+  "m4_production_compose_job": 97125224186,
   "m4_production_compose_markers": [
     "m4-family-export",
     "m4-backup-integrity",
@@ -111,7 +111,15 @@
     "m4-birth-ready-operations"
   ],
   "m4_documentation_closure_ci": "verify_latest_branch_run_externally_without_rewriting_tracked_exact_head_evidence",
-  "m4_human_family_acceptance": "pending",
+  "m4_human_family_acceptance": "verified_complete_2026_08_23",
+  "m4_human_family_acceptance_evidence": [
+    "Dad/Mom private export interaction completed without inspecting export content",
+    "owner-private backup destination outside Git selected and backup create/verify completed",
+    "isolated restore-verify completed without restoring into the live family database",
+    "Nanny export control absent",
+    "Nanny care record, Dad attribution review, Dad takeover and void-based undo completed",
+    "LAN request-id and timeline-detail navigation defects closed at f0d634d and 3f6676f"
+  ],
   "m4_scope": [
     "Dad/Mom-only private family data export",
     "atomic private PostgreSQL backup and integrity verification",
@@ -132,8 +140,8 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "read the latest branch CI to confirm the documentation-closure checkpoint without rewriting this exact-head record",
-    "execute the separate supervised human family acceptance checklist one step at a time"
+    "verify the documentation-only closure checkpoint CI externally without rewriting this accepted product-head record",
+    "preserve M4 and await an explicit next-milestone or branch-integration decision without modifying main"
   ],
   "requires_separate_post_m3_design": [
     "Guardian integration",

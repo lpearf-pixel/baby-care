@@ -1,6 +1,6 @@
 # Baby Care Birth Ready Plan
 
-Status: active  
+Status: verified complete
 Target: `v0.1 Birth Ready`  
 Expected birth date: 2026-09-10  
 Repository: `lpearf-pixel/baby-care`
@@ -10,7 +10,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 ## Current state
 
 Current milestone: **M4 — Birth Ready Operations and Data Safety — verified complete**
-Current delivery gate: **supervised family acceptance — pending**
+Current delivery gate: **supervised family acceptance — verified complete on 2026-08-23**
 Previous completed milestone: **M3 — Care Workspace — verified complete**
 Earlier completed milestone: **M2 — Care Recording MVP — verified complete**
 
@@ -129,12 +129,18 @@ production Compose flow preserved all M1–M3 markers before
 emitting each of the four fixed M4 markers exactly once. Dad/Mom export, Nanny denial,
 private backup verification, isolated restore, old-session rejection, fresh Dad login and
 stable read-model digests all passed with owned source/restore volumes removed afterward.
-M4 is software `verified_complete` on
-`debabe0018ed17e65ebf7959ca237e8770cbacd0`. CI run `32562168081` passed static,
+M4 was software `verified_complete` on
+`debabe0018ed17e65ebf7959ca237e8770cbacd0`. The supervised family acceptance found and
+closed two bounded LAN Web defects: secure client request IDs at `f0d634d` and visible,
+focused timeline details at `3f6676f`. The accepted product head is
+`3f6676f2c7bf65d11efedecce6ac57e261d1545d`. CI run `32611502497` passed static,
 unit/contracts, PostgreSQL integration, production build and production Compose smoke
-5/5. Compose job `97005337160` emitted `m4-family-export`, `m4-backup-integrity`,
-`m4-isolated-restore` and `m4-birth-ready-operations` exactly once. The separate
-supervised family acceptance checklist remains pending and is not implied by this result.
+5/5. Compose job `97125224186` exercised the M4 export, backup and isolated-restore path.
+The supervised family acceptance completed on 2026-08-23: Dad/Mom private export,
+owner-private Git-external backup create/verify, isolated restore-verify, Nanny export
+denial, Nanny care entry with Dad attribution review, Dad takeover, detail navigation and
+void-based undo all passed. No private export contents, household care values, credentials,
+paths or live-database restore were used as tracked evidence.
 M3 implementation scope must not be reopened implicitly.
 
 ## Hard scope boundaries
