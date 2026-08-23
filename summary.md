@@ -27,8 +27,9 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 - M3 implementation branch: `codex/m3-care-workspace-implementation`.
 - Published integration state: `codex/m3-care-workspace-implementation` was fast-forwarded
   through the M4 documentation head `6f112e4`, includes the post-merge unsaved
-  family-settings race fix `1d6d7a5`, and was published at checkpoint `9b1d0aa`.
-  `main` remains unchanged.
+  family-settings race fix `1d6d7a5`, and has verified integrated release head
+  `cd968c4573b3b33eab178f0fca978e56a3d5380a`. CI `32617045070` passed all five
+  jobs. `main` remains unchanged.
 - M3 approved design: `docs/superpowers/specs/2026-08-15-m3-care-workspace-design.md`.
 - M3 implementation plan: `docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md`.
 - M3 Draft PR #5 remains open and unmerged.
@@ -285,8 +286,8 @@ Recommended first sequence:
 3. Preserve the M4 accepted pair `3f6676f2c7bf65d11efedecce6ac57e261d1545d` /
    `32611502497`; supervised family acceptance completed on 2026-08-23.
 4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary. The
-   M3 integration was published at `9b1d0aa`; await an explicit next-milestone decision
-   without modifying `main`.
+   M3 integration release head `cd968c4` passed CI `32617045070`; await an explicit
+   next-milestone decision without modifying `main`.
 
 ## 10. Copy/paste prompt after M4 acceptance
 

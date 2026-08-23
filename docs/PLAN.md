@@ -16,8 +16,9 @@ Earlier completed milestone: **M2 — Care Recording MVP — verified complete**
 
 Published integration checkpoint: `codex/m3-care-workspace-implementation` was
 fast-forwarded through the M4 documentation head `6f112e4`, includes the post-merge
-unsaved family-settings race fix `1d6d7a5`, and was published at `9b1d0aa`.
-`main` is unchanged.
+unsaved family-settings race fix `1d6d7a5`, and has verified integrated release head
+`cd968c4573b3b33eab178f0fca978e56a3d5380a`. CI `32617045070` passed static,
+unit, integration, build and production Compose smoke. `main` is unchanged.
 
 Verified M1 production baseline:
 
