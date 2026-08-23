@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { isSafeTimeZoneIdentifier, type BabyDto, type FamilyDto, type MemberDto } from '@baby-care/contracts';
 
 export function AdminFamilyPanel({
@@ -34,11 +34,13 @@ export function AdminFamilyPanel({
   const [nannyName, setNannyName] = useState('Nanny');
   const [nannyPassword, setNannyPassword] = useState('');
   const [resetPassword, setResetPassword] = useState('');
+  const previousFamily = useRef({ name: family.name, timezone: family.timezone });
 
   useEffect(() => {
-    setFamilyName(family.name);
-    setTimezone(family.timezone);
-  }, [family]);
+    if (family.name !== previousFamily.current.name) setFamilyName(family.name);
+    if (family.timezone !== previousFamily.current.timezone) setTimezone(family.timezone);
+    previousFamily.current = { name: family.name, timezone: family.timezone };
+  }, [family.name, family.timezone]);
 
   useEffect(() => {
     setBabyName(baby.displayName);
