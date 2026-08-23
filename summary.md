@@ -13,7 +13,13 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   implementation on `codex/m5-voice-care-adapter-implementation`.
 - M5 Task 1 is complete at `bb1337226c1948695159d14199c9bb73cdaf115a`: strict
   signed-intent contracts, canonical bytes, browser DTOs, deterministic JSON Schema and
-  synthetic golden corpus. Task 2 database schema and fail-closed invariants are next.
+  synthetic golden corpus.
+- M5 Task 2 is complete at `990c99f795d6a1b20188f2a1a86b792f9ede6c51`: five
+  ownership-bound Voice Care tables, `care_source=voice`, closed state/timestamp/digest
+  checks and Drizzle migration metadata. Task 3 browser-authenticated pairing is next.
+- Host-only test note: the existing M1 birth-date integration test shifts one calendar
+  day under macOS `Asia/Shanghai`; it passes 2/2 with the CI `TZ=UTC` baseline. M5
+  migration compatibility is 15/15 and the full UTC API suite is 176/176.
 - M4 accepted product head: `3f6676f2c7bf65d11efedecce6ac57e261d1545d`.
 - M4 authoritative CI: `32611502497` — static / unit / PostgreSQL integration /
   production build / production Compose smoke 5/5 PASS.
@@ -290,8 +296,8 @@ Recommended first sequence:
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
 3. Preserve the M4 accepted pair `3f6676f2c7bf65d11efedecce6ac57e261d1545d` /
    `32611502497`; supervised family acceptance completed on 2026-08-23.
-4. Continue M5 Task 2 on `codex/m5-voice-care-adapter-implementation` from Task 1
-   commit `bb13372`, preserving the Guardian/audio/AI system boundary and `main`.
+4. Continue M5 Task 3 on `codex/m5-voice-care-adapter-implementation` from Task 2
+   commit `990c99f`, preserving the Guardian/audio/AI system boundary and `main`.
 
 ## 10. Copy/paste prompt after M4 acceptance
 

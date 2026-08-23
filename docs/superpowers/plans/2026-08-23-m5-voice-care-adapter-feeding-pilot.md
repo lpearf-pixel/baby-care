@@ -366,7 +366,7 @@ contracts typecheck, repository lint and `git diff --check` passed on Node 24.19
 
 ### Task 2: M5.0 Database Schema And Fail-Closed Invariants
 
-**Status:** Pending; requires Task 1.
+**Status:** Complete at `990c99f795d6a1b20188f2a1a86b792f9ede6c51`; Task 3 is next.
 
 **Files:**
 
@@ -380,7 +380,7 @@ contracts typecheck, repository lint and `git diff --check` passed on Node 24.19
 - Consumes: Task 1 enums and existing family/baby/user/membership/handoff/care-event ownership.
 - Produces: `voiceCareDevices`, `voiceCarePairingChallenges`, `voiceCareLeases`, `voiceCareIntentReceipts`, `voiceCareFeedingSessions` Drizzle tables and matching PostgreSQL constraints.
 
-- [ ] **Step 1: Write PostgreSQL migration RED tests**
+- [x] **Step 1: Write PostgreSQL migration RED tests**
 
 ```ts
 it('creates all M5 tables and adds voice to care_source', async () => {
@@ -401,7 +401,7 @@ it('rejects cross-family lease ownership and a second active family/device lease
 
 Also prove: five-minute challenge/consumption fields; public-key length 32 bytes; key/device uniqueness; fixed capability/status values; positive session version; legal state/proposal/terminal combinations; receipt digest length 32; one event per Voice Care session; actor membership ownership; session device/lease/family/baby consistency; `manual` and `voice` care/checkpoint rows both require server-owned actor plus client request ID; and terminal states cannot have a missing required terminal timestamp.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 env TEST_DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @baby-care/api test -- m5-migrations.integration.test.ts
@@ -409,7 +409,7 @@ env TEST_DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @baby-care/api test -- 
 
 Expected: FAIL because migration `0004` and M5 tables are absent. If `TEST_DATABASE_URL` is unavailable, start only the repository's disposable PostgreSQL 16 test service; do not use a household or production database.
 
-- [ ] **Step 3: Add the forward-only migration and Drizzle schema**
+- [x] **Step 3: Add the forward-only migration and Drizzle schema**
 
 ```sql
 alter type care_source add value if not exists 'voice';
@@ -430,7 +430,7 @@ create table voice_care_devices (
 
 Create the remaining four tables with composite foreign keys back to the family-owned device/lease/session rows. Store only typed JSON proposals/results validated at service boundaries; do not add raw request bodies, signatures, transcripts or speaker scores. Add partial unique indexes for an unrevoked family/device lease and a nonterminal session-to-final-event link. Replace the existing actor-required checks so both `manual` and `voice` care/checkpoint sources require actor user, membership and client request ID; preserve all other source meanings.
 
-- [ ] **Step 4: Run migration GREEN and compatibility gates**
+- [x] **Step 4: Run migration GREEN and compatibility gates**
 
 ```bash
 env TEST_DATABASE_URL="$TEST_DATABASE_URL" pnpm --filter @baby-care/api test -- m5-migrations.integration.test.ts migrations.integration.test.ts m2-migrations.integration.test.ts m3-migrations.integration.test.ts
@@ -440,7 +440,7 @@ git diff --check
 
 Expected: all enabled PostgreSQL tests PASS and all earlier migrations remain valid.
 
-- [ ] **Step 5: Review and commit Task 2**
+- [x] **Step 5: Review and commit Task 2**
 
 ```bash
 git add migrations apps/api/src/schema.ts apps/api/test/m5-migrations.integration.test.ts apps/api/test/helpers/m2-family-app.ts
@@ -449,6 +449,12 @@ git commit -m "feat: add M5 Voice Care persistence"
 ```
 
 **Completion:** The database can hold M5 security and pending state with ownership constraints. No pairing, lease or intent route exists.
+
+Fresh PostgreSQL 16 evidence: M5 migration tests 7/7, M1-M5 migration compatibility
+15/15 and the full UTC API suite 176/176 passed. Root typecheck, lint, API build,
+Drizzle snapshot check and diff check passed. On the macOS Asia/Shanghai host, the
+pre-existing M1 birth-date integration case returns the previous UTC calendar date;
+the isolated test passes 2/2 under the CI `TZ=UTC` baseline. Task 2 did not alter that path.
 
 ---
 
