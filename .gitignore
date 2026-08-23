@@ -6,4 +6,5 @@ coverage/
 !.env.example
 diagnostics/latest/
 packages/operations/.native/
+.worktrees/
 .DS_Store
