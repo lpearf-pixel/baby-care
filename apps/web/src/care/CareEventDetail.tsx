@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CareTimelineItemDto, EditCareEventInput } from '@baby-care/contracts';
 import { BabyCareApiError, type BabyCareApi, type CareRevisionHistoryItemDto } from '../api-client.js';
 import { CareEventEditForm } from './CareEventEditForm.js';
@@ -104,6 +104,7 @@ export function CareEventDetail({
   onChanged: () => Promise<void>;
   familyTimeZone: string;
 }) {
+  const detailRef = useRef<HTMLElement>(null);
   const [detail, setDetail] = useState<CareTimelineItemDto | null>(null);
   const [revisions, setRevisions] = useState<CareRevisionHistoryItemDto[]>([]);
   const [revisionError, setRevisionError] = useState(false);
@@ -113,6 +114,13 @@ export function CareEventDetail({
   const [editingVersion, setEditingVersion] = useState<number | null>(null);
   const [confirmingUndo, setConfirmingUndo] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const element = detailRef.current;
+    if (!element) return;
+    element.focus({ preventScroll: true });
+    element.scrollIntoView?.({ block: 'start' });
+  }, [eventId]);
 
   const reloadRevisions = useCallback(async () => {
     try {
@@ -202,7 +210,7 @@ export function CareEventDetail({
   }
 
   return (
-    <section className="panel care-event-detail" aria-label="护理记录详情">
+    <section ref={detailRef} className="panel care-event-detail" aria-label="护理记录详情" tabIndex={-1}>
       <div className="care-panel-header">
         <h2>护理记录详情</h2>
         <button type="button" className="text-button" onClick={onClose}>关闭详情</button>

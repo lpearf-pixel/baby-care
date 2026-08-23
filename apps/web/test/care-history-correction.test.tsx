@@ -153,6 +153,29 @@ async function openOnlyDetail(item: CareTimelineItemDto, overrides: Record<strin
 afterEach(() => cleanup());
 
 describe('M3 complete care history correction', () => {
+  it('moves focus and the viewport to a timeline detail opened below a long list', async () => {
+    const originalScrollIntoView = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+
+    try {
+      const { detail } = await openOnlyDetail(details[3]!);
+
+      await waitFor(() => expect(detail).toHaveFocus());
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' });
+      expect(scrollIntoView.mock.instances[0]).toBe(detail);
+    } finally {
+      if (originalScrollIntoView) {
+        Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoView);
+      } else {
+        Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+      }
+    }
+  });
+
   it.each([
     [details[0]!, ['实际喝了 70ml', '奶瓶容量 150ml（不计入摄入量）', '亲喂 12min', '拍嗝', '少量吐奶']],
     [details[1]!, ['尿+便', '便便颜色 黄色', '便便性状 籽状', '便便量 中量']],
