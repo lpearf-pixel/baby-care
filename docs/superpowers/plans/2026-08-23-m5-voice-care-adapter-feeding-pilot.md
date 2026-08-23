@@ -642,7 +642,7 @@ authority fails closed. Task 5 signed device intents and pending feeding state i
 
 ### Task 5: M5.3 Signed Device Endpoint And Pending Feeding State Machine
 
-**Status:** Pending; requires Tasks 1-4.
+**Status:** Complete at `4c65c00`; requires Tasks 1-4.
 
 **Files:**
 
@@ -656,7 +656,7 @@ authority fails closed. Task 5 signed device intents and pending feeding state i
 - Consumes: canonical intent parser/signing bytes, Ed25519 device key, active lease lookup, receipt/session tables and centralized application configuration.
 - Produces: `VoiceCareIntentAuthenticator.authenticate(raw, now)`, `VoiceCareIntentService.accept`, `VoiceCareSessionService.state`, device route, `VOICE_CARE_ENABLED=false` and fixed operational bounds.
 
-- [ ] **Step 1: Write endpoint/authentication RED tests**
+- [x] **Step 1: Write endpoint/authentication RED tests**
 
 ```ts
 it('accepts one canonical signed live start and creates no care event', async () => {
@@ -676,7 +676,7 @@ it.each(['bad_signature', 'revoked_device', 'expired_lease', 'cross_family'])('%
 
 Cover the exact 16 KiB body limit/media type; duplicate keys/noncanonical body rejected before DB; two-minute live window; replay/out-of-window never auto-commits; device/request same digest returns stored result; different digest returns `rejected`; capability/revocation/lease/membership checks; uncertain/mismatch/not-enrolled/unavailable speaker outcomes; rate/concurrency bounds; abort settlement; disabled-by-default startup; and stable errors with no identity enumeration.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pnpm --filter @baby-care/api test -- voice-care-contract.integration.test.ts voice-care-session.integration.test.ts voice-care-route.test.ts config.test.ts startup.test.ts
@@ -684,7 +684,7 @@ pnpm --filter @baby-care/api test -- voice-care-contract.integration.test.ts voi
 
 Expected: FAIL because the device route, authenticator, state machine and setting do not exist.
 
-- [ ] **Step 3: Implement raw canonical authentication and receipt transaction**
+- [x] **Step 3: Implement raw canonical authentication and receipt transaction**
 
 ```ts
 export interface AuthenticatedVoiceIntent {
@@ -702,7 +702,7 @@ export interface VoiceCareIntentAuthenticator {
 
 Register a fixed parser for `application/vnd.baby-care.voice-intent+json` with `parseAs: 'buffer'` and `bodyLimit: 16_384`; do not replace ordinary JSON parsing. Verify canonical bytes and Ed25519 before interpreting payload state. Use one per-device in-flight slot, a 30-attempt rolling-minute limiter and a 30-second abort-aware deadline; release the slot only after database work settles. Use a constant external rejection shape for all device/key/lease lookup failures.
 
-- [ ] **Step 4: Implement only noncommitting transitions**
+- [x] **Step 4: Implement only noncommitting transitions**
 
 ```ts
 export type VoiceCareSessionState =
@@ -722,7 +722,7 @@ export async function applyPendingVoiceIntent(
 
 In Task 5, `feeding_start`, `feeding_update`, `feeding_end` and `care_cancel` are implemented; device `care_confirm` returns `needs_confirmation` without a final write until Task 6. Start creates a typed proposal; update uses `expectedVersion`; end freezes `proposalDigest`; cancel is terminal. The device cannot submit `amountValueOrigin`: Baby Care sets `spoken` for a submitted amount, and may set `family_default` only for a value read from a future server-owned configuration. M5 adds no new default-setting surface. A six-hour sweep runs opportunistically inside bounded state reads/transitions and moves eligible nonterminal rows to `needs_review` without inventing care facts.
 
-- [ ] **Step 5: Run state-machine GREEN**
+- [x] **Step 5: Run state-machine GREEN**
 
 ```bash
 pnpm --filter @baby-care/api test -- voice-care-contract.integration.test.ts voice-care-session.integration.test.ts voice-care-route.test.ts config.test.ts startup.test.ts
@@ -733,7 +733,7 @@ git diff --check
 
 Expected: focused tests PASS and every Task 5 path leaves `care_events` unchanged.
 
-- [ ] **Step 6: Review and commit Task 5**
+- [x] **Step 6: Review and commit Task 5**
 
 ```bash
 git add apps/api/src/voice-care apps/api/src/routes/voice-care-device.ts apps/api/src/app.ts apps/api/src/config.ts apps/api/src/startup.ts apps/api/test/voice-care-contract.integration.test.ts apps/api/test/voice-care-session.integration.test.ts apps/api/test/voice-care-route.test.ts apps/api/test/config.test.ts apps/api/test/startup.test.ts
@@ -742,6 +742,15 @@ git commit -m "feat: accept pending Voice Care feeding intents"
 ```
 
 **Completion:** A valid leased device can create/update/end/cancel a typed pending feeding session with replay protection. No Voice Care request can yet create a final care event.
+
+Fresh evidence: Task 5 focused API/config/startup tests passed 35/35, shared Voice Care
+contract tests passed 14/14, and the full UTC API suite passed 45 files / 205 tests on
+disposable PostgreSQL 16. API typecheck, root lint, production build, diff and privacy
+scans passed. The endpoint is disabled by default, accepts only canonical signed 16 KiB
+bounded bodies, revalidates authority under transaction locks, persists digest-only
+receipts, enforces one in-flight request and 30/minute, and exposes a typed state DTO.
+Start/update/end/cancel/replay/speaker-review paths create no care event; Task 6 promotion
+and exact confirmation is next.
 
 ---
 
