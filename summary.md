@@ -19,8 +19,12 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   checks and Drizzle migration metadata.
 - M5 Task 3 is complete at `e42ec508506e91681ac4cdb55cf2b28eca031237`: generated
   Ed25519 device pairing, digest-only five-minute challenges, family-admin-only device
-  list/revocation, cross-family isolation and atomic lease revocation. Task 4 active
-  caregiver lease and handoff is next.
+  list/revocation, cross-family isolation and atomic lease revocation.
+- M5 Task 4 is complete at `44799029d741846e55e2ac60b5db31e85417616d`: an
+  authenticated Dad/Mom/Nanny can deliberately bind one paired device to themselves for
+  eight hours; replacement, voice handoff, lease and audits commit atomically, and
+  family/Nanny revocation rules fail closed. Task 5 signed device intents and pending
+  feeding state is next.
 - Host-only test note: the existing M1 birth-date integration test shifts one calendar
   day under macOS `Asia/Shanghai`; it passes 2/2 with the CI `TZ=UTC` baseline. M5
   migration compatibility is 15/15 and the full UTC API suite is 176/176.

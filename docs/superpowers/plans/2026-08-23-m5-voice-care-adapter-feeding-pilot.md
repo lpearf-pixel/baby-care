@@ -550,7 +550,7 @@ invalidates every open lease. Task 4 active-caregiver lease and handoff is next.
 
 ### Task 4: M5.2 Active Caregiver Lease And Atomic Handoff
 
-**Status:** Pending; requires Tasks 1-3.
+**Status:** Complete at `4479902`; requires Tasks 1-3.
 
 **Files:**
 
@@ -564,7 +564,7 @@ invalidates every open lease. Task 4 active-caregiver lease and handoff is next.
 - Consumes: paired device, authenticated `CareActorContext`, existing handoff ownership and Task 1 lease DTOs.
 - Produces: `createVoiceCareLeaseService`, `insertHandoffCheckpointInTransaction`, active lease lookup and lease activation/revocation routes.
 
-- [ ] **Step 1: Write lease RED tests**
+- [x] **Step 1: Write lease RED tests**
 
 ```ts
 it('atomically activates an eight-hour lease and a voice handoff checkpoint', async () => {
@@ -584,7 +584,7 @@ it('rolls back the lease if handoff creation fails', async () => {
 
 Cover replacement revokes prior lease; one family/device active lease under concurrency; Dad/Mom may revoke any family lease; Nanny may activate/revoke only their own; disabled membership, expired lease and revoked device are inactive; no silent renewal; cross-family access is closed; and the browser never receives a reusable session credential.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pnpm --filter @baby-care/api test -- voice-care-lease.integration.test.ts care-handoff.integration.test.ts
@@ -592,7 +592,7 @@ pnpm --filter @baby-care/api test -- voice-care-lease.integration.test.ts care-h
 
 Expected: FAIL because lease service/repository and source-aware handoff insertion are absent.
 
-- [ ] **Step 3: Implement transaction-scoped lease activation**
+- [x] **Step 3: Implement transaction-scoped lease activation**
 
 ```ts
 export async function insertHandoffCheckpointInTransaction(
@@ -610,7 +610,7 @@ export async function insertHandoffCheckpointInTransaction(
 
 `activate` locks the family/device row, revalidates device and membership, revokes the old lease, inserts the `source='voice'` checkpoint, inserts the new lease with `expiresAt = issuedAt + 8h`, writes bounded audit metadata and commits once. Keep the existing manual handoff service calling the same helper with `source='manual'`.
 
-- [ ] **Step 4: Run lease GREEN**
+- [x] **Step 4: Run lease GREEN**
 
 ```bash
 pnpm --filter @baby-care/api test -- voice-care-lease.integration.test.ts care-handoff.integration.test.ts care-workspace-system.integration.test.ts
@@ -620,7 +620,7 @@ git diff --check
 
 Expected: lease tests PASS and existing manual handoff tests remain green.
 
-- [ ] **Step 5: Review and commit Task 4**
+- [x] **Step 5: Review and commit Task 4**
 
 ```bash
 git add apps/api/src/voice-care apps/api/src/routes/voice-care-browser.ts apps/api/src/care/handoff-repository.ts apps/api/test/voice-care-lease.integration.test.ts apps/api/test/care-handoff.integration.test.ts
@@ -629,6 +629,14 @@ git commit -m "feat: issue active caregiver voice leases"
 ```
 
 **Completion:** A browser-authenticated caregiver can deliberately bind one paired device to themselves for at most eight hours, with an atomic handoff checkpoint. No device intent route exists.
+
+Fresh evidence: the focused Task 4 compatibility set passed 21/21, the corrected Task 3
+cross-family fixture passed 4/4 without leaving its schema index removed, and the full
+UTC API suite passed 43 files / 192 tests against disposable PostgreSQL 16. API
+typecheck, root lint, production build, diff and privacy scans passed. Activation writes
+the voice handoff, lease and bounded audits in one transaction; replacement is serialized
+by the device row, replay does not renew, and disabled/expired/revoked/cross-family
+authority fails closed. Task 5 signed device intents and pending feeding state is next.
 
 ---
 
