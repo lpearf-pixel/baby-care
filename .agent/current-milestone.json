@@ -1,8 +1,12 @@
 {
   "schema_version": 1,
-  "milestone": "M4 Birth Ready Operations and Data Safety",
-  "status": "verified_complete",
-  "branch": "codex/m3-care-workspace-implementation",
+  "milestone": "M5 Voice Care Adapter and Feeding Pilot",
+  "status": "design_review_pending",
+  "branch": "codex/m5-voice-care-adapter-design",
+  "m5_baseline_head": "cebd5d35c6095b08982216ccc706f0226e710dbc",
+  "m5_design": "docs/superpowers/specs/2026-08-23-m5-voice-care-adapter-feeding-pilot-design.md",
+  "m5_design_state": "draft_for_final_human_review",
+  "m5_business_implementation_state": "not_started_not_authorized",
   "m3_m4_integration_state": "published_and_exact_head_ci_verified",
   "m3_m4_integration_business_head": "1d6d7a50462b0420514f3ed7356148accf90dd04",
   "m3_m4_integration_release_head": "cd968c4573b3b33eab178f0fca978e56a3d5380a",
@@ -146,7 +150,9 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "preserve completed M4 and await an explicit next-milestone decision without modifying main"
+    "review and approve or revise the M5 Voice Care Adapter and Feeding Pilot design",
+    "after design approval write a detailed implementation plan before modifying business code",
+    "preserve completed M4 and do not modify main"
   ],
   "requires_separate_post_m3_design": [
     "Guardian integration",

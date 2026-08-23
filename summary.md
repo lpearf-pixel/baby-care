@@ -9,6 +9,9 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 
 - Current completed milestone: **M4 — Birth Ready Operations and Data Safety**, including
   supervised family acceptance, `verified_complete`.
+- Proposed next milestone: **M5 — Voice Care Adapter and Feeding Pilot**. Its Baby Care
+  design is drafted on `codex/m5-voice-care-adapter-design` for final human review; no
+  M5 business implementation is authorized or present.
 - M4 accepted product head: `3f6676f2c7bf65d11efedecce6ac57e261d1545d`.
 - M4 authoritative CI: `32611502497` — static / unit / PostgreSQL integration /
   production build / production Compose smoke 5/5 PASS.
@@ -285,9 +288,9 @@ Recommended first sequence:
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
 3. Preserve the M4 accepted pair `3f6676f2c7bf65d11efedecce6ac57e261d1545d` /
    `32611502497`; supervised family acceptance completed on 2026-08-23.
-4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary. The
-   M3 integration release head `cd968c4` passed CI `32617045070`; await an explicit
-   next-milestone decision without modifying `main`.
+4. Keep Guardian/audio/AI outside completed M4 and preserve the independent-system
+   boundary. Review the proposed M5 Baby Care design before creating an implementation
+   plan or modifying business code; do not modify `main`.
 
 ## 10. Copy/paste prompt after M4 acceptance
 
