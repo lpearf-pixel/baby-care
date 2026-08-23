@@ -40,8 +40,15 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   cancellation controls, operator-assisted device pairing, warning confirmation and
   committed timeline links without transcript/model/security diagnostics. Active lease
   actor/expiry is visible to every caregiver while Nanny admin actions remain absent.
-  Fresh Web evidence is 108/108 and full UTC API evidence remains 214/214. Task 8 family
-  export v2, backup and isolated restore closure is next.
+  Fresh Web evidence is 108/108 and full UTC API evidence remains 214/214.
+- M5 Task 8 is complete at `d1a582d`: Family Export v2 adds deterministic typed Voice
+  Care history without device/security material; backup catalogue coverage includes all
+  five M5 tables; isolated restore revokes login sessions and Voice leases, moves only
+  nonterminal Voice sessions to `needs_review`, and proves zero actionable restored
+  authority while preserving committed care facts. Fresh evidence is Contracts 52/52,
+  Task 8 API 79/79, Operations 56 passed / 4 opt-in skipped, real PostgreSQL 16 restore
+  3/3, and workspace typecheck PASS. Task 9 synthetic production and cross-repository
+  consumer-contract gate is next.
 - Host-only test note: the existing M1 birth-date integration test shifts one calendar
   day under macOS `Asia/Shanghai`; it passes 2/2 with the CI `TZ=UTC` baseline. M5
   migration compatibility is 15/15 and the full UTC API suite is 176/176.
