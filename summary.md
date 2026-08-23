@@ -28,8 +28,13 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   default-disabled, canonical Ed25519 device endpoint now has fixed body/time/rate/
   concurrency bounds, transaction-locked lease authority, digest-only receipts and a
   noncommitting typed feeding state machine. Full UTC API evidence is 205/205 and every
-  Task 5 path leaves final care events unchanged. Task 6 transactional confirmation and
-  existing feeding promotion is next.
+  Task 5 path leaves final care events unchanged.
+- M5 Task 6 is complete at `2573ae45b7f900ad53996476efdeca18efff7aa6`: exact
+  device or same-actor browser confirmation promotes frozen bottle/direct proposals
+  through the existing feeding rules into one server-owned `source=voice` event. Warning
+  digests/versions, lease revocation, cross-actor confirmation, idempotency collisions,
+  audit rollback and outer-commit failure all fail closed. Full UTC API evidence is
+  214/214. Task 7 responsive Web review, lease and cancellation panel is next.
 - Host-only test note: the existing M1 birth-date integration test shifts one calendar
   day under macOS `Asia/Shanghai`; it passes 2/2 with the CI `TZ=UTC` baseline. M5
   migration compatibility is 15/15 and the full UTC API suite is 176/176.

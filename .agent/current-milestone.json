@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "milestone": "M5 Voice Care Adapter and Feeding Pilot",
-  "status": "implementation_in_progress_task_6_next",
+  "status": "implementation_in_progress_task_7_next",
   "branch": "codex/m5-voice-care-adapter-implementation",
   "m5_baseline_head": "cebd5d35c6095b08982216ccc706f0226e710dbc",
   "m5_design": "docs/superpowers/specs/2026-08-23-m5-voice-care-adapter-feeding-pilot-design.md",
@@ -9,7 +9,7 @@
   "m5_implementation_plan": "docs/superpowers/plans/2026-08-23-m5-voice-care-adapter-feeding-pilot.md",
   "m5_implementation_plan_state": "approved_2026_08_23",
   "m5_implementation_baseline_head": "579122fdd3147704c107fe811e0e04013dfd1faa",
-  "m5_business_implementation_state": "tasks_1_2_3_4_5_complete_task_6_next",
+  "m5_business_implementation_state": "tasks_1_2_3_4_5_6_complete_task_7_next",
   "m5_completed_tasks": [
     {
       "task": "Task 1 Strict Contracts Canonical Bytes And Golden Corpus",
@@ -35,6 +35,11 @@
       "task": "Task 5 Signed Device Endpoint And Pending Feeding State Machine",
       "commit": "4c65c0064a03514eb6b0a03c5e9c7058bfb2d965",
       "verification": "focused_35_of_35_contracts_14_of_14_full_utc_api_205_of_205_typecheck_lint_build_diff_privacy_pass"
+    },
+    {
+      "task": "Task 6 Transactional Confirmation And Existing Feeding Promotion",
+      "commit": "2573ae45b7f900ad53996476efdeca18efff7aa6",
+      "verification": "promotion_9_of_9_full_utc_api_214_of_214_typecheck_lint_build_diff_privacy_pass"
     }
   ],
   "m3_m4_integration_state": "published_and_exact_head_ci_verified",
@@ -180,8 +185,8 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "execute M5 Task 6 transactional confirmation and existing feeding promotion with TDD",
-    "continue on codex/m5-voice-care-adapter-implementation from Task 5 4c65c00",
+    "execute M5 Task 7 responsive web review lease and cancellation panel with TDD",
+    "continue on codex/m5-voice-care-adapter-implementation from Task 6 2573ae4",
     "preserve completed M4 and do not modify main"
   ],
   "requires_separate_post_m3_design": [

@@ -756,7 +756,7 @@ and exact confirmation is next.
 
 ### Task 6: M5.4 Transactional Confirmation And Existing Feeding Promotion
 
-**Status:** Pending; requires Task 5.
+**Status:** Complete at `2573ae4`; requires Task 5.
 
 **Files:**
 
@@ -769,7 +769,7 @@ and exact confirmation is next.
 - Consumes: frozen proposal digest/version, valid lease actor and existing feeding warnings/writer.
 - Produces: `prepareFeedingWarnings`, `writeFeedingSessionInTransaction`, `promoteVoiceCareFeeding`, device/browser confirmation and exactly-once final linkage.
 
-- [ ] **Step 1: Write promotion RED tests**
+- [x] **Step 1: Write promotion RED tests**
 
 ```ts
 it('commits one voice feeding event and returns saved only after commit', async () => {
@@ -789,7 +789,7 @@ it('creates one event under concurrent duplicate confirms', async () => {
 
 Cover bottle amount is consumed ml; capacity excluded from totals; expressed/formula distinct; direct breastfeeding minutes and no inferred ml; default proposal never committed without exact confirmation; warning codes/digest/version bound; changed warning set requires reconfirmation; mismatch/not-enrolled/unavailable cannot device-confirm; uncertain requires authenticated browser confirmation; expired/revoked lease blocks device confirm; rollback/audit failure never returns `saved`; request abort settles transaction before slot release; manual feeding, warnings and idempotency remain unchanged.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pnpm --filter @baby-care/api test -- voice-care-promotion.integration.test.ts feeding-warning.integration.test.ts feeding-bottle.integration.test.ts feeding-direct.integration.test.ts care-concurrency.integration.test.ts
@@ -797,7 +797,7 @@ pnpm --filter @baby-care/api test -- voice-care-promotion.integration.test.ts fe
 
 Expected: FAIL because Voice Care confirm has no transactional promotion path.
 
-- [ ] **Step 3: Refactor the existing writer without changing manual semantics**
+- [x] **Step 3: Refactor the existing writer without changing manual semantics**
 
 ```ts
 type QueryExecutor = Pick<pg.Pool | pg.PoolClient, 'query'>;
@@ -820,7 +820,7 @@ export async function writeFeedingSessionInTransaction(
 
 Keep `FeedingService.createSession` as the manual transaction owner and pass `source='manual'`. Extend the care-event writer to accept only a server-owned source argument; routes and device payloads never supply it.
 
-- [ ] **Step 4: Implement atomic Voice Care promotion**
+- [x] **Step 4: Implement atomic Voice Care promotion**
 
 ```ts
 export async function promoteVoiceCareFeeding(
@@ -834,7 +834,7 @@ export async function promoteVoiceCareFeeding(
 
 Begin one transaction, lock the session and receipt, revalidate device/lease/membership, compare version/proposal/warning digests, mark `committing`, call `writeFeedingSessionInTransaction`, link event/session, write allow-listed audit and receipt result, mark `committed`, then commit. A retry reads the committed receipt/session link and returns the same `saved` result without writing again. Browser confirmation authenticates the same session actor; Dad/Mom may cancel but cannot silently confirm another actor's session.
 
-- [ ] **Step 5: Run promotion GREEN and prior-care regression**
+- [x] **Step 5: Run promotion GREEN and prior-care regression**
 
 ```bash
 pnpm --filter @baby-care/api test -- voice-care-promotion.integration.test.ts feeding-warning.integration.test.ts feeding-bottle.integration.test.ts feeding-direct.integration.test.ts care-concurrency.integration.test.ts care-event.integration.test.ts care-workspace-system.integration.test.ts
@@ -844,7 +844,7 @@ git diff --check
 
 Expected: all focused tests PASS; manual and voice paths share domain semantics but retain distinct server-owned sources.
 
-- [ ] **Step 6: Review and commit Task 6**
+- [x] **Step 6: Review and commit Task 6**
 
 ```bash
 git add apps/api/src/care apps/api/src/voice-care apps/api/src/routes/voice-care-browser.ts apps/api/test/voice-care-promotion.integration.test.ts apps/api/test/feeding-warning.integration.test.ts apps/api/test/feeding-bottle.integration.test.ts apps/api/test/feeding-direct.integration.test.ts apps/api/test/care-concurrency.integration.test.ts
@@ -853,6 +853,14 @@ git commit -m "feat: confirm Voice Care feeding records"
 ```
 
 **Completion:** Exact confirmed bottle/direct proposals promote through existing care rules into exactly one `source=voice` event. `saved` is transactionally honest.
+
+Fresh evidence: Task 6 promotion tests passed 9/9 and the final full UTC API suite
+passed 46 files / 214 tests on disposable PostgreSQL 16. Exact device and same-actor
+browser confirmation share existing feeding warnings/writes; concurrent retries link one
+event, Dad/Mom may cancel stale sessions, and cross-actor confirm is closed. Revoked
+leases, changed warning sets, audit/commit failures and manual/voice idempotency-key
+collisions return no false `saved`. Workspace typecheck, lint, production build, diff and
+privacy scans passed. Task 7 Web review, lease and cancellation controls are next.
 
 ---
 
