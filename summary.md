@@ -9,10 +9,11 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 
 - Current completed milestone: **M4 — Birth Ready Operations and Data Safety**, including
   supervised family acceptance, `verified_complete`.
-- Proposed next milestone: **M5 — Voice Care Adapter and Feeding Pilot**. Its Baby Care
-  design was approved on 2026-08-23 and its detailed implementation plan is drafted on
-  `codex/m5-voice-care-adapter-design` for review; no M5 business implementation is
-  authorized or present.
+- Current milestone: **M5 — Voice Care Adapter and Feeding Pilot**, approved and in
+  implementation on `codex/m5-voice-care-adapter-implementation`.
+- M5 Task 1 is complete at `bb1337226c1948695159d14199c9bb73cdaf115a`: strict
+  signed-intent contracts, canonical bytes, browser DTOs, deterministic JSON Schema and
+  synthetic golden corpus. Task 2 database schema and fail-closed invariants are next.
 - M4 accepted product head: `3f6676f2c7bf65d11efedecce6ac57e261d1545d`.
 - M4 authoritative CI: `32611502497` — static / unit / PostgreSQL integration /
   production build / production Compose smoke 5/5 PASS.
@@ -280,8 +281,8 @@ This remains separate from verified M3 Care Workspace. The first code work belon
 
 ## 9. Fresh Work entry point
 
-The next Work should preserve the accepted M4 product head and must not redesign M2/M3,
-repeat the completed family acceptance, or implicitly begin Guardian coding.
+The next Work should preserve the accepted M4 product head and completed M5 Task 1,
+must not redesign M2/M3, repeat completed family acceptance, or begin Guardian coding.
 
 Recommended first sequence:
 
@@ -289,9 +290,8 @@ Recommended first sequence:
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
 3. Preserve the M4 accepted pair `3f6676f2c7bf65d11efedecce6ac57e261d1545d` /
    `32611502497`; supervised family acceptance completed on 2026-08-23.
-4. Keep Guardian/audio/AI outside completed M4 and preserve the independent-system
-   boundary. Review the M5 implementation plan, then create its isolated implementation
-   branch before modifying business code; do not modify `main`.
+4. Continue M5 Task 2 on `codex/m5-voice-care-adapter-implementation` from Task 1
+   commit `bb13372`, preserving the Guardian/audio/AI system boundary and `main`.
 
 ## 10. Copy/paste prompt after M4 acceptance
 

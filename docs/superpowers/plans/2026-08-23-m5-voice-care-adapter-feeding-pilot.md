@@ -274,14 +274,14 @@ All transitions carry `expectedVersion`. Receipt key `(device_id, request_id)` h
 
 ### Task 1: M5.0 Strict Contracts, Canonical Bytes And Golden Corpus
 
-**Status:** Pending.
+**Status:** Complete at `bb1337226c1948695159d14199c9bb73cdaf115a`; Task 2 is next.
 
 **Files:**
 
 - Create: `packages/contracts/src/voice-care.ts`
 - Create: `packages/contracts/schema/voice-care-intent.v1.schema.json`
 - Create: `packages/contracts/fixtures/voice-care-v1.json`
-- Create: `packages/contracts/scripts/write-voice-care-schema.mjs`
+- Create: `packages/contracts/scripts/write-voice-care-schema.ts`, `packages/contracts/scripts/write-voice-care-fixtures.ts`
 - Modify: `packages/contracts/src/care/common.ts`, `packages/contracts/src/index.ts`, `packages/contracts/src/errors.ts`, `packages/contracts/package.json`
 - Test: `packages/contracts/test/voice-care.test.ts`, `packages/contracts/test/voice-care-golden.test.ts`
 
@@ -290,7 +290,7 @@ All transitions carry `expectedVersion`. Receipt key `(device_id, request_id)` h
 - Consumes: existing offset timestamp, bottle liquid type, feeding component and warning-code contracts.
 - Produces: `VoiceCareIntentV1Schema`, browser DTO schemas, `VoiceCareSemanticResultV1Schema`, `parseCanonicalVoiceCareIntentV1`, `voiceCareSigningBytesV1`, `voiceCareProposalDigestV1`, `voiceCarePairingSigningBytesV1`, tracked JSON Schema and golden corpus.
 
-- [ ] **Step 1: Write contract RED tests**
+- [x] **Step 1: Write contract RED tests**
 
 ```ts
 it('rejects unknown fields, duplicate keys, transcript fields and noncanonical bytes', () => {
@@ -309,7 +309,7 @@ it('binds every accepted field except signature into Ed25519 signing bytes', () 
 
 Cover all five intent discriminants; integer and upper bounds; exact base64url signature length; `source='voice'`; model label bounds; payload/intent mismatch; invalid UUID/time; unknown speaker state; invalid delivery mode; warning digest/code-set/expected-version shape; pairing domain separation and exact challenge/key/signature lengths; semantic response allow-list; and browser pairing/lease/session DTOs.
 
-- [ ] **Step 2: Run RED and record the first expected failure**
+- [x] **Step 2: Run RED and record the first expected failure**
 
 ```bash
 pnpm --filter @baby-care/contracts test -- voice-care.test.ts voice-care-golden.test.ts
@@ -317,7 +317,7 @@ pnpm --filter @baby-care/contracts test -- voice-care.test.ts voice-care-golden.
 
 Expected: FAIL because `voice-care.ts`, schema artifact and fixtures do not exist.
 
-- [ ] **Step 3: Implement the strict contract and canonicalizer**
+- [x] **Step 3: Implement the strict contract and canonicalizer**
 
 ```ts
 export const VoiceCareSemanticCodeSchema = z.enum([
@@ -337,7 +337,7 @@ export function parseCanonicalVoiceCareIntentV1(raw: Uint8Array): VoiceCareInten
 
 Use a closed recursive canonicalizer that accepts only null, booleans, safe integers, strings, arrays and plain objects. Do not use locale-sensitive sorting. Proposal digest is lowercase SHA-256 over canonical proposal bytes through Web Crypto and is separate from the request signature.
 
-- [ ] **Step 4: Generate and verify the tracked schema/corpus**
+- [x] **Step 4: Generate and verify the tracked schema/corpus**
 
 ```bash
 pnpm --filter @baby-care/contracts voice-care:schema
@@ -349,7 +349,7 @@ git diff --check
 
 Expected: all focused tests PASS; a second schema write produces no diff. Confirm corpus values are synthetic and contain no transcript, name, private address, key or signature from a real device.
 
-- [ ] **Step 5: Review and commit Task 1**
+- [x] **Step 5: Review and commit Task 1**
 
 ```bash
 git add packages/contracts/src/voice-care.ts packages/contracts/src/care/common.ts packages/contracts/src/index.ts packages/contracts/src/errors.ts packages/contracts/schema packages/contracts/fixtures packages/contracts/scripts packages/contracts/test/voice-care.test.ts packages/contracts/test/voice-care-golden.test.ts packages/contracts/package.json
@@ -358,6 +358,9 @@ git commit -m "feat: define M5 Voice Care contracts"
 ```
 
 **Completion:** Baby Care publishes one closed, byte-stable v1 contract and fixture corpus. No API route, device key or database table exists.
+
+Fresh verification: 44 contract tests passed; schema and fixture byte-stability checks,
+contracts typecheck, repository lint and `git diff --check` passed on Node 24.19.0.
 
 ---
 
