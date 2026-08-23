@@ -2,7 +2,11 @@
   "schema_version": 1,
   "milestone": "M4 Birth Ready Operations and Data Safety",
   "status": "verified_complete",
-  "branch": "codex/m4-birth-ready-operations",
+  "branch": "codex/m3-care-workspace-implementation",
+  "local_integration_state": "m4_fast_forwarded_into_local_m3_with_post_merge_form_race_fix",
+  "local_integration_business_head": "1d6d7a50462b0420514f3ed7356148accf90dd04",
+  "local_integration_remote_m3_head": "52b042a66122464af338a2b4931315d92dff0965",
+  "local_integration_pushed": false,
   "completed_milestones": [
     "M0 Repository and delivery foundation",
     "M1 Family and baby foundation",
@@ -110,7 +114,7 @@
     "m4-isolated-restore",
     "m4-birth-ready-operations"
   ],
-  "m4_documentation_closure_ci": "verify_latest_branch_run_externally_without_rewriting_tracked_exact_head_evidence",
+  "m4_documentation_closure_ci": "verified_5_of_5_run_32611880463",
   "m4_human_family_acceptance": "verified_complete_2026_08_23",
   "m4_human_family_acceptance_evidence": [
     "Dad/Mom private export interaction completed without inspecting export content",
@@ -140,8 +144,8 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "verify the documentation-only closure checkpoint CI externally without rewriting this accepted product-head record",
-    "preserve M4 and await an explicit next-milestone or branch-integration decision without modifying main"
+    "publish the local M3 integration only after an explicit publication decision; remote M3 remains at 52b042a",
+    "preserve completed M4 and await an explicit next-milestone decision without modifying main"
   ],
   "requires_separate_post_m3_design": [
     "Guardian integration",
