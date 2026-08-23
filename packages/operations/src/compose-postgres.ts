@@ -40,13 +40,22 @@ export type ComposeLifecycleRequest =
 
 const ComposeRunnerConfigSchema = z
   .object({
-    sourceProject: z.literal('baby-care'),
-    targetProject: z.string().regex(/^baby-care-restore(?:-[a-f0-9]{24})?$/),
+    sourceProject: z.enum(['baby-care', 'baby-care-m5']),
+    targetProject: z.string().regex(/^baby-care(?:-m5)?-restore(?:-[a-f0-9]{24})?$/),
     sourceService: z.literal('postgres'),
     targetService: z.literal('postgres_restore'),
     verifierService: z.literal('operations_verifier'),
   })
-  .strict();
+  .strict()
+  .superRefine((config, context) => {
+    const targetPrefix = `${config.sourceProject}-restore`;
+    if (
+      config.targetProject !== targetPrefix
+      && !config.targetProject.startsWith(`${targetPrefix}-`)
+    ) {
+      context.addIssue({ code: 'custom', message: 'project identity pair invalid' });
+    }
+  });
 
 export interface ComposeRunnerConfig {
   sourceProject: string;
@@ -102,6 +111,8 @@ export function createComposePostgresRunners(
   probeReadModels(signal: AbortSignal): Promise<{
     summaryExecutable: true;
     timelineExecutable: true;
+    activeVoiceCareLeaseCount: 0;
+    actionableVoiceCareSessionCount: 0;
   }>;
 } {
   const parsed = ComposeRunnerConfigSchema.safeParse(rawConfig);

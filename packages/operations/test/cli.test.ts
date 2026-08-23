@@ -24,11 +24,34 @@ interface CapturedIo {
   stderr: string[];
 }
 
+interface RestoreResult {
+  code: 'restore_verified';
+  revokedSessionCount: number;
+  revokedVoiceCareLeaseCount: number;
+  invalidatedVoiceCareSessionCount: number;
+}
+
+function restoreResult(revokedSessionCount = 1): RestoreResult {
+  return {
+    code: 'restore_verified',
+    revokedSessionCount,
+    revokedVoiceCareLeaseCount: 1,
+    invalidatedVoiceCareSessionCount: 1,
+  };
+}
+
+const verifiedReadModels = {
+  summaryExecutable: true,
+  timelineExecutable: true,
+  activeVoiceCareLeaseCount: 0,
+  actionableVoiceCareSessionCount: 0,
+} as const;
+
 interface CliDependencies {
   create(): Promise<{ code: 'backup_created' }>;
   verify(): Promise<{ code: 'backup_verified' }>;
-  restore(): Promise<{ code: 'restore_verified'; revokedSessionCount: number }>;
-  restoreVerify(): Promise<{ code: 'restore_verified'; revokedSessionCount: number }>;
+  restore(): Promise<RestoreResult>;
+  restoreVerify(): Promise<RestoreResult>;
 }
 
 type RunOperatorCli = (options: {
@@ -58,8 +81,8 @@ function dependencies(overrides: Partial<CliDependencies> = {}): CliDependencies
   return {
     create: vi.fn(async () => ({ code: 'backup_created' as const })),
     verify: vi.fn(async () => ({ code: 'backup_verified' as const })),
-    restore: vi.fn(async () => ({ code: 'restore_verified' as const, revokedSessionCount: 1 })),
-    restoreVerify: vi.fn(async () => ({ code: 'restore_verified' as const, revokedSessionCount: 1 })),
+    restore: vi.fn(async () => restoreResult()),
+    restoreVerify: vi.fn(async () => restoreResult()),
     ...overrides,
   };
 }
@@ -126,6 +149,32 @@ describe('guarded operator CLI', () => {
     expect(result.exitCode).toBe(2);
     expect(result.io).toEqual({ stdout: [], stderr: ['operator_config_invalid\n'] });
     expect(JSON.stringify(result.io)).not.toMatch(/fixture|private-parent|baby-care-backup-/);
+  });
+
+  test('accepts only the second fixed M5 production and restore project pair', async () => {
+    const result = await run(['backup:verify'], {
+      ...validEnv,
+      BABY_CARE_COMPOSE_PROJECT: 'baby-care-m5',
+      BABY_CARE_RESTORE_PROJECT: 'baby-care-m5-restore',
+    });
+    expect(result.exitCode).toBe(0);
+    expect(result.io).toEqual({ stdout: ['backup_verified\n'], stderr: [] });
+  });
+
+  test.each([
+    ['baby-care', 'baby-care-m5-restore'],
+    ['baby-care-m5', 'baby-care-restore'],
+  ])('rejects a crossed production and restore project pair', async (
+    sourceProject,
+    restoreProject,
+  ) => {
+    const result = await run(['backup:verify'], {
+      ...validEnv,
+      BABY_CARE_COMPOSE_PROJECT: sourceProject,
+      BABY_CARE_RESTORE_PROJECT: restoreProject,
+    });
+    expect(result.exitCode).toBe(2);
+    expect(result.io).toEqual({ stdout: [], stderr: ['operator_config_invalid\n'] });
   });
 
   test.each([
@@ -198,13 +247,11 @@ describe('guarded operator CLI', () => {
 type RunDisposableRestore = (options: {
   createTarget(): Promise<void>;
   waitForTarget(): Promise<void>;
-  restore(): Promise<{
-    code: 'restore_verified'; revokedSessionCount: number;
-  }>;
+  restore(): Promise<RestoreResult>;
   startProbe(): Promise<void>;
-  executeProbe(): Promise<{ summaryExecutable: true; timelineExecutable: true }>;
+  executeProbe(): Promise<typeof verifiedReadModels>;
   teardown(): Promise<void>;
-}) => Promise<{ code: 'restore_verified'; revokedSessionCount: number }>;
+}) => Promise<RestoreResult>;
 
 const runDisposableRestore: RunDisposableRestore = sourceRunDisposableRestore;
 
@@ -219,18 +266,18 @@ describe('disposable restore lifecycle', () => {
         order.push('restore');
         if (mode === 'failure') throw new Error('synthetic failure');
         order.push('restore-verified');
-        return { code: 'restore_verified', revokedSessionCount: 1 };
+        return restoreResult();
       },
       startProbe: async () => { order.push('start-probe'); },
       executeProbe: async () => {
         order.push('execute-probe');
-        return { summaryExecutable: true, timelineExecutable: true };
+        return verifiedReadModels;
       },
       teardown: async () => { order.push('teardown'); },
     });
 
     if (mode === 'success') {
-      await expect(result).resolves.toEqual({ code: 'restore_verified', revokedSessionCount: 1 });
+      await expect(result).resolves.toEqual(restoreResult());
       expect(order).toEqual([
         'create-target', 'target-healthy', 'restore', 'restore-verified',
         'start-probe', 'execute-probe', 'teardown',
@@ -250,9 +297,9 @@ describe('disposable restore lifecycle', () => {
         throw new Error('partial create');
       },
       waitForTarget: async () => { order.push('target-healthy'); },
-      restore: async () => ({ code: 'restore_verified', revokedSessionCount: 0 }),
+      restore: async () => restoreResult(0),
       startProbe: async () => { order.push('start-probe'); },
-      executeProbe: async () => ({ summaryExecutable: true, timelineExecutable: true }),
+      executeProbe: async () => verifiedReadModels,
       teardown: async () => { order.push('teardown'); },
     })).rejects.toThrow('partial create');
     expect(order).toEqual(['create-target', 'teardown']);
@@ -263,7 +310,7 @@ describe('disposable restore lifecycle', () => {
     await expect(runDisposableRestore!({
       createTarget: async () => undefined,
       waitForTarget: async () => undefined,
-      restore: async () => ({ code: 'restore_verified', revokedSessionCount: 0 }),
+      restore: async () => restoreResult(0),
       startProbe: async () => undefined,
       executeProbe: async () => ({ summaryExecutable: false, timelineExecutable: true }) as never,
       teardown: async () => undefined,
@@ -273,8 +320,8 @@ describe('disposable restore lifecycle', () => {
 
 type RunExistingTargetRestore = (options: {
   assertTargetRunning(): Promise<void>;
-  restore(): Promise<{ code: 'restore_verified'; revokedSessionCount: number }>;
-}) => Promise<{ code: 'restore_verified'; revokedSessionCount: number }>;
+  restore(): Promise<RestoreResult>;
+}) => Promise<RestoreResult>;
 
 const runExistingTargetRestore: RunExistingTargetRestore = sourceRunExistingTargetRestore;
 
@@ -285,9 +332,9 @@ test('ordinary restore only checks a separately running target and performs no l
     assertTargetRunning: async () => { order.push('target-running'); },
     restore: async () => {
       order.push('restore');
-      return { code: 'restore_verified', revokedSessionCount: 1 };
+      return restoreResult();
     },
-  })).resolves.toEqual({ code: 'restore_verified', revokedSessionCount: 1 });
+  })).resolves.toEqual(restoreResult());
   expect(order).toEqual(['target-running', 'restore']);
 });
 
@@ -424,10 +471,9 @@ describe('fixed Compose PG16 adapter', () => {
       executable: 'pg_restore',
       args: ['--exit-on-error', '--no-owner', '--no-privileges', '--dbname=babycare'],
     }, Readable.from(['PGDMP synthetic']), new AbortController().signal);
-    await expect(runners.probeReadModels(new AbortController().signal)).resolves.toEqual({
-      summaryExecutable: true,
-      timelineExecutable: true,
-    });
+    await expect(runners.probeReadModels(new AbortController().signal)).resolves.toEqual(
+      verifiedReadModels,
+    );
 
     expect(requests.map(({ project, service }) => [project, service])).toEqual([
       ['baby-care', 'postgres'],
@@ -470,6 +516,23 @@ describe('fixed Compose PG16 adapter', () => {
       sourceService,
       targetService,
       verifierService,
+    }, executor)).toThrowError('operator_config_invalid');
+  });
+
+  test.each([
+    ['baby-care', 'baby-care-m5-restore'],
+    ['baby-care-m5', 'baby-care-restore'],
+  ])('rejects crossed fixed Compose project identities', (sourceProject, targetProject) => {
+    const executor: ComposeExecutor = {
+      exec: vi.fn(),
+      lifecycle: vi.fn(),
+    };
+    expect(() => createComposePostgresRunners({
+      sourceProject,
+      targetProject,
+      sourceService: 'postgres',
+      targetService: 'postgres_restore',
+      verifierService: 'operations_verifier',
     }, executor)).toThrowError('operator_config_invalid');
   });
 });
@@ -732,9 +795,9 @@ describe('owned disposable Compose identity', () => {
     await expect(runDisposableRestore!({
       createTarget: lifecycle.createTarget,
       waitForTarget: async () => undefined,
-      restore: async () => ({ code: 'restore_verified', revokedSessionCount: 0 }),
+      restore: async () => restoreResult(0),
       startProbe: async () => undefined,
-      executeProbe: async () => ({ summaryExecutable: true, timelineExecutable: true }),
+      executeProbe: async () => verifiedReadModels,
       teardown: lifecycle.teardown,
     })).rejects.toThrow('partial create');
     expect(calls).toEqual([
@@ -767,9 +830,9 @@ describe('owned disposable Compose identity', () => {
       await expect(runDisposableRestore!({
         createTarget: lifecycle.createTarget,
         waitForTarget: async () => undefined,
-        restore: async () => ({ code: 'restore_verified', revokedSessionCount: 0 }),
+        restore: async () => restoreResult(0),
         startProbe: async () => undefined,
-        executeProbe: async () => ({ summaryExecutable: true, timelineExecutable: true }),
+        executeProbe: async () => verifiedReadModels,
         teardown: lifecycle.teardown,
       })).rejects.toMatchObject({ code: 'restore_target_not_empty' });
       const objectTypes = ['container', 'volume', 'network'] as const;

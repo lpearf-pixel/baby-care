@@ -46,6 +46,9 @@ describe('compact diagnostic privacy', () => {
       '151',
       'raw-session-token-private',
       'setup-token-private',
+      'private-voice-public-key',
+      'private-voice-signature',
+      'private-voice-proposal',
     ];
     await writeFile(
       evidenceFile,
@@ -60,6 +63,7 @@ describe('compact diagnostic privacy', () => {
         ']',
         'feeding amountMl=61 bottleCapacityMl=151 liquidType="private-formula-type"',
         'cookie="baby_care_session=raw-session-token-private" setupToken="setup-token-private"',
+        'voice publicKey="private-voice-public-key" signature="private-voice-signature" proposal="private-voice-proposal"',
         'constraint care_event_owner_membership_fk failed',
       ].join('\n'),
       'utf8',

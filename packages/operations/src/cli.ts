@@ -1,4 +1,6 @@
 import { z } from 'zod';
+
+import type { RestoreSanitationReport } from './contracts.js';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { isAbsolute, parse } from 'node:path';
 
@@ -33,13 +35,18 @@ const OperatorConfigSchema = z
         return false;
       }
     }),
-    BABY_CARE_COMPOSE_PROJECT: z.literal('baby-care'),
-    BABY_CARE_RESTORE_PROJECT: z.literal('baby-care-restore'),
+    BABY_CARE_COMPOSE_PROJECT: z.enum(['baby-care', 'baby-care-m5']),
+    BABY_CARE_RESTORE_PROJECT: z.enum(['baby-care-restore', 'baby-care-m5-restore']),
     BABY_CARE_SOURCE_SERVICE: z.literal('postgres'),
     BABY_CARE_RESTORE_SERVICE: z.literal('postgres_restore'),
     BABY_CARE_RESTORE_PROBE_SERVICE: z.literal('restored_api_probe'),
   })
-  .strict();
+  .strict()
+  .superRefine((config, context) => {
+    if (config.BABY_CARE_RESTORE_PROJECT !== `${config.BABY_CARE_COMPOSE_PROJECT}-restore`) {
+      context.addIssue({ code: 'custom', message: 'project identity pair invalid' });
+    }
+  });
 
 export type OperatorConfig = z.infer<typeof OperatorConfigSchema>;
 
@@ -74,11 +81,13 @@ export function parseOperatorConfig(env: NodeJS.ProcessEnv): OperatorConfig {
   return parsed.data;
 }
 
+type RestoreVerifiedResult = { code: 'restore_verified' } & RestoreSanitationReport;
+
 export interface OperatorDependencies {
   create(): Promise<{ code: 'backup_created' }>;
   verify(): Promise<{ code: 'backup_verified' }>;
-  restore(): Promise<{ code: 'restore_verified'; revokedSessionCount: number }>;
-  restoreVerify(): Promise<{ code: 'restore_verified'; revokedSessionCount: number }>;
+  restore(): Promise<RestoreVerifiedResult>;
+  restoreVerify(): Promise<RestoreVerifiedResult>;
 }
 
 export interface OperatorCliOptions {
@@ -150,10 +159,14 @@ const BackupVerifiedResultSchema = z.object({ code: z.literal('backup_verified')
 const RestoreVerifiedResultSchema = z.object({
   code: z.literal('restore_verified'),
   revokedSessionCount: z.number().int().nonnegative().safe(),
+  revokedVoiceCareLeaseCount: z.number().int().nonnegative().safe(),
+  invalidatedVoiceCareSessionCount: z.number().int().nonnegative().safe(),
 }).strict();
 const ReadModelReportSchema = z.object({
   summaryExecutable: z.literal(true),
   timelineExecutable: z.literal(true),
+  activeVoiceCareLeaseCount: z.literal(0),
+  actionableVoiceCareSessionCount: z.literal(0),
 }).strict();
 
 function commandFrom(argv: readonly string[]): OperatorCommand | null {
@@ -204,14 +217,16 @@ export async function runOperatorCli(options: OperatorCliOptions): Promise<numbe
 export async function runDisposableRestore(options: {
   createTarget(): Promise<void>;
   waitForTarget(): Promise<void>;
-  restore(): Promise<{
-    code: 'restore_verified';
-    revokedSessionCount: number;
-  }>;
+  restore(): Promise<RestoreVerifiedResult>;
   startProbe(): Promise<void>;
-  executeProbe(): Promise<{ summaryExecutable: true; timelineExecutable: true }>;
+  executeProbe(): Promise<{
+    summaryExecutable: true;
+    timelineExecutable: true;
+    activeVoiceCareLeaseCount: 0;
+    actionableVoiceCareSessionCount: 0;
+  }>;
   teardown(): Promise<void>;
-}): Promise<{ code: 'restore_verified'; revokedSessionCount: number }> {
+}): Promise<RestoreVerifiedResult> {
   try {
     await options.createTarget();
     await options.waitForTarget();
@@ -229,8 +244,8 @@ export async function runDisposableRestore(options: {
 
 export async function runExistingTargetRestore(options: {
   assertTargetRunning(): Promise<void>;
-  restore(): Promise<{ code: 'restore_verified'; revokedSessionCount: number }>;
-}): Promise<{ code: 'restore_verified'; revokedSessionCount: number }> {
+  restore(): Promise<RestoreVerifiedResult>;
+}): Promise<RestoreVerifiedResult> {
   await options.assertTargetRunning();
   return options.restore();
 }
@@ -289,7 +304,7 @@ export function createProductionOperatorDependencies(
     },
     restore: async () => {
       await preflightStorage();
-      const lifecycle = createExistingRestoreLifecycle(executor);
+      const lifecycle = createExistingRestoreLifecycle(executor, config.BABY_CARE_RESTORE_PROJECT);
       return runExistingTargetRestore({
         assertTargetRunning: lifecycle.assertTargetRunning,
         restore: () => restoreBackup(bundle, normalRestoreTools),

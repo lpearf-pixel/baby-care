@@ -228,12 +228,21 @@ jobs:
         run: |
           set -o pipefail
           pnpm --filter @baby-care/api exec tsx ../../scripts/m4-birth-ready-operations.mjs 2>&1 | tee -a /tmp/compose.log
+      - name: Exercise M5 Voice Care feeding and recovery
+        shell: bash
+        env:
+          VOICE_CARE_ENABLED: "true"
+        run: |
+          set -o pipefail
+          pnpm --filter @baby-care/api exec tsx ../../scripts/m5-voice-care-feeding-pilot.mjs 2>&1 | tee -a /tmp/compose.log
       - name: Capture bounded service state
         if: failure()
         shell: bash
         run: |
           docker compose --project-name baby-care ps 2>&1 | tee -a /tmp/compose.log
           docker compose --profile operations --project-name baby-care-restore --file compose.yaml --file infra/backup/compose.operations.yaml ps 2>&1 | tee -a /tmp/compose.log
+          docker compose --profile operations --project-name baby-care-m5 --file compose.yaml --file infra/backup/compose.operations.yaml ps 2>&1 | tee -a /tmp/compose.log
+          docker compose --profile operations --project-name baby-care-m5-restore --file compose.yaml --file infra/backup/compose.operations.yaml ps 2>&1 | tee -a /tmp/compose.log
       - name: Collect compact diagnostics
         if: failure()
         env:
@@ -254,8 +263,14 @@ jobs:
         shell: bash
         run: |
           restore_status=0
+          m5_status=0
+          m5_restore_status=0
           source_status=0
+          docker compose --profile operations --project-name baby-care-m5-restore --file compose.yaml --file infra/backup/compose.operations.yaml down -v --remove-orphans --timeout 10 || m5_restore_status=$?
+          docker compose --profile operations --project-name baby-care-m5 --file compose.yaml --file infra/backup/compose.operations.yaml down -v --remove-orphans --timeout 10 || m5_status=$?
           docker compose --profile operations --project-name baby-care-restore --file compose.yaml --file infra/backup/compose.operations.yaml down -v --remove-orphans --timeout 10 || restore_status=$?
           docker compose --project-name baby-care down -v --remove-orphans --timeout 10 || source_status=$?
           test "$restore_status" -eq 0
+          test "$m5_status" -eq 0
+          test "$m5_restore_status" -eq 0
           test "$source_status" -eq 0

@@ -60,7 +60,7 @@ function composePrefix(project: string): string[] {
 }
 
 function lifecycleArgs(request: ComposeLifecycleRequest): readonly string[] {
-  if (!/^baby-care-restore(?:-[a-f0-9]{24})?$/.test(request.project)) throw closed();
+  if (!/^baby-care(?:-m5)?-restore(?:-[a-f0-9]{24})?$/.test(request.project)) throw closed();
   switch (request.action) {
     case 'project-object-status':
       throw closed();
@@ -80,7 +80,7 @@ function lifecycleArgs(request: ComposeLifecycleRequest): readonly string[] {
 function projectObjectArgs(
   request: Extract<ComposeLifecycleRequest, { action: 'project-object-status' }>,
 ): readonly string[] {
-  if (!/^baby-care-restore(?:-[a-f0-9]{24})?$/.test(request.project)) throw closed();
+  if (!/^baby-care(?:-m5)?-restore(?:-[a-f0-9]{24})?$/.test(request.project)) throw closed();
   const prefix = request.objectType === 'container'
     ? ['ps', '--all', '--quiet']
     : request.objectType === 'volume'
@@ -281,7 +281,12 @@ export function createDisposableComposeLifecycle(
   createTarget(): Promise<void>;
   waitForTarget(): Promise<void>;
   startProbe(): Promise<void>;
-  executeProbe(): Promise<{ summaryExecutable: true; timelineExecutable: true }>;
+  executeProbe(): Promise<{
+    summaryExecutable: true;
+    timelineExecutable: true;
+    activeVoiceCareLeaseCount: 0;
+    actionableVoiceCareSessionCount: 0;
+  }>;
   teardown(): Promise<void>;
 } {
   const id = randomId();
@@ -349,7 +354,12 @@ export function createDisposableComposeLifecycle(
           if (output.toString('utf8').trim() !== 'restore_read_model_verified') {
             throw new BackupError('restore_read_model_failed');
           }
-          return { summaryExecutable: true, timelineExecutable: true };
+          return {
+            summaryExecutable: true,
+            timelineExecutable: true,
+            activeVoiceCareLeaseCount: 0,
+            actionableVoiceCareSessionCount: 0,
+          };
         } catch {
           await new Promise((resolve) => setTimeout(resolve, 250));
         }
@@ -370,7 +380,10 @@ export function createDisposableComposeLifecycle(
   };
 }
 
-export function createExistingRestoreLifecycle(executor: ComposeExecutor): {
+export function createExistingRestoreLifecycle(
+  executor: ComposeExecutor,
+  project: 'baby-care-restore' | 'baby-care-m5-restore' = 'baby-care-restore',
+): {
   assertTargetRunning(): Promise<void>;
 } {
   return {
@@ -378,7 +391,7 @@ export function createExistingRestoreLifecycle(executor: ComposeExecutor): {
       for (const service of ['postgres_restore', 'operations_verifier']) {
         const output = await executor.lifecycle({
           action: 'running-service',
-          project: 'baby-care-restore',
+          project,
           service: service as 'postgres_restore' | 'operations_verifier',
         }, new AbortController().signal);
         if (!output.toString('utf8').trim()) throw new BackupError('restore_target_check_failed');

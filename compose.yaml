@@ -21,15 +21,16 @@ services:
       API_HOST: 0.0.0.0
       API_PORT: 8787
       DATABASE_URL: postgres://babycare:babycare@postgres:5432/babycare
-      BABY_CARE_APP_ORIGIN: http://127.0.0.1:8080
-      BABY_CARE_SETUP_TOKEN: local-development-setup-token-change-me
+      BABY_CARE_APP_ORIGIN: "http://127.0.0.1:${BABY_CARE_WEB_PORT:-8080}"
+      BABY_CARE_SETUP_TOKEN: "${BABY_CARE_SETUP_TOKEN:-local-development-setup-token-change-me}"
       SESSION_SECURE: "false"
       DIAGNOSTIC_LEVEL: info
+      VOICE_CARE_ENABLED: "${VOICE_CARE_ENABLED:-false}"
     depends_on:
       postgres:
         condition: service_healthy
     ports:
-      - "8787:8787"
+      - "${BABY_CARE_API_PORT:-8787}:8787"
     healthcheck:
       test:
         [
@@ -50,7 +51,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "8080:80"
+      - "${BABY_CARE_WEB_PORT:-8080}:80"
 
 volumes:
   babycare_postgres:
