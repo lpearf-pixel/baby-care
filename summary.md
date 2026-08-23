@@ -16,7 +16,11 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   synthetic golden corpus.
 - M5 Task 2 is complete at `990c99f795d6a1b20188f2a1a86b792f9ede6c51`: five
   ownership-bound Voice Care tables, `care_source=voice`, closed state/timestamp/digest
-  checks and Drizzle migration metadata. Task 3 browser-authenticated pairing is next.
+  checks and Drizzle migration metadata.
+- M5 Task 3 is complete at `e42ec508506e91681ac4cdb55cf2b28eca031237`: generated
+  Ed25519 device pairing, digest-only five-minute challenges, family-admin-only device
+  list/revocation, cross-family isolation and atomic lease revocation. Task 4 active
+  caregiver lease and handoff is next.
 - Host-only test note: the existing M1 birth-date integration test shifts one calendar
   day under macOS `Asia/Shanghai`; it passes 2/2 with the CI `TZ=UTC` baseline. M5
   migration compatibility is 15/15 and the full UTC API suite is 176/176.

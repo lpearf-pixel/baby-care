@@ -460,7 +460,7 @@ the isolated test passes 2/2 under the CI `TZ=UTC` baseline. Task 2 did not alte
 
 ### Task 3: M5.1 Browser-Authenticated Pairing And Device Revocation
 
-**Status:** Pending; requires Tasks 1-2.
+**Status:** Complete at `e42ec50`; requires Tasks 1-2.
 
 **Files:**
 
@@ -474,7 +474,7 @@ the isolated test passes 2/2 under the CI `TZ=UTC` baseline. Task 2 did not alte
 - Consumes: `CareAuth.requireRead/requireWrite`, family-admin permission, Task 1 pairing DTOs and Task 2 device/challenge tables.
 - Produces: `createVoiceCareDeviceService(database, now, randomBytes)`, pairing/list/revoke browser routes and generated-key pairing fixtures.
 
-- [ ] **Step 1: Write pairing and authorization RED tests**
+- [x] **Step 1: Write pairing and authorization RED tests**
 
 ```ts
 it('pairs a generated Ed25519 key after one valid five-minute challenge', async () => {
@@ -493,7 +493,7 @@ it('does not allow Nanny to pair or revoke a device', async () => {
 
 Cover expired, unknown and consumed challenge; wrong key/signature; malformed key; cross-family access; duplicate public key; revocation idempotency; device list excludes public key/challenge/signature; audit metadata allow-list; and browser origin/session enforcement.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pnpm --filter @baby-care/api test -- voice-care-device.integration.test.ts voice-care-route.test.ts
@@ -501,7 +501,7 @@ pnpm --filter @baby-care/api test -- voice-care-device.integration.test.ts voice
 
 Expected: FAIL because the device service and browser routes do not exist.
 
-- [ ] **Step 3: Implement pairing with fixed challenge bytes**
+- [x] **Step 3: Implement pairing with fixed challenge bytes**
 
 ```ts
 export function createVoiceCareDeviceService(
@@ -520,7 +520,7 @@ export function createVoiceCareDeviceService(
 
 Hash challenge bytes at rest, verify Ed25519 with the supplied 32-byte raw public key converted through a fixed SPKI prefix, consume challenge and insert device/audit in one transaction, and map all external failures to closed codes. Revoke the device and every unrevoked lease in the same transaction.
 
-- [ ] **Step 4: Run pairing GREEN**
+- [x] **Step 4: Run pairing GREEN**
 
 ```bash
 pnpm --filter @baby-care/api test -- voice-care-device.integration.test.ts voice-care-route.test.ts security-primitives.test.ts family-authorization.integration.test.ts
@@ -530,7 +530,7 @@ git diff --check
 
 Expected: focused tests PASS; ordinary browser auth and family authorization remain unchanged.
 
-- [ ] **Step 5: Review and commit Task 3**
+- [x] **Step 5: Review and commit Task 3**
 
 ```bash
 git add apps/api/src/voice-care apps/api/src/routes/voice-care-browser.ts apps/api/src/app.ts apps/api/test/voice-care-device.integration.test.ts apps/api/test/voice-care-route.test.ts
@@ -539,6 +539,12 @@ git commit -m "feat: pair and revoke Voice Care devices"
 ```
 
 **Completion:** Dad/Mom can pair and revoke a generated-key device. Device pairing grants no care-write path and stores no private key.
+
+Fresh evidence: four focused API files passed 16/16 against disposable PostgreSQL 16;
+API typecheck, root lint, API production build, staged diff and credential/privacy scans
+passed. Pairing stores only the challenge digest and public key, device administration is
+family-admin-only, cross-family device access fails closed, and revocation atomically
+invalidates every open lease. Task 4 active-caregiver lease and handoff is next.
 
 ---
 

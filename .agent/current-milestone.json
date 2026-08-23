@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "milestone": "M5 Voice Care Adapter and Feeding Pilot",
-  "status": "implementation_in_progress_task_3_next",
+  "status": "implementation_in_progress_task_4_next",
   "branch": "codex/m5-voice-care-adapter-implementation",
   "m5_baseline_head": "cebd5d35c6095b08982216ccc706f0226e710dbc",
   "m5_design": "docs/superpowers/specs/2026-08-23-m5-voice-care-adapter-feeding-pilot-design.md",
@@ -9,7 +9,7 @@
   "m5_implementation_plan": "docs/superpowers/plans/2026-08-23-m5-voice-care-adapter-feeding-pilot.md",
   "m5_implementation_plan_state": "approved_2026_08_23",
   "m5_implementation_baseline_head": "579122fdd3147704c107fe811e0e04013dfd1faa",
-  "m5_business_implementation_state": "tasks_1_2_complete_task_3_next",
+  "m5_business_implementation_state": "tasks_1_2_3_complete_task_4_next",
   "m5_completed_tasks": [
     {
       "task": "Task 1 Strict Contracts Canonical Bytes And Golden Corpus",
@@ -20,6 +20,11 @@
       "task": "Task 2 Database Schema And Fail-Closed Invariants",
       "commit": "990c99f795d6a1b20188f2a1a86b792f9ede6c51",
       "verification": "m5_7_of_7_migration_compatibility_15_of_15_full_utc_api_176_of_176"
+    },
+    {
+      "task": "Task 3 Browser-Authenticated Pairing And Device Revocation",
+      "commit": "e42ec508506e91681ac4cdb55cf2b28eca031237",
+      "verification": "focused_api_16_of_16_pg16_typecheck_lint_build_diff_privacy_pass"
     }
   ],
   "m3_m4_integration_state": "published_and_exact_head_ci_verified",
@@ -165,8 +170,8 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "execute M5 Task 3 browser-authenticated device pairing and revocation with TDD",
-    "continue on codex/m5-voice-care-adapter-implementation from Task 2 990c99f",
+    "execute M5 Task 4 active caregiver lease and atomic handoff with TDD",
+    "continue on codex/m5-voice-care-adapter-implementation from Task 3 e42ec50",
     "preserve completed M4 and do not modify main"
   ],
   "requires_separate_post_m3_design": [
