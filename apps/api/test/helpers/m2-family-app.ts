@@ -20,6 +20,8 @@ export async function createM2TestApp(testDatabaseUrl: string) {
   const database = createDatabase(testDatabaseUrl);
   await database.migrate();
   await database.pool.query(`truncate table
+    voice_care_intent_receipts, voice_care_feeding_sessions, voice_care_leases,
+    voice_care_pairing_challenges, voice_care_devices,
     care_event_revisions, measurements, care_actions, sleep_intervals, diaper_events,
     feeding_components, feeding_sessions, care_events, audit_events, sessions, babies,
     family_memberships, users, families restart identity cascade`);
