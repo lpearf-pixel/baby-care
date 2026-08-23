@@ -34,7 +34,14 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   through the existing feeding rules into one server-owned `source=voice` event. Warning
   digests/versions, lease revocation, cross-actor confirmation, idempotency collisions,
   audit rollback and outer-commit failure all fail closed. Full UTC API evidence is
-  214/214. Task 7 responsive Web review, lease and cancellation panel is next.
+  214/214.
+- M5 Task 7 is complete at `836d0a779a658f09ad7d124ae9c550e9f573ae2c`:
+  Dad/Mom/Nanny receive a responsive typed Voice Care review panel, permitted lease and
+  cancellation controls, operator-assisted device pairing, warning confirmation and
+  committed timeline links without transcript/model/security diagnostics. Active lease
+  actor/expiry is visible to every caregiver while Nanny admin actions remain absent.
+  Fresh Web evidence is 108/108 and full UTC API evidence remains 214/214. Task 8 family
+  export v2, backup and isolated restore closure is next.
 - Host-only test note: the existing M1 birth-date integration test shifts one calendar
   day under macOS `Asia/Shanghai`; it passes 2/2 with the CI `TZ=UTC` baseline. M5
   migration compatibility is 15/15 and the full UTC API suite is 176/176.

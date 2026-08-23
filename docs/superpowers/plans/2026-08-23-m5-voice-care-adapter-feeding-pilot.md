@@ -866,7 +866,7 @@ privacy scans passed. Task 7 Web review, lease and cancellation controls are nex
 
 ### Task 7: M5.5 Responsive Web Review, Lease And Cancellation Panel
 
-**Status:** Pending; requires Tasks 3-6.
+**Status:** Complete at `836d0a7`; requires Tasks 3-6.
 
 **Files:**
 
@@ -879,7 +879,7 @@ privacy scans passed. Task 7 Web review, lease and cancellation controls are nex
 - Consumes: browser pairing/device/lease/state/confirm/cancel routes and session permission context.
 - Produces: typed `BabyCareApi` methods and a Voice Care panel that reveals typed care facts but no transcript/key/signature/model detail.
 
-- [ ] **Step 1: Write Web RED tests**
+- [x] **Step 1: Write Web RED tests**
 
 ```tsx
 it('lets Dad activate his lease and review a typed pending bottle', async () => {
@@ -899,7 +899,7 @@ it('does not expose pairing/revocation controls to Nanny', async () => {
 
 Cover the operator-assisted first-pilot pairing exchange (copy one strict challenge bundle from Baby Care, paste one strict signed response bundle from Baby Local, never handle a private key); loading/error/retry; explicit lease stop; actor/expiry visibility; same-actor confirm/cancel; Dad/Mom stale cancellation; cross-actor confirm absent; warning readback; committed timeline link; iPhone-width overflow/tap targets; night mode; request abort/stale response protection; and existing quick-record/timeline/detail/undo remaining mounted.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pnpm --filter @baby-care/web test -- voice-care-panel.test.tsx voice-care-responsive.test.tsx App.test.tsx care-workspace.test.tsx
@@ -907,11 +907,11 @@ pnpm --filter @baby-care/web test -- voice-care-panel.test.tsx voice-care-respon
 
 Expected: FAIL because Voice Care Web components and API methods do not exist.
 
-- [ ] **Step 3: Implement the typed API methods and panel**
+- [x] **Step 3: Implement the typed API methods and panel**
 
 ```ts
 export interface BabyCareApi {
-  getVoiceCareState(): Promise<VoiceCareStateDto>;
+  getVoiceCareState(signal?: AbortSignal): Promise<VoiceCareStateDto>;
   createVoiceCarePairingChallenge(): Promise<VoiceCarePairingChallengeDto>;
   pairVoiceCareDevice(input: PairVoiceCareDeviceInput): Promise<VoiceCareDeviceDto>;
   revokeVoiceCareDevice(deviceId: string): Promise<void>;
@@ -924,7 +924,7 @@ export interface BabyCareApi {
 
 Render only server DTO fields. The first pilot uses an explicit copy/paste challenge/response exchange between the two local admin pages; do not add discovery, cloud relay or a Baby Local private-key export. Use an explicit confirmation dialog for warnings and device revocation. Do not render/store the one-time challenge after pairing completion; do not place public key material in DOM diagnostics or local storage.
 
-- [ ] **Step 4: Run Web GREEN**
+- [x] **Step 4: Run Web GREEN**
 
 ```bash
 pnpm --filter @baby-care/web test -- voice-care-panel.test.tsx voice-care-responsive.test.tsx App.test.tsx care-workspace.test.tsx care-history-correction.test.tsx
@@ -935,7 +935,7 @@ git diff --check
 
 Expected: focused tests, typecheck and production build PASS with existing care workspace behavior intact.
 
-- [ ] **Step 5: Review and commit Task 7**
+- [x] **Step 5: Review and commit Task 7**
 
 ```bash
 git add apps/web/src/voice-care apps/web/src/api-client.ts apps/web/src/auth/AuthenticatedShell.tsx apps/web/src/app.css apps/web/test/voice-care-panel.test.tsx apps/web/test/voice-care-responsive.test.tsx apps/web/test/App.test.tsx apps/web/test/care-workspace.test.tsx
@@ -944,6 +944,12 @@ git commit -m "feat: add Voice Care review controls"
 ```
 
 **Completion:** Dad/Mom/Nanny can see and control only their permitted typed Voice Care state on desktop and iPhone layouts. Existing manual care remains the primary fallback.
+
+Fresh evidence: Task 7 Web tests passed 108/108 and the full UTC API suite remained
+214/214. Web/API typechecks, Web production build, root lint, diff and bounded privacy
+scans passed. The state read is abortable, semantic conflicts never report a save,
+all caregivers see active lease actor/expiry, and Nanny receives no pairing, device
+revocation or cross-actor lease-stop control. Task 8 export/backup/restore closure is next.
 
 ---
 
