@@ -5,6 +5,8 @@ import type { CareActorContext, CareAuth } from '../src/care/care-auth.js';
 import { registerVoiceCareBrowserRoutes } from '../src/routes/voice-care-browser.js';
 import type { VoiceCareDeviceService } from '../src/voice-care/device-service.js';
 import type { VoiceCareLeaseService } from '../src/voice-care/lease-service.js';
+import { VoiceCareBusyError, VoiceCareIntentCoordinator } from '../src/voice-care/intent-coordinator.js';
+import type { VoiceCareSessionService } from '../src/voice-care/session-service.js';
 import {
   VoiceCareNotFoundError,
   VoiceCarePairingInvalidError,
@@ -41,7 +43,10 @@ function fixture(overrides: Partial<VoiceCareDeviceService> = {}) {
     activate: vi.fn(),
     revoke: vi.fn(),
   } as VoiceCareLeaseService;
-  registerVoiceCareBrowserRoutes(app, { careAuth, deviceService, leaseService });
+  const sessionService = ({
+    state: vi.fn(async () => ({ devices: [], activeLeases: [], sessions: [] })),
+  }) as VoiceCareSessionService;
+  registerVoiceCareBrowserRoutes(app, { careAuth, deviceService, leaseService, sessionService });
   return { app, careAuth, deviceService };
 }
 
@@ -95,5 +100,47 @@ describe('M5 Voice Care browser route', () => {
     expect(list.json()).toEqual([]);
     expect(deviceService.list).toHaveBeenCalledWith(actor);
     await app.close();
+  });
+});
+
+describe('M5 Voice Care device coordination bounds', () => {
+  it('keeps the per-device slot until work settles and closes a pre-aborted request', async () => {
+    const coordinator = new VoiceCareIntentCoordinator();
+    let settle!: () => void;
+    const work = new Promise<void>((resolve) => { settle = resolve; });
+    const first = coordinator.run('device-a', new Date('2026-08-23T08:00:00Z'), new AbortController().signal, () => work);
+    await expect(coordinator.run(
+      'device-a',
+      new Date('2026-08-23T08:00:01Z'),
+      new AbortController().signal,
+      async () => {},
+    )).rejects.toBeInstanceOf(VoiceCareBusyError);
+    settle();
+    await first;
+    await expect(coordinator.run(
+      'device-a',
+      new Date('2026-08-23T08:00:02Z'),
+      new AbortController().signal,
+      async () => 'ok',
+    )).resolves.toBe('ok');
+    const aborted = new AbortController();
+    aborted.abort();
+    await expect(coordinator.run(
+      'device-b',
+      new Date('2026-08-23T08:00:00Z'),
+      aborted.signal,
+      async () => {},
+    )).rejects.toBeInstanceOf(VoiceCareBusyError);
+  });
+
+  it('allows exactly thirty attempts in one rolling minute', async () => {
+    const coordinator = new VoiceCareIntentCoordinator();
+    const signal = new AbortController().signal;
+    const current = new Date('2026-08-23T08:00:00Z');
+    for (let index = 0; index < 30; index += 1) {
+      await expect(coordinator.run('device-rate', current, signal, async () => index)).resolves.toBe(index);
+    }
+    await expect(coordinator.run('device-rate', current, signal, async () => 31))
+      .rejects.toBeInstanceOf(VoiceCareBusyError);
   });
 });

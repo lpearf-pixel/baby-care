@@ -16,7 +16,10 @@ function sessionCookie(response: { headers: Record<string, unknown> }): string {
   return pair;
 }
 
-export async function createM2TestApp(testDatabaseUrl: string) {
+export async function createM2TestApp(
+  testDatabaseUrl: string,
+  options: { voiceCareEnabled?: boolean } = {},
+) {
   const database = createDatabase(testDatabaseUrl);
   await database.migrate();
   await database.pool.query(`truncate table
@@ -33,6 +36,7 @@ export async function createM2TestApp(testDatabaseUrl: string) {
     setupToken: SETUP_TOKEN,
     sessionSecure: false,
     now: () => M2_TEST_NOW,
+    voiceCareEnabled: options.voiceCareEnabled ?? false,
   });
 
   const setup = await app.inject({

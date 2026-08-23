@@ -56,6 +56,7 @@ describe('production API startup', () => {
       setupToken: 'local-development-setup-token-change-me',
       sessionSecure: false,
       familyExportMaxBytes: 33_554_432,
+      voiceCareEnabled: false,
     });
 
     await closeHook!();

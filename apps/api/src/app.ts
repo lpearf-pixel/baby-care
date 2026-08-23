@@ -34,8 +34,12 @@ import { registerFamilyExportRoute } from './routes/family-export.js';
 import { registerHealthRoute } from './routes/health.js';
 import { registerSetupRoutes } from './routes/setup.js';
 import { registerVoiceCareBrowserRoutes } from './routes/voice-care-browser.js';
+import { registerVoiceCareDeviceRoute } from './routes/voice-care-device.js';
 import { createVoiceCareDeviceService } from './voice-care/device-service.js';
+import { createVoiceCareIntentAuthenticator } from './voice-care/intent-authenticator.js';
+import { createVoiceCareIntentService } from './voice-care/intent-service.js';
 import { createVoiceCareLeaseService } from './voice-care/lease-service.js';
+import { createVoiceCareSessionService } from './voice-care/session-service.js';
 
 export interface AppDependencies {
   checkDatabase: () => Promise<boolean>;
@@ -45,6 +49,7 @@ export interface AppDependencies {
   setupToken?: string;
   sessionSecure?: boolean;
   familyExportMaxBytes?: number;
+  voiceCareEnabled?: boolean;
 }
 
 export function buildApp(dependencies: AppDependencies): FastifyInstance {
@@ -131,7 +136,17 @@ export function buildApp(dependencies: AppDependencies): FastifyInstance {
       careAuth,
       deviceService: createVoiceCareDeviceService(dependencies.database, now),
       leaseService: createVoiceCareLeaseService(dependencies.database, now),
+      sessionService: createVoiceCareSessionService(dependencies.database, now),
     });
+    if (dependencies.voiceCareEnabled === true) {
+      registerVoiceCareDeviceRoute(app, {
+        intentService: createVoiceCareIntentService(
+          dependencies.database,
+          createVoiceCareIntentAuthenticator(dependencies.database),
+        ),
+        now,
+      });
+    }
   }
 
   if (dependencies.database && dependencies.appOrigin && dependencies.setupToken) {

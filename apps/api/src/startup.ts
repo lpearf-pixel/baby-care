@@ -34,6 +34,7 @@ export async function startServer(options: StartServerOptions = {}): Promise<voi
       setupToken: config.BABY_CARE_SETUP_TOKEN,
       sessionSecure: config.SESSION_SECURE,
       familyExportMaxBytes: config.FAMILY_EXPORT_MAX_BYTES,
+      voiceCareEnabled: config.VOICE_CARE_ENABLED,
     });
     app.addHook('onClose', async () => {
       await database.close();

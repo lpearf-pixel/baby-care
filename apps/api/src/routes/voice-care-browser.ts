@@ -10,6 +10,7 @@ import type { CareAuth } from '../care/care-auth.js';
 import { CareValidationError } from '../care/care-errors.js';
 import type { VoiceCareDeviceService } from '../voice-care/device-service.js';
 import type { VoiceCareLeaseService } from '../voice-care/lease-service.js';
+import type { VoiceCareSessionService } from '../voice-care/session-service.js';
 import {
   VoiceCareForbiddenError,
   VoiceCareNotFoundError,
@@ -61,6 +62,7 @@ export function registerVoiceCareBrowserRoutes(
     careAuth: CareAuth;
     deviceService: VoiceCareDeviceService;
     leaseService: VoiceCareLeaseService;
+    sessionService: VoiceCareSessionService;
   },
 ): void {
   app.post('/api/voice-care/pairing-challenges', async (request, reply) => {
@@ -92,6 +94,16 @@ export function registerVoiceCareBrowserRoutes(
     if (!actor) return;
     try {
       return reply.send(await dependencies.deviceService.list(actor));
+    } catch (error) {
+      return handleVoiceCareError(reply, request, error);
+    }
+  });
+
+  app.get('/api/voice-care/state', async (request, reply) => {
+    const actor = await dependencies.careAuth.requireRead(request, reply);
+    if (!actor) return;
+    try {
+      return reply.send(await dependencies.sessionService.state(actor));
     } catch (error) {
       return handleVoiceCareError(reply, request, error);
     }

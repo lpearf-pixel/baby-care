@@ -32,4 +32,10 @@ describe('production API configuration', () => {
   it.each(['0', '-1', 'not-a-number', '9007199254740992', '134217729'])('fails closed for invalid export bounds: %s', (raw) => {
     expect(() => loadConfig({ ...baseEnvironment, SESSION_SECURE: 'false', FAMILY_EXPORT_MAX_BYTES: raw })).toThrow();
   });
+
+  it('keeps Voice Care disabled by default and accepts only explicit booleans', () => {
+    expect(loadConfig({ ...baseEnvironment, SESSION_SECURE: 'false' }).VOICE_CARE_ENABLED).toBe(false);
+    expect(loadConfig({ ...baseEnvironment, SESSION_SECURE: 'false', VOICE_CARE_ENABLED: 'true' }).VOICE_CARE_ENABLED).toBe(true);
+    expect(() => loadConfig({ ...baseEnvironment, SESSION_SECURE: 'false', VOICE_CARE_ENABLED: 'yes' })).toThrow();
+  });
 });
