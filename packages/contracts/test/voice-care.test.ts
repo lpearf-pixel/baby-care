@@ -1,3 +1,4 @@
+import { createPrivateKey, sign } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -167,6 +168,35 @@ describe('M5 Voice Care contracts', () => {
     expect(new TextDecoder().decode(voiceCareSigningBytesV1(parsed))).toBe(signing);
     expect(() => parseCanonicalVoiceCareIntentV1(new TextEncoder().encode(` ${canonical}`))).toThrow('voice_care_contract_invalid');
     expect(() => parseCanonicalVoiceCareIntentV1(new TextEncoder().encode(canonical.replace('"schemaVersion":1', '"schemaVersion":1,"schemaVersion":1')))).toThrow('voice_care_contract_invalid');
+  });
+
+  it('matches the Baby Local Ed25519 signing golden vector', () => {
+    const seed = Buffer.from('9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60', 'hex');
+    const privateKey = createPrivateKey({
+      key: Buffer.concat([Buffer.from('302e020100300506032b657004220420', 'hex'), seed]),
+      format: 'der',
+      type: 'pkcs8',
+    });
+    const intent = VoiceCareIntentV1Schema.parse({
+      schemaVersion: 1,
+      requestId: '33333333-3333-4333-8333-333333333333',
+      deviceId: '11111111-1111-4111-8111-111111111111',
+      leaseId: '22222222-2222-4222-8222-222222222222',
+      issuedAt: '2026-08-19T04:00:00+00:00',
+      occurredAt: '2026-08-19T04:00:00+00:00',
+      deliveryMode: 'live',
+      speakerState: 'verified',
+      source: 'voice',
+      modelVersion: 'voice-v1',
+      signature: SIGNATURE,
+      intentType: 'feeding_start',
+      careSessionId: null,
+      payload: { mode: 'bottle', startedAt: '2026-08-19T04:00:00+00:00' },
+    });
+
+    expect(sign(null, voiceCareSigningBytesV1(intent), privateKey).toString('base64url')).toBe(
+      'Mwlnf3FH_210bcOCBztwEIeItNMscBJw7pb1ZWCYbZI6JmAnW-u4jCaBVFE1rUIxpRFxCypOZpilL7fmIEJ7Cw',
+    );
   });
 
   it('binds pairing fields and hashes canonical proposal bytes deterministically', async () => {
