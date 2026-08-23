@@ -14,10 +14,10 @@ Current delivery gate: **supervised family acceptance — verified complete on 2
 Previous completed milestone: **M3 — Care Workspace — verified complete**
 Earlier completed milestone: **M2 — Care Recording MVP — verified complete**
 
-Local integration checkpoint: `codex/m3-care-workspace-implementation` was fast-forwarded
-through the M4 documentation head `6f112e4` and includes the post-merge unsaved
-family-settings race fix `1d6d7a5`. This integration is local only: remote M3 remains
-`52b042a`, no integration push has occurred, and `main` is unchanged.
+Published integration checkpoint: `codex/m3-care-workspace-implementation` was
+fast-forwarded through the M4 documentation head `6f112e4`, includes the post-merge
+unsaved family-settings race fix `1d6d7a5`, and was published at `9b1d0aa`.
+`main` is unchanged.
 
 Verified M1 production baseline:
 

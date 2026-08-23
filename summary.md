@@ -25,10 +25,10 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 - M2 Draft PR: **#4 — `M2: care recording MVP`**, base `codex/m1-family-baby-foundation`.
 - `main` has not been modified or merged for M2. Keep PR #4 Draft unless the user explicitly approves merge/integration.
 - M3 implementation branch: `codex/m3-care-workspace-implementation`.
-- Local integration state: `codex/m3-care-workspace-implementation` was fast-forwarded
-  through the M4 documentation head `6f112e4` and now includes the post-merge unsaved
-  family-settings race fix `1d6d7a5`. This local integration has not been pushed;
-  remote M3 remains at `52b042a`, and `main` is unchanged.
+- Published integration state: `codex/m3-care-workspace-implementation` was fast-forwarded
+  through the M4 documentation head `6f112e4`, includes the post-merge unsaved
+  family-settings race fix `1d6d7a5`, and was published at checkpoint `9b1d0aa`.
+  `main` remains unchanged.
 - M3 approved design: `docs/superpowers/specs/2026-08-15-m3-care-workspace-design.md`.
 - M3 implementation plan: `docs/superpowers/plans/2026-08-16-m3-care-workspace-implementation.md`.
 - M3 Draft PR #5 remains open and unmerged.
@@ -285,8 +285,8 @@ Recommended first sequence:
 3. Preserve the M4 accepted pair `3f6676f2c7bf65d11efedecce6ac57e261d1545d` /
    `32611502497`; supervised family acceptance completed on 2026-08-23.
 4. Keep Guardian/audio/AI outside M4 and preserve the independent-system boundary. The
-   local M3 integration is complete through `1d6d7a5` but remains unpublished; await an
-   explicit publication or next-milestone decision without modifying `main`.
+   M3 integration was published at `9b1d0aa`; await an explicit next-milestone decision
+   without modifying `main`.
 
 ## 10. Copy/paste prompt after M4 acceptance
 
