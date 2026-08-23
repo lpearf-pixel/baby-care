@@ -1,6 +1,6 @@
 # M5 Voice Care Adapter And Feeding Pilot Design
 
-Status: draft for final human review; product direction approved on 2026-08-23
+Status: approved on 2026-08-23; implementation plan pending review
 
 Date: 2026-08-23
 
@@ -217,10 +217,11 @@ The signature covers a canonical byte representation of every field except
 `signature`. Unknown keys, duplicate JSON keys, noncanonical numbers, overlong strings,
 non-finite values and unsupported versions fail closed.
 
-`speakerState` never identifies the actor. `mismatch`, `not_enrolled` and `unavailable`
-cannot commit. `uncertain` moves the session to authenticated confirmation. `verified`
-only clears this additional uncertainty gate after the lease has already resolved the
-actor.
+`speakerState` never identifies the actor. `mismatch` returns `identity_mismatch` and
+does not create or mutate a session. `not_enrolled`, `unavailable` and `uncertain` may
+hold a typed proposal for authenticated browser confirmation, but cannot device-confirm
+it. `verified` only clears this additional confirmation gate after the lease has already
+resolved the actor.
 
 Payloads are closed:
 
@@ -228,7 +229,8 @@ Payloads are closed:
 - `feeding_update`: bottle liquid type, proposed actual consumed ml, optional bottle
   capacity, or a direct-breastfeeding elapsed-minutes proposal;
 - `feeding_end`: typed final proposal and end time;
-- `care_confirm`: exact proposal digest and expected session version;
+- `care_confirm`: exact proposal digest, expected session version, nullable warning
+  digest and an exact closed set of confirmed warning codes;
 - `care_cancel`: expected session version and closed cancellation reason.
 
 No payload carries free-form transcript or model reasoning. M5 does not accept a note
@@ -249,10 +251,11 @@ For every request Baby Care:
 7. runs one legal state transition;
 8. commits the receipt and result with the transition.
 
-Live requests must be within a fixed two-minute clock window. A `replay` request or a
-request outside that window cannot directly commit a care fact; it becomes
-`needs_confirmation`/`needs_review` or is rejected. A duplicated request returns the
-previous closed result and never repeats a write or acknowledgement transition.
+Live requests must be within a fixed two-minute clock window; an out-of-window request
+is rejected without changing session state. A valid `replay` start/update/end may only
+create or move typed state to `needs_review` and can never device-confirm a care fact.
+A duplicated request returns the previous closed result and never repeats a write or
+acknowledgement transition.
 
 Rate and concurrency limits are fixed server bounds, not caller settings. Rejected
 requests expose stable codes without revealing whether a device, lease or membership
@@ -304,9 +307,11 @@ values required for local TTS.
 lease-bound membership and an allowed speaker state. Baby Care reruns existing feeding
 validation and warning rules.
 
-If warnings require confirmation, the session stays `needs_confirmation` with closed
-warning codes. The device cannot invent or suppress warning codes. A later explicit
-confirmation must bind the exact warning set and session version.
+If warnings require confirmation, the session stays `needs_confirmation`, advances its
+version and stores a digest of the closed warning set. The device cannot invent or
+suppress warning codes. A later explicit confirmation must bind that exact warning
+digest, warning-code set, proposal digest and current session version. The first
+confirmation attempt carries a null warning digest and no confirmed warning codes.
 
 The final transaction:
 

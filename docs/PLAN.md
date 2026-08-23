@@ -11,7 +11,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 Current milestone: **M4 — Birth Ready Operations and Data Safety — verified complete**
 Current delivery gate: **supervised family acceptance — verified complete on 2026-08-23**
-Proposed next milestone: **M5 — Voice Care Adapter and Feeding Pilot — design review pending**
+Proposed next milestone: **M5 — Voice Care Adapter and Feeding Pilot — implementation plan review pending**
 Previous completed milestone: **M3 — Care Workspace — verified complete**
 Earlier completed milestone: **M2 — Care Recording MVP — verified complete**
 
@@ -48,9 +48,10 @@ M4 sources:
 
 M5 proposed source:
 
-- design draft: `docs/superpowers/specs/2026-08-23-m5-voice-care-adapter-feeding-pilot-design.md`
+- approved design: `docs/superpowers/specs/2026-08-23-m5-voice-care-adapter-feeding-pilot-design.md`
 - design branch: `codex/m5-voice-care-adapter-design`
-- implementation plan: not authorized until final design review
+- implementation plan draft: `docs/superpowers/plans/2026-08-23-m5-voice-care-adapter-feeding-pilot.md`
+- business implementation: not started; requires plan review and an isolated implementation branch
 
 ## M2 delivered
 
