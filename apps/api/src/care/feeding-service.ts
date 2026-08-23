@@ -6,7 +6,7 @@ import { CareConfirmationRequiredError } from './care-errors.js';
 import { findByClientRequestId } from './care-event-repository.js';
 import { recentBottleHistory } from './feeding-history.js';
 import { collectFeedingWarnings } from './feeding-warnings.js';
-import { writeFeedingSession } from './feeding-write-service.js';
+import { writeFeedingSessionInTransaction } from './feeding-write-service.js';
 
 function toDto(event: { id: string; occurredAt: Date; status: 'active' | 'voided' }, input: CreateFeedingSessionInput): FeedingSessionDto {
   return {
@@ -38,7 +38,7 @@ export function createFeedingService(database: DatabaseContext, now: () => Date 
       const client = await database.pool.connect();
       try {
         await client.query('begin');
-        const event = await writeFeedingSession(client, actor, input, traceId);
+        const event = await writeFeedingSessionInTransaction(client, actor, input, traceId, 'manual');
         await client.query('commit');
         return toDto(event, input);
       } catch (error) {

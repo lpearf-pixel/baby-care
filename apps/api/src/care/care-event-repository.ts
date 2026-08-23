@@ -72,6 +72,7 @@ export interface CreateCareEventInput {
   clientRequestId: string;
   note?: string | null;
   traceId: string;
+  source?: 'manual' | 'voice';
 }
 
 export async function findByClientRequestId(
@@ -97,11 +98,12 @@ export async function createCareEvent(
   client: pg.PoolClient,
   input: CreateCareEventInput,
 ): Promise<CareEventRow> {
+  const source = input.source ?? 'manual';
   const result = await client.query<CareEventDbRow>(
     `insert into care_events (
        family_id, baby_id, actor_user_id, actor_membership_id,
        source, event_type, occurred_at, client_request_id, note, trace_id
-     ) values ($1,$2,$3,$4,'manual',$5,$6,$7,$8,$9)
+     ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
      on conflict (family_id, actor_user_id, client_request_id)
        where client_request_id is not null
      do nothing
@@ -111,6 +113,7 @@ export async function createCareEvent(
       input.actor.babyId,
       input.actor.userId,
       input.actor.membershipId,
+      source,
       input.eventType,
       input.occurredAt,
       input.clientRequestId,
@@ -131,7 +134,7 @@ export async function createCareEvent(
       targetId: event.id,
       source: 'api',
       traceId: input.traceId,
-      metadata: { eventType: input.eventType, careSource: 'manual' },
+      metadata: { eventType: input.eventType, careSource: source },
     });
     return event;
   }

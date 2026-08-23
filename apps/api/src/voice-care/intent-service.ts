@@ -29,7 +29,7 @@ function sameDigest(left: Buffer, right: Buffer): boolean {
 }
 
 export interface VoiceCareIntentService {
-  accept(raw: Uint8Array, acceptedAt: Date, signal: AbortSignal): Promise<VoiceCareSemanticResultV1>;
+  accept(raw: Uint8Array, acceptedAt: Date, traceId: string, signal: AbortSignal): Promise<VoiceCareSemanticResultV1>;
 }
 
 export function createVoiceCareIntentService(
@@ -38,7 +38,7 @@ export function createVoiceCareIntentService(
   coordinator = new VoiceCareIntentCoordinator(),
 ): VoiceCareIntentService {
   return {
-    async accept(raw, acceptedAt, signal) {
+    async accept(raw, acceptedAt, traceId, signal) {
       let authenticated;
       try {
         authenticated = await authenticator.authenticate(raw, acceptedAt);
@@ -96,7 +96,7 @@ export function createVoiceCareIntentService(
                 ? VoiceCareSemanticResultV1Schema.parse(existing.result_json)
                 : closedResult('rejected');
             }
-            const semantic = await applyPendingVoiceIntent(client, authenticated, acceptedAt);
+            const semantic = await applyPendingVoiceIntent(client, authenticated, acceptedAt, traceId);
             if (signal.aborted) throw new VoiceCareBusyError();
             await client.query(
               `insert into voice_care_intent_receipts

@@ -22,7 +22,7 @@ afterEach(async () => {
 });
 
 describeDatabase('M5 pending Voice Care feeding state', () => {
-  it('updates, ends and cancels typed state without creating a care event', async () => {
+  it('updates, ends and confirms typed state, while cancellation creates no additional care event', async () => {
     context = await createM2TestApp(testDatabaseUrl!, { voiceCareEnabled: true });
     const fixture = await createVoiceCareDeviceFixture(context);
     const start = await postVoiceIntent(context, signedVoiceIntent(fixture, {
@@ -76,7 +76,7 @@ describeDatabase('M5 pending Voice Care feeding state', () => {
         confirmedWarningCodes: [],
       },
     }).raw);
-    expect(confirm.json()).toMatchObject({ code: 'needs_confirmation', sessionVersion: 3 });
+    expect(confirm.json()).toMatchObject({ code: 'saved', sessionVersion: 4, careEventId: expect.any(String) });
     const state = await context.app.inject({
       method: 'GET',
       url: '/api/voice-care/state',
@@ -86,21 +86,25 @@ describeDatabase('M5 pending Voice Care feeding state', () => {
     expect(state.json()).toMatchObject({
       devices: [{ id: fixture.deviceId }],
       activeLeases: [{ id: fixture.leaseId }],
-      sessions: [{ id: sessionId, state: 'needs_confirmation', canConfirm: true, canCancel: true }],
+      sessions: [{ id: sessionId, state: 'committed', canConfirm: false, canCancel: false }],
     });
     expect(state.body).not.toMatch(/signature|publicKey|modelVersion|requestId/);
+    const cancellable = await postVoiceIntent(context, signedVoiceIntent(fixture, {
+      payload: { mode: 'bottle', startedAt: M2_TEST_NOW.toISOString() },
+    }).raw);
+    const cancellableId = cancellable.json().careSessionId as string;
     const cancel = await postVoiceIntent(context, signedVoiceIntent(fixture, {
       intentType: 'care_cancel',
-      careSessionId: sessionId,
-      payload: { expectedVersion: 3, reason: 'caregiver_cancelled' },
+      careSessionId: cancellableId,
+      payload: { expectedVersion: 1, reason: 'caregiver_cancelled' },
     }).raw);
-    expect(cancel.json()).toMatchObject({ code: 'accepted_pending', sessionVersion: 4 });
+    expect(cancel.json()).toMatchObject({ code: 'accepted_pending', sessionVersion: 2 });
     const rows = await context.database.pool.query<{ state: string; care_count: number }>(
       `select state, (select count(*)::int from care_events) care_count
          from voice_care_feeding_sessions where id = $1`,
-      [sessionId],
+      [cancellableId],
     );
-    expect(rows.rows[0]).toEqual({ state: 'cancelled', care_count: 0 });
+    expect(rows.rows[0]).toEqual({ state: 'cancelled', care_count: 1 });
   });
 
   it('keeps replay and uncertain state reviewable, and mismatch creates no session', async () => {
@@ -168,5 +172,16 @@ describeDatabase('M5 pending Voice Care feeding state', () => {
       [sessionId],
     );
     expect(row.rows[0]).toEqual({ state: 'needs_review', version: 2, care_count: 0 });
+    const state = await context.app.inject({
+      method: 'GET',
+      url: '/api/voice-care/state',
+      headers: { cookie: context.cookie },
+    });
+    expect(state.json().sessions.find((session: { id: string }) => session.id === sessionId)).toMatchObject({
+      id: sessionId,
+      state: 'needs_review',
+      canConfirm: false,
+      canCancel: true,
+    });
   });
 });

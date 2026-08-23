@@ -7,6 +7,7 @@ import { feedingSessions } from '../schema.js';
 import type { CareActorContext } from './care-auth.js';
 import { insertCareActionRow } from './care-action-repository.js';
 import { createCareEvent, type CareEventRow } from './care-event-repository.js';
+import { CareStateConflictError } from './care-errors.js';
 import { persistFeedingComponents } from './feeding-persistence.js';
 
 export async function writeFeedingSession(
@@ -14,6 +15,16 @@ export async function writeFeedingSession(
   actor: CareActorContext,
   input: CreateFeedingSessionInput,
   traceId: string,
+): Promise<CareEventRow> {
+  return writeFeedingSessionInTransaction(client, actor, input, traceId, 'manual');
+}
+
+export async function writeFeedingSessionInTransaction(
+  client: pg.PoolClient,
+  actor: CareActorContext,
+  input: CreateFeedingSessionInput,
+  traceId: string,
+  source: 'manual' | 'voice',
 ): Promise<CareEventRow> {
   const occurredAt = new Date(input.occurredAt);
   const event = await createCareEvent(client, {
@@ -23,7 +34,11 @@ export async function writeFeedingSession(
     clientRequestId: input.clientRequestId,
     note: input.note ?? null,
     traceId,
+    source,
   });
+  if (event.eventType !== 'feeding' || event.source !== source) {
+    throw new CareStateConflictError('The idempotent feeding write conflicts with an existing care event.');
+  }
 
   const orm = drizzle({ client });
   const existing = await orm.select({ eventId: feedingSessions.eventId })
@@ -40,6 +55,7 @@ export async function writeFeedingSession(
       occurredAt,
       clientRequestId: randomUUID(),
       traceId,
+      source,
     });
     await insertCareActionRow(client, {
       eventId: child.id,

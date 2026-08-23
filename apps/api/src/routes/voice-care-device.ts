@@ -28,6 +28,7 @@ export function registerVoiceCareDeviceRoute(
       const semantic = await dependencies.intentService.accept(
         request.body,
         (dependencies.now ?? (() => new Date()))(),
+        request.id,
         controller.signal,
       );
       return reply.send(semantic);

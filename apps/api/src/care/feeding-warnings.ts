@@ -8,7 +8,7 @@ import { findNearbyBottleEvent } from './feeding-nearby-bottle.js';
 import { findNearbyDirectEvent } from './feeding-nearby-direct.js';
 
 export async function collectFeedingWarnings(
-  pool: pg.Pool,
+  pool: Pick<pg.Pool | pg.PoolClient, 'query'>,
   actor: CareActorContext,
   input: CreateFeedingSessionInput,
   now: Date,

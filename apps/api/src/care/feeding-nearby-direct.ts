@@ -1,8 +1,10 @@
 import type pg from 'pg';
 import type { CareActorContext } from './care-auth.js';
 
+type QueryExecutor = Pick<pg.Pool | pg.PoolClient, 'query'>;
+
 export async function findNearbyDirectEvent(
-  pool: pg.Pool,
+  pool: QueryExecutor,
   actor: CareActorContext,
   occurredAt: Date,
   durationMinutes: number,

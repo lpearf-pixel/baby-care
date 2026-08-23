@@ -45,6 +45,8 @@ function fixture(overrides: Partial<VoiceCareDeviceService> = {}) {
   } as VoiceCareLeaseService;
   const sessionService = ({
     state: vi.fn(async () => ({ devices: [], activeLeases: [], sessions: [] })),
+    confirmFromBrowser: vi.fn(),
+    cancelFromBrowser: vi.fn(),
   }) as VoiceCareSessionService;
   registerVoiceCareBrowserRoutes(app, { careAuth, deviceService, leaseService, sessionService });
   return { app, careAuth, deviceService };

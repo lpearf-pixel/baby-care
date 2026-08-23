@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   ActivateVoiceCareLeaseInputSchema,
+  CancelVoiceCareSessionInputSchema,
+  ConfirmVoiceCareSessionInputSchema,
   PairVoiceCareDeviceInputSchema,
   type ApiErrorCode,
 } from '@baby-care/contracts';
@@ -20,6 +22,7 @@ import {
 
 const DeviceParamsSchema = z.object({ deviceId: z.string().uuid() }).strict();
 const LeaseParamsSchema = z.object({ leaseId: z.string().uuid() }).strict();
+const SessionParamsSchema = z.object({ sessionId: z.string().uuid() }).strict();
 
 function sendError(
   reply: FastifyReply,
@@ -104,6 +107,40 @@ export function registerVoiceCareBrowserRoutes(
     if (!actor) return;
     try {
       return reply.send(await dependencies.sessionService.state(actor));
+    } catch (error) {
+      return handleVoiceCareError(reply, request, error);
+    }
+  });
+
+  app.post('/api/voice-care/sessions/:sessionId/confirm', async (request, reply) => {
+    const actor = await dependencies.careAuth.requireWrite(request, reply);
+    if (!actor) return;
+    const params = SessionParamsSchema.safeParse(request.params);
+    const input = ConfirmVoiceCareSessionInputSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
+      return sendError(reply, 400, 'validation_failed', 'Invalid Voice Care confirmation.', request.id);
+    }
+    try {
+      return reply.send(
+        await dependencies.sessionService.confirmFromBrowser(actor, params.data.sessionId, input.data, request.id),
+      );
+    } catch (error) {
+      return handleVoiceCareError(reply, request, error);
+    }
+  });
+
+  app.post('/api/voice-care/sessions/:sessionId/cancel', async (request, reply) => {
+    const actor = await dependencies.careAuth.requireWrite(request, reply);
+    if (!actor) return;
+    const params = SessionParamsSchema.safeParse(request.params);
+    const input = CancelVoiceCareSessionInputSchema.safeParse(request.body);
+    if (!params.success || !input.success) {
+      return sendError(reply, 400, 'validation_failed', 'Invalid Voice Care cancellation.', request.id);
+    }
+    try {
+      return reply.send(
+        await dependencies.sessionService.cancelFromBrowser(actor, params.data.sessionId, input.data, request.id),
+      );
     } catch (error) {
       return handleVoiceCareError(reply, request, error);
     }

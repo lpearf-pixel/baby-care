@@ -2,8 +2,10 @@ import type pg from 'pg';
 import type { BottleLiquidType } from '@baby-care/contracts';
 import type { CareActorContext } from './care-auth.js';
 
+type QueryExecutor = Pick<pg.Pool | pg.PoolClient, 'query'>;
+
 export async function findNearbyBottleEvent(
-  pool: pg.Pool,
+  pool: QueryExecutor,
   actor: CareActorContext,
   occurredAt: Date,
   liquidType: BottleLiquidType,
