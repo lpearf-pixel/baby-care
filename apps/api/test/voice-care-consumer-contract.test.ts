@@ -82,4 +82,15 @@ describe('read-only Voice Care consumer contract verifier', () => {
     expect(result.stdout).toBe('CONTRACT_FAIL code=consumer_missing\n');
     expect(result.stdout).not.toContain(root);
   });
+
+  it('rejects required artifacts that exist only as untracked files', async () => {
+    const root = await consumer();
+    git(root, 'rm', '--cached', '--quiet',
+      'packages/contracts/voice-care/voice-care-v1.json');
+    git(root, 'commit', '--quiet', '-m', 'synthetic untracked artifact');
+    const result = run(root);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('CONTRACT_FAIL code=consumer_missing\n');
+    expect(result.stdout).not.toContain(root);
+  });
 });

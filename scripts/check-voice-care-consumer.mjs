@@ -56,6 +56,7 @@ async function checkedConsumerRoot(input) {
     throw new ContractFailure('consumer_dirty');
   }
   for (const path of [CONSUMER_SCHEMA, CONSUMER_CORPUS, CONSUMER_SOURCE_COMMIT]) {
+    git(canonical, ['ls-files', '--error-unmatch', '--', path]);
     const relation = relative(canonical, join(canonical, path));
     if (relation.startsWith(`..${sep}`) || isAbsolute(relation)) throw new ContractFailure('consumer_missing');
     await rejectSymlinkComponents(canonical, path);
