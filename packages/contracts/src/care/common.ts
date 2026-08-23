@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const CareSourceSchema = z.enum(['manual', 'guardian', 'device', 'import', 'ai']);
+export const CareSourceSchema = z.enum(['manual', 'guardian', 'device', 'import', 'ai', 'voice']);
 export const CareEventStatusSchema = z.enum(['active', 'voided']);
 export const CareEventTypeSchema = z.enum([
   'feeding',

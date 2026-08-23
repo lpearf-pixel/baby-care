@@ -18,6 +18,10 @@ export const ApiErrorCodeSchema = z.enum([
   'export_too_large',
   'export_in_progress',
   'export_failed',
+  'voice_care_disabled',
+  'voice_care_pairing_invalid',
+  'voice_care_not_found',
+  'voice_care_state_conflict',
 ]);
 
 const NonConfirmationErrorCodeSchema = z.enum([
@@ -36,6 +40,10 @@ const NonConfirmationErrorCodeSchema = z.enum([
   'export_too_large',
   'export_in_progress',
   'export_failed',
+  'voice_care_disabled',
+  'voice_care_pairing_invalid',
+  'voice_care_not_found',
+  'voice_care_state_conflict',
 ]);
 
 const NonConfirmationApiErrorSchema = z
