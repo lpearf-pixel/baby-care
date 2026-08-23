@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { BottleLiquidType, CreateFeedingSessionInput } from '@baby-care/contracts';
 import type { BabyCareApi } from '../api-client.js';
+import { createClientRequestId } from './client-request-id.js';
 
 type FeedingMode = 'direct' | BottleLiquidType | null;
 
@@ -17,7 +18,7 @@ export function FeedingForm({
   const [quickValues, setQuickValues] = useState<number[]>([]);
   const [amount, setAmount] = useState('');
   const [duration, setDuration] = useState('');
-  const requestId = useRef(crypto.randomUUID());
+  const requestId = useRef(createClientRequestId());
 
   async function chooseBottle(next: BottleLiquidType) {
     setMode(next);
@@ -53,7 +54,7 @@ export function FeedingForm({
       return;
     }
     if (await onSave(input)) {
-      requestId.current = crypto.randomUUID();
+      requestId.current = createClientRequestId();
       setMode(null);
       setAmount('');
       setDuration('');

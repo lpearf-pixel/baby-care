@@ -3,6 +3,7 @@ import type {
   CreateCareActionInput,
   CreateMeasurementInput,
 } from '@baby-care/contracts';
+import { createClientRequestId } from './client-request-id.js';
 
 export type OtherCareKind =
   | 'burping'
@@ -41,10 +42,10 @@ export function OtherCareForm({
   const [medicationName, setMedicationName] = useState('');
   const [dose, setDose] = useState('');
   const [doseUnit, setDoseUnit] = useState('');
-  const requestId = useRef(crypto.randomUUID());
+  const requestId = useRef(createClientRequestId());
 
   function reset() {
-    requestId.current = crypto.randomUUID();
+    requestId.current = createClientRequestId();
     setKind(null);
     setSpitAmount('small');
     setCryMinutes('');

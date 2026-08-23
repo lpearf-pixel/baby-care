@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CareHandoffBriefingDto } from '@baby-care/contracts';
 import type { BabyCareApi } from '../api-client.js';
+import { createClientRequestId } from './client-request-id.js';
 
 function canReadHandoff(api: BabyCareApi): api is BabyCareApi & {
   getLatestCareHandoff: NonNullable<BabyCareApi['getLatestCareHandoff']>;
@@ -74,7 +75,7 @@ export function useHandoff(api: BabyCareApi) {
     takeOverInFlightRef.current = true;
     setBusy(true);
     setMessage(null);
-    const clientRequestId = takeOverRequestIdRef.current ?? crypto.randomUUID();
+    const clientRequestId = takeOverRequestIdRef.current ?? createClientRequestId();
     takeOverRequestIdRef.current = clientRequestId;
     try {
       const next = await api.createCareHandoff({
