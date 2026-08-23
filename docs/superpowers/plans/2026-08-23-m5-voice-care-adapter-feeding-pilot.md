@@ -955,7 +955,7 @@ revocation or cross-actor lease-stop control. Task 8 export/backup/restore closu
 
 ### Task 8: M5.6 Family Export V2, Backup And Isolated Restore Closure
 
-**Status:** Pending; requires Tasks 2 and 6.
+**Status:** Complete at `d1a582d`; requires Tasks 2 and 6.
 
 **Files:**
 
@@ -971,7 +971,7 @@ revocation or cross-actor lease-stop control. Task 8 export/backup/restore closu
 - Consumes: M5 tables/final links and the completed M4 export/backup/restore boundaries.
 - Produces: `FamilyExportSchemaV2`, `VoiceCareExportSessionSchemaV1`, M5 restore invariants and transactionally invalidated restored Voice Care authority.
 
-- [ ] **Step 1: Write export/restore RED tests**
+- [x] **Step 1: Write export/restore RED tests**
 
 ```ts
 it('exports typed Voice Care session history without security material', async () => {
@@ -995,7 +995,7 @@ it('revokes restored leases and moves nonterminal voice sessions to needs_review
 
 Cover v1 export parsing unchanged; v2 deterministic ordering; pending/committed/cancelled/review history; no public key/signature/challenge/receipt/security identifiers; M5 ownership and proposal/event consistency; migration fingerprint includes `0004`; backup manifest/content remain complete; restore keeps committed facts/revisions; all leases revoked; nonterminal sessions become `needs_review` with `restoreInvalidatedAt`; sanitation writes no care/audit/family/user history; read models accept `source=voice`; and the existing M4 production script parses v2 without weakening any M4 marker or stable-fact comparison.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```bash
 pnpm --filter @baby-care/contracts test -- family-export.test.ts
@@ -1005,7 +1005,7 @@ pnpm --filter @baby-care/operations test -- backup.test.ts restore.test.ts resto
 
 Expected: FAIL because export v2 and M5 restore checks/sanitation do not exist.
 
-- [ ] **Step 3: Add versioned export DTO and deterministic repository reads**
+- [x] **Step 3: Add versioned export DTO and deterministic repository reads**
 
 ```ts
 export const VoiceCareExportSessionSchemaV1 = z.object({
@@ -1031,7 +1031,7 @@ export const FamilyExportSchemaV2 = FamilyExportSchemaV1.omit({ schemaVersion: t
 
 Export only durable semantic history. Omit devices, challenges, leases, receipts, signatures, request IDs, speaker state/model labels and security timestamps. Sort sessions by `startedAt`, then ID. Keep `FamilyExportSchemaV1` exported for old-file validation.
 
-- [ ] **Step 4: Extend restore invariants and sanitation**
+- [x] **Step 4: Extend restore invariants and sanitation**
 
 ```ts
 export interface RestoreInvariantReport {
@@ -1053,7 +1053,7 @@ export interface RestoreSanitationReport {
 
 Run M5 invariant reads before sanitation in the same existing restore verification boundary. In the fixed sanitation transaction revoke ordinary login sessions, revoke every Voice Care lease, and move only `pending`/`needs_confirmation`/`committing` Voice Care sessions to `needs_review` with `restore_invalidated_at`. Recheck zero active authority and unchanged committed care digests before declaring the restore usable.
 
-- [ ] **Step 5: Run M4/M5 compatibility GREEN**
+- [x] **Step 5: Run M4/M5 compatibility GREEN**
 
 ```bash
 pnpm --filter @baby-care/contracts test -- family-export.test.ts
@@ -1066,7 +1066,7 @@ git diff --check
 
 Expected: software and enabled disposable PostgreSQL 16 gates PASS; no production or household backup is opened.
 
-- [ ] **Step 6: Review and commit Task 8**
+- [x] **Step 6: Review and commit Task 8**
 
 ```bash
 git add packages/contracts/src/family-export.ts packages/contracts/test/family-export.test.ts apps/api/src/family/family-export-repository.ts apps/api/src/operations/verify-restored-database.ts apps/api/test/family-export-service.test.ts apps/api/test/family-export.integration.test.ts apps/api/test/family-export-route.test.ts apps/api/test/restored-database-verifier.integration.test.ts apps/api/test/m4-compose-smoke-contract.test.ts packages/operations/src/postgres-tools.ts packages/operations/src/restore.ts packages/operations/test/backup.test.ts packages/operations/test/restore.test.ts packages/operations/test/restore.integration.test.ts scripts/m4-birth-ready-operations.mjs
@@ -1075,6 +1075,12 @@ git commit -m "feat: preserve M5 data safety and recovery"
 ```
 
 **Completion:** Family export v2 contains useful typed Voice Care history without security material, and M4 backup/restore proves restored Voice Care cannot retain active authority.
+
+Fresh evidence: Contracts 52/52, Task 8 API 79/79, Operations 56 passed / 4
+opt-in skipped, real isolated PostgreSQL 16 restore 3/3, workspace typecheck and
+diff checks passed. The generated restore revoked one login session and one Voice
+Care lease, invalidated one nonterminal session and preserved the committed synthetic
+Voice feeding fact. Task 9 synthetic production and consumer-contract gate is next.
 
 ---
 
