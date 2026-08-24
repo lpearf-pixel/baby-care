@@ -1179,7 +1179,7 @@ volumes or networks. Baby Local contract commit `84e9a17` (clean documentation h
 verifier at `73e388a` also requires all three artifacts to be Git-tracked and returns
 `CONTRACT_OK schema=voice-care-intent.v1 corpus=voice-care-v1`.
 
-- [ ] **Step 6: Run the full software gate and exact-head CI**
+- [x] **Step 6: Run the full software gate and exact-head CI**
 
 ```bash
 pnpm lint
@@ -1196,8 +1196,11 @@ Local Baby Care evidence through cross-product Gate V1 commit `bca9b9e`: schema 
 lint, six-workspace typecheck and build pass; the full Node 24 workspace has 458 passed /
 115 environment-opt-in skipped. The new cross-product integration passes 2/2 against the
 existing disposable PostgreSQL 16 service and the corresponding clean Baby Local commit
-is `e4cd5d5`. Five isolated restore tests remain previously proven. Exact-head CI remains
-open until both feature branches are pushed.
+is `e4cd5d5`. Five isolated restore tests remain previously proven. Both branches are
+published; exact-head CI passed at Baby Care `53e69d4` / run `32680603091` (static,
+unit, PostgreSQL integration, build and production Compose 5/5) and Baby Local
+`c554334` / run `32680519119`. Installed Baby Local readiness remains open before the
+adult-only Task 10.
 
 - [x] **Step 7: Review and commit Task 9**
 

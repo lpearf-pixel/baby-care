@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "milestone": "M5 Voice Care Adapter and Feeding Pilot",
-  "status": "gate_v1_local_complete_exact_head_ci_pending",
+  "status": "gate_v1_exact_head_ci_complete_installed_acceptance_pending",
   "branch": "codex/m5-voice-care-adapter-implementation",
   "m5_baseline_head": "cebd5d35c6095b08982216ccc706f0226e710dbc",
   "m5_design": "docs/superpowers/specs/2026-08-23-m5-voice-care-adapter-feeding-pilot-design.md",
@@ -9,14 +9,18 @@
   "m5_implementation_plan": "docs/superpowers/plans/2026-08-23-m5-voice-care-adapter-feeding-pilot.md",
   "m5_implementation_plan_state": "approved_2026_08_23",
   "m5_implementation_baseline_head": "579122fdd3147704c107fe811e0e04013dfd1faa",
-  "m5_business_implementation_state": "tasks_1_through_9_and_cross_product_gate_v1_local_complete_exact_head_ci_pending",
+  "m5_business_implementation_state": "tasks_1_through_9_and_cross_product_gate_v1_exact_head_ci_complete_installed_acceptance_pending",
   "m5_task_9_local_implementation_head": "73e388abe2e86f65ffd844c3d33eae1497cf8697",
   "m5_task_9_local_result": "four_markers_pass_zero_owned_docker_residue_full_workspace_456_pass_113_opt_in_skip",
   "m5_task_9_consumer_gate": "pass_contract_ok_baby_local_artifact_84e9a17bd8349d89cf42fabb1546827cbde78858_docs_head_2cc2a495444f48620bd252d9688fff3390b679ef",
-  "m5_task_9_exact_head_ci": "not_run_unpushed",
+  "m5_task_9_exact_head_ci": "verified_5_of_5_run_32680603091_head_53e69d4fd3f4426404c5446db679fdc67fec6f6c",
   "m5_cross_product_gate_v1_head": "bca9b9e6f86f539ea50abe41a74e2def79989e02",
   "m5_cross_product_gate_v1_consumer_head": "e4cd5d5",
   "m5_cross_product_gate_v1_result": "real_postgresql16_2_of_2_full_workspace_458_pass_115_opt_in_skip_consumer_1108_python_73_frontend_pass",
+  "m5_cross_product_gate_v1_release_head": "53e69d4fd3f4426404c5446db679fdc67fec6f6c",
+  "m5_cross_product_gate_v1_ci_run": 32680603091,
+  "m5_cross_product_gate_v1_consumer_release_head": "c554334dfb83b91ca6cd4f787b39493d23d49892",
+  "m5_cross_product_gate_v1_consumer_ci_run": 32680519119,
   "m5_completed_tasks": [
     {
       "task": "Task 1 Strict Contracts Canonical Bytes And Golden Corpus",
@@ -207,9 +211,9 @@
     "Task 11 Production Compose Release Flow"
   ],
   "next_scope": [
-    "push the approved Baby Local and Baby Care feature branches",
-    "require exact head CI for both Gate V1 feature heads",
-    "begin adult only Task 10 only after exact head CI and installed Baby Local readiness pass",
+    "deploy accepted Baby Local head to the actual i9 checkout",
+    "require installed Baby Local Guardian readiness with Voice still disabled",
+    "begin adult only Task 10 only after installed Baby Local readiness passes",
     "preserve completed M4 and do not modify main"
   ],
   "requires_separate_post_m3_design": [

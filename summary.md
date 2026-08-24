@@ -65,7 +65,9 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   real PostgreSQL tests plus lint/typecheck/build and 458 passed / 115 opt-in skipped.
   Baby Local proves the matching synthetic PCM/VAD/wake/ASR/claim/speaker/sign/outbox
   loop, retrying exact encrypted bytes after an outage; its full gates are 1,108 Python
-  and 73 frontend passed. Exact-head CI remains pending until both branches are pushed.
+  and 73 frontend passed. Both branches are published. Exact-head CI passed at Baby Care
+  `53e69d4` / run `32680603091` (5/5 jobs, including PostgreSQL and production Compose)
+  and Baby Local `c554334` / run `32680519119`.
 - Host-only test note: the existing M1 birth-date integration test shifts one calendar
   day under macOS `Asia/Shanghai`; it passes 2/2 with the CI `TZ=UTC` baseline. M5
   migration compatibility is 15/15 and the full UTC API suite is 176/176.
@@ -346,10 +348,9 @@ Recommended first sequence:
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
 3. Preserve the M4 accepted pair `3f6676f2c7bf65d11efedecce6ac57e261d1545d` /
    `32611502497`; supervised family acceptance completed on 2026-08-23.
-4. Push the approved Baby Local and Baby Care feature branches, then require exact-head
-   CI on both. Gate V1 is locally complete at Baby Care `bca9b9e` and Baby Local
-   `e4cd5d5`; do not begin the adult-only supervised pilot until CI and installed Baby
-   Local readiness both pass.
+4. Deploy the accepted Baby Local head `c554334` to the actual i9 checkout and require
+   installed readiness. Gate V1 exact-head CI is complete; do not begin the adult-only
+   supervised pilot until installed Baby Local readiness also passes.
 
 ## 10. Copy/paste prompt after M4 acceptance
 
