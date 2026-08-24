@@ -587,6 +587,8 @@ describePg16('real fixed Compose operator flow', () => {
       await expect(dependencies.restoreVerify()).resolves.toEqual({
         code: 'restore_verified',
         revokedSessionCount: 1,
+        revokedVoiceCareLeaseCount: 1,
+        invalidatedVoiceCareSessionCount: 1,
       });
       expect(stableDump(await composeSourceDump())).toBe(stableDump(sourceBefore));
       const afterRestoreProjects = await docker([
