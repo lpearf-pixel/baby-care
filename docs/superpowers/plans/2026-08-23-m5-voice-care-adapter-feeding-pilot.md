@@ -1192,10 +1192,12 @@ git status --short
 
 After local review and separately authorized push, require exact remote-head jobs for static checks, unit tests, PostgreSQL integration, production build and production Compose smoke. Record the local implementation SHA and remote CI SHA separately if publication creates a different commit.
 
-Local Baby Care evidence at `594376b`: schema check, lint, six-workspace typecheck, build
-and 456 tests pass with 113 environment-opt-in skips. Five isolated PostgreSQL 16 restore
-tests pass; the separate fixed `baby-care` Compose integration refuses to run while the
-user-owned live project exists and was not stopped or deleted. Exact-head CI remains open.
+Local Baby Care evidence through cross-product Gate V1 commit `bca9b9e`: schema check,
+lint, six-workspace typecheck and build pass; the full Node 24 workspace has 458 passed /
+115 environment-opt-in skipped. The new cross-product integration passes 2/2 against the
+existing disposable PostgreSQL 16 service and the corresponding clean Baby Local commit
+is `e4cd5d5`. Five isolated restore tests remain previously proven. Exact-head CI remains
+open until both feature branches are pushed.
 
 - [x] **Step 7: Review and commit Task 9**
 

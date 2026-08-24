@@ -11,7 +11,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 Current milestone: **M4 — Birth Ready Operations and Data Safety — verified complete**
 Current delivery gate: **supervised family acceptance — verified complete on 2026-08-23**
-Current implementation milestone: **M5 — Voice Care Adapter and Feeding Pilot — Tasks 1-8 complete; Task 9 local implementation through `73e388a` and Baby Local consumer pass; exact-head CI pending**
+Current implementation milestone: **M5 — Voice Care Adapter and Feeding Pilot — Tasks 1-9 and cross-product synthetic Gate V1 locally complete; exact-head CI and adult-only installed acceptance pending**
 Previous completed milestone: **M3 — Care Workspace — verified complete**
 Earlier completed milestone: **M2 — Care Recording MVP — verified complete**
 
@@ -62,8 +62,11 @@ M5 implementation source:
 - Task 8 export/backup/restore checkpoint: `d1a582d`
 - Task 9 local synthetic-production checkpoint: `594376b`; tracked-consumer verifier
   hardening and cross-repository `CONTRACT_OK` checkpoint: `73e388a`
-- next: publish the approved Baby Local and Baby Care feature branches and require
-  exact-head CI before Task 10
+- cross-product Gate V1 checkpoint: Baby Care `bca9b9e`, Baby Local `e4cd5d5`; real
+  PostgreSQL 16 2/2, Baby Care full 458 passed / 115 opt-in skipped, Baby Local full
+  1,108 Python and 73 frontend passed
+- next: publish both approved feature branches and require exact-head CI before the
+  adult-only supervised Task 10
 
 ## M2 delivered
 

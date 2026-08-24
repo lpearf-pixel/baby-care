@@ -1,6 +1,6 @@
 # Baby Care Work Handoff Summary
 
-Updated: 2026-08-23
+Updated: 2026-08-24
 Repository: `lpearf-pixel/baby-care`
 
 This file is the short handoff for a fresh Work/chat. Read it together with `agent.md`, `docs/PLAN.md`, and `.agent/current-milestone.json` before planning or coding.
@@ -56,8 +56,16 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
   full workspace 456 pass / 113 opt-in skip, lint/typecheck/build PASS. Baby Local
   contract commit `84e9a17` vendors the exact source bytes; the consumer verifier now
   also requires tracked artifacts, passes 4/4 focused tests and returns `CONTRACT_OK`
-  against clean Baby Local head `2cc2a49`. Task 9 still lacks exact-head CI because both
-  feature heads remain unpushed.
+  against clean Baby Local head `2cc2a49`.
+- Cross-product synthetic Gate V1 is locally complete at Baby Care `bca9b9e` and Baby
+  Local `e4cd5d5`. The new Node 24/PostgreSQL 16 integration commits a bottle fact,
+  returns the same result for duplicate delivery, corrects it through the authenticated
+  revision route, commits direct breastfeeding, and proves cancel, identity mismatch and
+  injected commit failure create no false care fact. Fresh Baby Care evidence is 2/2
+  real PostgreSQL tests plus lint/typecheck/build and 458 passed / 115 opt-in skipped.
+  Baby Local proves the matching synthetic PCM/VAD/wake/ASR/claim/speaker/sign/outbox
+  loop, retrying exact encrypted bytes after an outage; its full gates are 1,108 Python
+  and 73 frontend passed. Exact-head CI remains pending until both branches are pushed.
 - Host-only test note: the existing M1 birth-date integration test shifts one calendar
   day under macOS `Asia/Shanghai`; it passes 2/2 with the CI `TZ=UTC` baseline. M5
   migration compatibility is 15/15 and the full UTC API suite is 176/176.
@@ -328,8 +336,9 @@ This remains separate from verified M3 Care Workspace. The first code work belon
 
 ## 9. Fresh Work entry point
 
-The next Work should preserve the accepted M4 product head and completed M5 Tasks 1-8,
-must not redesign M2/M3, repeat completed family acceptance, or begin Guardian coding.
+The next Work should preserve the accepted M4 product head, completed M5 Tasks 1-9 and
+the local cross-product Gate V1, and must not redesign M2/M3 or repeat completed family
+acceptance.
 
 Recommended first sequence:
 
@@ -337,9 +346,10 @@ Recommended first sequence:
 2. Preserve the authoritative M3 pair `52b042a66122464af338a2b4931315d92dff0965` / `31959895049`.
 3. Preserve the M4 accepted pair `3f6676f2c7bf65d11efedecce6ac57e261d1545d` /
    `32611502497`; supervised family acceptance completed on 2026-08-23.
-4. Continue M5 Task 9 from local checkpoint `73e388a`: push the approved Baby Local and
-   Baby Care feature branches, then require exact-head CI. The cross-repository consumer
-   gate is already `CONTRACT_OK`; do not begin Task 10 until CI also passes.
+4. Push the approved Baby Local and Baby Care feature branches, then require exact-head
+   CI on both. Gate V1 is locally complete at Baby Care `bca9b9e` and Baby Local
+   `e4cd5d5`; do not begin the adult-only supervised pilot until CI and installed Baby
+   Local readiness both pass.
 
 ## 10. Copy/paste prompt after M4 acceptance
 
