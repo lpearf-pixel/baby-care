@@ -1,8 +1,8 @@
+import { generateKeyPairSync, randomUUID, type KeyObject } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { createM2TestApp, M2_TEST_NOW, M2_TEST_ORIGIN } from './helpers/m2-family-app.js';
 import {
-  createVoiceCareDeviceFixture,
   postVoiceIntent,
   signedVoiceIntent,
   type VoiceCareDeviceFixture,
@@ -12,6 +12,46 @@ const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 const describeDatabase = testDatabaseUrl ? describe : describe.skip;
 type TestContext = Awaited<ReturnType<typeof createM2TestApp>>;
 let context: TestContext | undefined;
+
+function rawPublicKey(publicKey: KeyObject): Buffer {
+  const der = publicKey.export({ type: 'spki', format: 'der' });
+  return der.subarray(der.length - 32);
+}
+
+async function createActivatedDeviceFixture(): Promise<VoiceCareDeviceFixture> {
+  const keyPair = generateKeyPairSync('ed25519');
+  const deviceId = randomUUID();
+  const owner = await context!.database.pool.query<{
+    family_id: string;
+    user_id: string;
+  }>(
+    `select fm.family_id, fm.user_id
+       from family_memberships fm
+       join users u on u.id = fm.user_id and u.login_name = 'dad'`,
+  );
+  const row = owner.rows[0];
+  if (!row) throw new Error('expected synthetic Voice Care owner');
+  await context!.database.pool.query(
+    `insert into voice_care_devices
+      (id, family_id, public_key, capability, status, created_at)
+     values ($1,$2,$3,'voice_care.intent.submit','active',$4)`,
+    [deviceId, row.family_id, rawPublicKey(keyPair.publicKey), M2_TEST_NOW],
+  );
+  const lease = await context!.app.inject({
+    method: 'POST',
+    url: `/api/voice-care/devices/${deviceId}/leases`,
+    headers: { origin: M2_TEST_ORIGIN, cookie: context!.cookie },
+    payload: { clientRequestId: randomUUID(), occurredAt: M2_TEST_NOW.toISOString() },
+  });
+  expect(lease.statusCode).toBe(201);
+  return {
+    deviceId,
+    leaseId: lease.json().id as string,
+    privateKey: keyPair.privateKey,
+    actorUserId: row.user_id,
+    familyId: row.family_id,
+  };
+}
 
 afterEach(async () => {
   if (context) {
@@ -64,7 +104,11 @@ function confirmFeeding(
 describeDatabase('M5 cross-product Voice Care synthetic Gate V1', () => {
   it('commits one bottle fact, replays idempotently and corrects through the authenticated route', async () => {
     context = await createM2TestApp(testDatabaseUrl!, { voiceCareEnabled: true });
-    const fixture = await createVoiceCareDeviceFixture(context);
+    const fixture = await createActivatedDeviceFixture();
+    const takeover = await context.database.pool.query(
+      `select count(*)::int count from care_handoff_checkpoints where source::text = 'voice'`,
+    );
+    expect(takeover.rows).toEqual([{ count: 1 }]);
     const start = await postVoiceIntent(context, signedVoiceIntent(fixture, {
       payload: { mode: 'bottle', startedAt: M2_TEST_NOW.toISOString() },
     }).raw);
@@ -162,7 +206,7 @@ describeDatabase('M5 cross-product Voice Care synthetic Gate V1', () => {
 
   it('commits direct feeding and fails closed for cancel, identity mismatch and outage', async () => {
     context = await createM2TestApp(testDatabaseUrl!, { voiceCareEnabled: true });
-    const fixture = await createVoiceCareDeviceFixture(context);
+    const fixture = await createActivatedDeviceFixture();
     const direct = await endFeeding(fixture, {
       mode: 'direct_breastfeeding',
       startedAt: M2_TEST_NOW.toISOString(),
