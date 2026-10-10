@@ -10,6 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "voice-care:schema": "tsx scripts/write-voice-care-schema.ts",
     "voice-care:schema:check": "tsx scripts/write-voice-care-schema.ts --check",
+    "voice-care:v2-schema": "tsx scripts/write-voice-care-v2-schema.ts",
+    "voice-care:v2-schema:check": "tsx scripts/write-voice-care-v2-schema.ts --check",
     "voice-care:fixtures": "tsx scripts/write-voice-care-fixtures.ts",
     "voice-care:fixtures:check": "tsx scripts/write-voice-care-fixtures.ts --check"
   },

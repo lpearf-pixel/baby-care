@@ -1,9 +1,10 @@
 import { createHash, createPublicKey, verify as verifySignature } from 'node:crypto';
 
 import {
-  parseCanonicalVoiceCareIntentV1,
-  voiceCareSigningBytesV1,
+  parseCanonicalVoiceCareIntent,
+  voiceCareSigningBytes,
   type VoiceCareIntentV1,
+  type VoiceCareIntentV2,
 } from '@baby-care/contracts';
 import type { CareActorContext } from '../care/care-auth.js';
 import type { DatabaseContext } from '../db.js';
@@ -20,7 +21,7 @@ export class VoiceCareAuthenticationError extends Error {
 }
 
 export interface AuthenticatedVoiceIntent {
-  intent: VoiceCareIntentV1;
+  intent: VoiceCareIntentV1 | VoiceCareIntentV2;
   requestDigest: Buffer;
   device: { id: string; familyId: string };
   actor: CareActorContext;
@@ -34,7 +35,7 @@ export interface VoiceCareIntentAuthenticator {
 export function createVoiceCareIntentAuthenticator(database: DatabaseContext): VoiceCareIntentAuthenticator {
   return {
     async authenticate(raw, acceptedAt) {
-      const intent = parseCanonicalVoiceCareIntentV1(raw);
+      const intent = parseCanonicalVoiceCareIntent(raw);
       const issuedAt = new Date(intent.issuedAt);
       if (
         intent.deliveryMode === 'live'
@@ -69,7 +70,7 @@ export function createVoiceCareIntentAuthenticator(database: DatabaseContext): V
           type: 'spki',
         });
         const signature = Buffer.from(intent.signature, 'base64url');
-        if (!verifySignature(null, voiceCareSigningBytesV1(intent), key, signature)) {
+        if (!verifySignature(null, voiceCareSigningBytes(intent), key, signature)) {
           throw new VoiceCareAuthenticationError();
         }
       } catch (error) {

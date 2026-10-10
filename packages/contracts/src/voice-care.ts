@@ -175,7 +175,99 @@ export const VoiceCareIntentV1Schema = z.discriminatedUnion('intentType', [
   CareCancelIntentV1Schema,
 ]);
 
+const VoiceCareBottleComponentV2Schema = z.object({
+  kind: z.literal('bottle'),
+  liquidType: BottleLiquidTypeSchema,
+  amountMl: PositiveSafeIntegerSchema,
+  bottleCapacityMl: PositiveSafeIntegerSchema.optional(),
+}).strict();
+
+const VoiceCareDirectComponentV2Schema = z.object({
+  kind: z.literal('direct_breastfeeding'),
+  durationMinutes: PositiveSafeIntegerSchema,
+}).strict();
+
+export const VoiceCareFeedingComponentV2Schema = z.discriminatedUnion('kind', [
+  VoiceCareBottleComponentV2Schema,
+  VoiceCareDirectComponentV2Schema,
+]);
+
+export const VoiceCareFeedingProposalV2Schema = z.object({
+  schemaVersion: z.literal(2),
+  startedAt: OffsetTimestampSchema,
+  endedAt: OffsetTimestampSchema.nullable(),
+  components: z.array(VoiceCareFeedingComponentV2Schema).max(8),
+}).strict();
+
+export const VoiceCareFinalFeedingProposalV2Schema = z.object({
+  schemaVersion: z.literal(2),
+  startedAt: OffsetTimestampSchema,
+  endedAt: OffsetTimestampSchema,
+  components: z.array(VoiceCareFeedingComponentV2Schema).min(1).max(8),
+}).strict();
+
+const FeedingStartIntentV2Schema = z.object({
+  ...VoiceCareEnvelopeShape,
+  schemaVersion: z.literal(2),
+  intentType: z.literal('feeding_start'),
+  careSessionId: z.null(),
+  payload: z.object({
+    mode: z.enum(['unknown', 'bottle', 'direct_breastfeeding']),
+    startedAt: OffsetTimestampSchema,
+  }).strict(),
+}).strict();
+
+const FeedingUpdateIntentV2Schema = z.object({
+  ...VoiceCareEnvelopeShape,
+  schemaVersion: z.literal(2),
+  intentType: z.literal('feeding_update'),
+  careSessionId: z.string().uuid(),
+  payload: z.object({
+    expectedVersion: PositiveSafeIntegerSchema,
+    components: z.array(VoiceCareFeedingComponentV2Schema).min(1).max(8),
+  }).strict(),
+}).strict();
+
+const FeedingEndIntentV2Schema = z.object({
+  ...VoiceCareEnvelopeShape,
+  schemaVersion: z.literal(2),
+  intentType: z.literal('feeding_end'),
+  careSessionId: z.string().uuid(),
+  payload: z.object({
+    expectedVersion: PositiveSafeIntegerSchema,
+    finalProposal: VoiceCareFinalFeedingProposalV2Schema,
+  }).strict(),
+}).strict();
+
+const CareConfirmIntentV2Schema = z.object({
+  ...VoiceCareEnvelopeShape,
+  schemaVersion: z.literal(2),
+  intentType: z.literal('care_confirm'),
+  careSessionId: z.string().uuid(),
+  payload: ConfirmVoiceCareSessionInputSchema,
+}).strict();
+
+const CareCancelIntentV2Schema = z.object({
+  ...VoiceCareEnvelopeShape,
+  schemaVersion: z.literal(2),
+  intentType: z.literal('care_cancel'),
+  careSessionId: z.string().uuid(),
+  payload: CancelVoiceCareSessionInputSchema,
+}).strict();
+
+export const VoiceCareIntentV2Schema = z.discriminatedUnion('intentType', [
+  FeedingStartIntentV2Schema,
+  FeedingUpdateIntentV2Schema,
+  FeedingEndIntentV2Schema,
+  CareConfirmIntentV2Schema,
+  CareCancelIntentV2Schema,
+]);
+
 export type VoiceCareIntentV1 = z.infer<typeof VoiceCareIntentV1Schema>;
+export type VoiceCareIntentV2 = z.infer<typeof VoiceCareIntentV2Schema>;
+export type VoiceCareFeedingComponentV2 = z.infer<typeof VoiceCareFeedingComponentV2Schema>;
+export type VoiceCareFeedingProposalV2 = z.infer<typeof VoiceCareFeedingProposalV2Schema>;
+export type VoiceCareFinalFeedingProposalV2 = z.infer<typeof VoiceCareFinalFeedingProposalV2Schema>;
 export type VoiceCareFeedingProposalInputV1 = z.infer<typeof VoiceCareFeedingProposalInputV1Schema>;
 export type VoiceCareFeedingProposalV1 = z.infer<typeof VoiceCareFeedingProposalV1Schema>;
 export type ConfirmVoiceCareSessionInput = z.infer<typeof ConfirmVoiceCareSessionInputSchema>;
@@ -319,6 +411,44 @@ export const VoiceCareSemanticResultV1Schema = z.object({
   }
 });
 
+const VoiceCareV2ReadbackSchema = z.object({
+  templateId: z.literal('feeding_components_readback'),
+  components: z.array(VoiceCareFeedingComponentV2Schema).min(1).max(8),
+}).strict();
+
+export const VoiceCareSemanticResultV2Schema = z.object({
+  schemaVersion: z.literal(2),
+  code: VoiceCareSemanticCodeSchema,
+  careSessionId: z.string().uuid().nullable(),
+  careEventId: z.string().uuid().nullable(),
+  sessionVersion: PositiveSafeIntegerSchema.nullable(),
+  proposalDigest: Sha256HexSchema.nullable(),
+  warningDigest: Sha256HexSchema.nullable(),
+  warningCodes: z.array(CareWarningCodeSchema).max(4).superRefine(uniqueWarningCodes),
+  readback: VoiceCareV2ReadbackSchema.nullable(),
+}).strict().superRefine((value, context) => {
+  if ((value.warningDigest === null) !== (value.warningCodes.length === 0)) {
+    context.addIssue({ code: 'custom', message: 'warning digest and codes must be supplied together' });
+  }
+  if (value.code === 'saved' && (
+    value.careSessionId === null
+    || value.careEventId === null
+    || value.sessionVersion === null
+    || value.proposalDigest === null
+  )) {
+    context.addIssue({ code: 'custom', message: 'saved requires session, care event, version and proposal identifiers' });
+  }
+  if (value.code === 'accepted_pending' && (
+    value.careSessionId === null
+    || value.careEventId !== null
+    || value.sessionVersion === null
+  )) {
+    context.addIssue({ code: 'custom', message: 'accepted pending requires a session and version without a care event' });
+  }
+});
+
+export type VoiceCareSemanticResultV2 = z.infer<typeof VoiceCareSemanticResultV2Schema>;
+
 export class VoiceCareContractError extends Error {
   readonly code = 'voice_care_contract_invalid';
 
@@ -377,6 +507,54 @@ export function voiceCareSigningBytesV1(intent: VoiceCareIntentV1): Uint8Array {
   const parsed = VoiceCareIntentV1Schema.parse(intent);
   const unsigned = Object.fromEntries(Object.entries(parsed).filter(([key]) => key !== 'signature'));
   return canonicalBytes(unsigned);
+}
+
+export function parseCanonicalVoiceCareIntentV2(raw: Uint8Array): VoiceCareIntentV2 {
+  if (raw.byteLength === 0 || raw.byteLength > 16_384) throw new VoiceCareContractError();
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(raw);
+    const parsed: unknown = JSON.parse(text);
+    const intent = VoiceCareIntentV2Schema.parse(parsed);
+    if (!bytesEqual(raw, canonicalBytes(intent))) throw new VoiceCareContractError();
+    return intent;
+  } catch (error) {
+    if (error instanceof VoiceCareContractError) throw error;
+    throw new VoiceCareContractError();
+  }
+}
+
+export function parseCanonicalVoiceCareIntent(raw: Uint8Array): VoiceCareIntentV1 | VoiceCareIntentV2 {
+  try {
+    const text = new TextDecoder('utf-8', { fatal: true }).decode(raw);
+    const parsed: unknown = JSON.parse(text);
+    if (typeof parsed === 'object' && parsed !== null && 'schemaVersion' in parsed
+      && (parsed as { schemaVersion?: unknown }).schemaVersion === 2) {
+      return parseCanonicalVoiceCareIntentV2(raw);
+    }
+    return parseCanonicalVoiceCareIntentV1(raw);
+  } catch {
+    throw new VoiceCareContractError();
+  }
+}
+
+export function voiceCareSigningBytesV2(intent: VoiceCareIntentV2): Uint8Array {
+  const parsed = VoiceCareIntentV2Schema.parse(intent);
+  const unsigned = Object.fromEntries(Object.entries(parsed).filter(([key]) => key !== 'signature'));
+  return canonicalBytes(unsigned);
+}
+
+export function voiceCareSigningBytes(intent: VoiceCareIntentV1 | VoiceCareIntentV2): Uint8Array {
+  return intent.schemaVersion === 2
+    ? voiceCareSigningBytesV2(intent)
+    : voiceCareSigningBytesV1(intent);
+}
+
+export async function voiceCareProposalDigestV2(
+  proposal: VoiceCareFinalFeedingProposalV2,
+): Promise<string> {
+  const parsed = VoiceCareFinalFeedingProposalV2Schema.parse(proposal);
+  const digest = await globalThis.crypto.subtle.digest('SHA-256', canonicalBytes(parsed));
+  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('');
 }
 
 export async function voiceCareProposalDigestV1(proposal: VoiceCareFeedingProposalV1): Promise<string> {

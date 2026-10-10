@@ -1,6 +1,9 @@
 import {
   VoiceCareSemanticResultV1Schema,
+  VoiceCareSemanticResultV2Schema,
   type VoiceCareSemanticResultV1,
+  type VoiceCareSemanticResultV2,
+  type VoiceCareIntentV1,
 } from '@baby-care/contracts';
 import type { DatabaseContext } from '../db.js';
 import {
@@ -9,8 +12,19 @@ import {
 } from './intent-authenticator.js';
 import { VoiceCareBusyError, VoiceCareIntentCoordinator } from './intent-coordinator.js';
 import { applyPendingVoiceIntent } from './session-service.js';
+import { applyPendingVoiceIntentV2 } from './session-service-v2.js';
 
-function closedResult(code: VoiceCareSemanticResultV1['code']): VoiceCareSemanticResultV1 {
+function closedResult(
+  code: VoiceCareSemanticResultV1['code'],
+  schemaVersion: 1 | 2 = 1,
+): VoiceCareSemanticResultV1 | VoiceCareSemanticResultV2 {
+  if (schemaVersion === 2) {
+    return VoiceCareSemanticResultV2Schema.parse({
+      schemaVersion: 2, code, careSessionId: null, careEventId: null,
+      sessionVersion: null, proposalDigest: null, warningDigest: null,
+      warningCodes: [], readback: null,
+    });
+  }
   return VoiceCareSemanticResultV1Schema.parse({
     schemaVersion: 1,
     code,
@@ -29,7 +43,7 @@ function sameDigest(left: Buffer, right: Buffer): boolean {
 }
 
 export interface VoiceCareIntentService {
-  accept(raw: Uint8Array, acceptedAt: Date, traceId: string, signal: AbortSignal): Promise<VoiceCareSemanticResultV1>;
+  accept(raw: Uint8Array, acceptedAt: Date, traceId: string, signal: AbortSignal): Promise<VoiceCareSemanticResultV1 | VoiceCareSemanticResultV2>;
 }
 
 export function createVoiceCareIntentService(
@@ -92,11 +106,21 @@ export function createVoiceCareIntentService(
             const existing = receipt.rows[0];
             if (existing) {
               await client.query('commit');
-              return sameDigest(existing.request_digest, authenticated.requestDigest)
-                ? VoiceCareSemanticResultV1Schema.parse(existing.result_json)
-                : closedResult('rejected');
+              if (!sameDigest(existing.request_digest, authenticated.requestDigest)) {
+                return closedResult('rejected', authenticated.intent.schemaVersion);
+              }
+              return authenticated.intent.schemaVersion === 2
+                ? VoiceCareSemanticResultV2Schema.parse(existing.result_json)
+                : VoiceCareSemanticResultV1Schema.parse(existing.result_json);
             }
-            const semantic = await applyPendingVoiceIntent(client, authenticated, acceptedAt, traceId);
+            const semantic = authenticated.intent.schemaVersion === 2
+              ? await applyPendingVoiceIntentV2(client, authenticated, acceptedAt, traceId)
+              : await applyPendingVoiceIntent(
+                  client,
+                  { ...authenticated, intent: authenticated.intent as VoiceCareIntentV1 },
+                  acceptedAt,
+                  traceId,
+                );
             if (signal.aborted) throw new VoiceCareBusyError();
             await client.query(
               `insert into voice_care_intent_receipts

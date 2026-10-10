@@ -1,7 +1,17 @@
 # Baby Care Work Handoff Summary
 
-Updated: 2026-08-24
+Updated: 2026-10-10
 Repository: `lpearf-pixel/baby-care`
+
+M6 Voice Care v2 is being implemented on `codex/m6-voice-care-v2`. The v2
+contract supports multiple expressed-breast-milk/formula bottle components and
+direct-breastfeeding duration without converting duration to millilitres. The
+Baby Monitor M6 coordinator keeps its eight-second dialogue expiry separate from
+the long-lived Baby Care pending task. Current offline evidence: contracts
+typecheck plus 55 contract tests, API typecheck, and 2 synthetic v2 handoff tests
+pass under Node 22; repository CI requires Node 24. No household deployment or
+Camera Reply is enabled.
+Generated v2 schema SHA-256: `a0fe59a4c30c7f053a13677ab472e343c95a8794def7ee8ac5303a46d4d47954`.
 
 This file is the short handoff for a fresh Work/chat. Read it together with `agent.md`, `docs/PLAN.md`, and `.agent/current-milestone.json` before planning or coding.
 
@@ -9,8 +19,8 @@ This file is the short handoff for a fresh Work/chat. Read it together with `age
 
 - Current completed milestone: **M4 — Birth Ready Operations and Data Safety**, including
   supervised family acceptance, `verified_complete`.
-- Current milestone: **M5 — Voice Care Adapter and Feeding Pilot**, approved and in
-  implementation on `codex/m5-voice-care-adapter-implementation`.
+- Current milestone: **M6 — Voice Care v2 multi-component feeding**, on
+  `codex/m6-voice-care-v2`; M5 remains the v1 compatibility baseline.
 - M5 Task 1 is complete at `bb1337226c1948695159d14199c9bb73cdaf115a`: strict
   signed-intent contracts, canonical bytes, browser DTOs, deterministic JSON Schema and
   synthetic golden corpus.

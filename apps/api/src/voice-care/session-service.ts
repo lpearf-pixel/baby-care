@@ -13,6 +13,7 @@ import {
   type VoiceCareFeedingProposalV1,
   type VoiceCareSemanticResultV1,
   type VoiceCareStateDto,
+  type VoiceCareIntentV1,
 } from '@baby-care/contracts';
 import type { CareActorContext } from '../care/care-auth.js';
 import { writeAudit } from '../audit/audit-repository.js';
@@ -418,7 +419,7 @@ async function promoteBrowserConfirmation(
 
 export async function applyPendingVoiceIntent(
   client: pg.PoolClient,
-  authenticated: AuthenticatedVoiceIntent,
+  authenticated: Omit<AuthenticatedVoiceIntent, 'intent'> & { intent: VoiceCareIntentV1 },
   acceptedAt: Date,
   traceId: string,
 ): Promise<VoiceCareSemanticResultV1> {

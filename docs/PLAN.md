@@ -11,7 +11,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 Current milestone: **M4 — Birth Ready Operations and Data Safety — verified complete**
 Current delivery gate: **supervised family acceptance — verified complete on 2026-08-23**
-Current implementation milestone: **M5 — Voice Care Adapter and Feeding Pilot — Tasks 1-9 and cross-product synthetic Gate V1 exact-head CI complete; installed adult-only acceptance pending**
+Current implementation milestone: **M6 — Voice Care v2 multi-component feeding — offline contracts/Gateway and synthetic handoff in progress; M5 remains v1-compatible and complete**
 Previous completed milestone: **M3 — Care Workspace — verified complete**
 Earlier completed milestone: **M2 — Care Recording MVP — verified complete**
 
