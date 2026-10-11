@@ -11,7 +11,7 @@ Read `/agent.md` first. Detailed design and implementation history live under `d
 
 Current milestone: **M4 — Birth Ready Operations and Data Safety — verified complete**
 Current delivery gate: **supervised family acceptance — verified complete on 2026-08-23**
-Current implementation milestone: **M6 — Voice Care v2 multi-component feeding — contracts, Gateway and PostgreSQL 16 synthetic integration complete locally; Node 24 full CI/unit/build gate pending**
+Current implementation milestone: **M6 — Voice Care v2 multi-component feeding — exact-head Node 24/PG16/Compose CI green; cross-repository release candidate remains blocked by baby-monitor-local CI**
 Previous completed milestone: **M3 — Care Workspace — verified complete**
 Earlier completed milestone: **M2 — Care Recording MVP — verified complete**
 

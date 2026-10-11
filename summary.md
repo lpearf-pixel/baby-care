@@ -17,6 +17,11 @@ direct-breastfeeding duration flow (2/2), with duplicate confirmation returning
 the committed result. Node 24 lint/typecheck pass; full unit/build remain gated
 by the temporary container's native-helper compiler setup and must not be called
 production-ready until CI confirms them.
+The exact-head GitHub Actions run for `76d4b41` is green across static, unit,
+PostgreSQL 16 integration, build and production Compose smoke:
+`https://github.com/lpearf-pixel/baby-care/actions/runs/38113773124`.
+The repository's Node 24 runner compiled the native helper successfully; the
+local slim-container compiler limitation is not a repository gate failure.
 
 This file is the short handoff for a fresh Work/chat. Read it together with `agent.md`, `docs/PLAN.md`, and `.agent/current-milestone.json` before planning or coding.
 
