@@ -67,8 +67,12 @@ describeDatabase('Voice Care v2 multi-component feeding', () => {
         confirmedWarningCodes: [],
       },
     }).raw;
-    const confirm = await postVoiceIntent(context, confirmRaw);
+    const [confirm, concurrentConfirm] = await Promise.all([
+      postVoiceIntent(context, confirmRaw),
+      postVoiceIntent(context, confirmRaw),
+    ]);
     expect(confirm.json()).toMatchObject({ code: 'saved', sessionVersion: 4 });
+    expect(concurrentConfirm.json()).toEqual(confirm.json());
     const stored = await context.database.pool.query(
       `select fc.liquid_type, fc.amount_ml, fc.duration_minutes
          from care_events ce join feeding_components fc on fc.session_event_id = ce.id
