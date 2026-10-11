@@ -11,7 +11,6 @@ import {
   type VoiceCareSemanticResultV2,
   voiceCareProposalDigestV2,
 } from '@baby-care/contracts';
-import type { CareActorContext } from '../care/care-auth.js';
 import { collectFeedingWarnings } from '../care/feeding-warnings.js';
 import { writeFeedingSessionInTransaction } from '../care/feeding-write-service.js';
 import { writeAudit } from '../audit/audit-repository.js';

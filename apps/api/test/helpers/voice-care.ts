@@ -3,8 +3,11 @@ import type { KeyObject } from 'node:crypto';
 
 import {
   VoiceCareIntentV1Schema,
+  VoiceCareIntentV2Schema,
   voiceCareSigningBytesV1,
+  voiceCareSigningBytesV2,
   type VoiceCareIntentV1,
+  type VoiceCareIntentV2,
 } from '@baby-care/contracts';
 import { M2_TEST_NOW, type createM2TestApp } from './m2-family-app.js';
 
@@ -107,6 +110,36 @@ export function signedVoiceIntent(
     signature: typeof fields.signature === 'string'
       ? fields.signature
       : sign(null, voiceCareSigningBytesV1(candidate), fixture.privateKey).toString('base64url'),
+  });
+  return { intent, raw: Buffer.from(canonicalJson(intent)) };
+}
+
+export function signedVoiceIntentV2(
+  fixture: VoiceCareDeviceFixture,
+  fields: Record<string, unknown> = {},
+): { intent: VoiceCareIntentV2; raw: Buffer } {
+  const candidate = VoiceCareIntentV2Schema.parse({
+    schemaVersion: 2,
+    requestId: randomUUID(),
+    deviceId: fixture.deviceId,
+    leaseId: fixture.leaseId,
+    issuedAt: M2_TEST_NOW.toISOString(),
+    occurredAt: M2_TEST_NOW.toISOString(),
+    deliveryMode: 'live',
+    intentType: 'feeding_start',
+    careSessionId: null,
+    speakerState: 'verified',
+    payload: { mode: 'bottle', startedAt: M2_TEST_NOW.toISOString() },
+    source: 'voice',
+    modelVersion: 'synthetic-v2',
+    signature: PLACEHOLDER_SIGNATURE,
+    ...fields,
+  });
+  const intent = VoiceCareIntentV2Schema.parse({
+    ...candidate,
+    signature: typeof fields.signature === 'string'
+      ? fields.signature
+      : sign(null, voiceCareSigningBytesV2(candidate), fixture.privateKey).toString('base64url'),
   });
   return { intent, raw: Buffer.from(canonicalJson(intent)) };
 }
