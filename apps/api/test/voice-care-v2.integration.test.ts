@@ -91,7 +91,7 @@ describeDatabase('Voice Care v2 multi-component feeding', () => {
       { event_count: 1, liquid_type: 'expressed_breast_milk', amount_ml: 60, duration_minutes: null },
       { event_count: 1, liquid_type: 'formula', amount_ml: 30, duration_minutes: null },
     ]);
-    expect((await postVoiceIntent(context, confirmRaw)).json()).toEqual(confirm.json());
+    expect((await postVoiceIntent(context, confirmRaw)).json()).toEqual(confirm);
   });
 
   it('commits direct breastfeeding duration without an inferred amount', async () => {
