@@ -1,6 +1,6 @@
 FROM node:24-alpine
 
-RUN apk add --no-cache build-base
+RUN apk add --no-cache build-base linux-headers
 RUN corepack enable && corepack prepare pnpm@10.17.1 --activate
 WORKDIR /app
 

@@ -1,5 +1,5 @@
 FROM node:24-alpine AS build
-RUN apk add --no-cache build-base
+RUN apk add --no-cache build-base linux-headers
 RUN corepack enable && corepack prepare pnpm@10.17.1 --activate
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
