@@ -12,6 +12,11 @@ typecheck plus 55 contract tests, API typecheck, and 2 synthetic v2 handoff test
 pass under Node 22; repository CI requires Node 24. No household deployment or
 Camera Reply is enabled.
 Generated v2 schema SHA-256: `a0fe59a4c30c7f053a13677ab472e343c95a8794def7ee8ac5303a46d4d47954`.
+At `73c9f8b`, PostgreSQL 16 integration covers the v2 mixed bottle flow and
+direct-breastfeeding duration flow (2/2), with duplicate confirmation returning
+the committed result. Node 24 lint/typecheck pass; full unit/build remain gated
+by the temporary container's native-helper compiler setup and must not be called
+production-ready until CI confirms them.
 
 This file is the short handoff for a fresh Work/chat. Read it together with `agent.md`, `docs/PLAN.md`, and `.agent/current-milestone.json` before planning or coding.
 
