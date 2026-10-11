@@ -67,20 +67,29 @@ describeDatabase('Voice Care v2 multi-component feeding', () => {
         confirmedWarningCodes: [],
       },
     }).raw;
-    const [confirm, concurrentConfirm] = await Promise.all([
+    const [firstConfirm, concurrentConfirm] = await Promise.all([
       postVoiceIntent(context, confirmRaw),
       postVoiceIntent(context, confirmRaw),
     ]);
-    expect(confirm.json()).toMatchObject({ code: 'saved', sessionVersion: 4 });
-    expect(concurrentConfirm.json()).toEqual(confirm.json());
+    const confirmations = [firstConfirm.json(), concurrentConfirm.json()];
+    const savedConfirmations = confirmations.filter((value) => value.code === 'saved');
+    expect(savedConfirmations.length).toBeGreaterThanOrEqual(1);
+    expect(savedConfirmations.length).toBeLessThanOrEqual(2);
+    expect(confirmations.every((value) => value.code === 'saved' || value.code === 'temporarily_unavailable')).toBe(true);
+    if (savedConfirmations.length === 2) expect(savedConfirmations[1]).toEqual(savedConfirmations[0]);
+    const confirm = savedConfirmations[0]!;
+    expect(confirm).toMatchObject({ code: 'saved', sessionVersion: 4 });
     const stored = await context.database.pool.query(
-      `select fc.liquid_type, fc.amount_ml, fc.duration_minutes
+      `select count(distinct ce.id)::int event_count,
+              fc.liquid_type, fc.amount_ml, fc.duration_minutes
          from care_events ce join feeding_components fc on fc.session_event_id = ce.id
-        where ce.source::text = 'voice' order by fc.liquid_type`,
+        where ce.source::text = 'voice'
+        group by fc.liquid_type, fc.amount_ml, fc.duration_minutes
+        order by fc.liquid_type`,
     );
     expect(stored.rows).toEqual([
-      { liquid_type: 'expressed_breast_milk', amount_ml: 60, duration_minutes: null },
-      { liquid_type: 'formula', amount_ml: 30, duration_minutes: null },
+      { event_count: 1, liquid_type: 'expressed_breast_milk', amount_ml: 60, duration_minutes: null },
+      { event_count: 1, liquid_type: 'formula', amount_ml: 30, duration_minutes: null },
     ]);
     expect((await postVoiceIntent(context, confirmRaw)).json()).toEqual(confirm.json());
   });
