@@ -8,6 +8,7 @@ import {
 import type { DatabaseContext } from '../db.js';
 import {
   VoiceCareAuthenticationError,
+  type AuthenticatedVoiceIntent,
   type VoiceCareIntentAuthenticator,
 } from './intent-authenticator.js';
 import { VoiceCareBusyError, VoiceCareIntentCoordinator } from './intent-coordinator.js';
@@ -42,6 +43,28 @@ function sameDigest(left: Buffer, right: Buffer): boolean {
   return left.length === right.length && left.equals(right);
 }
 
+async function replayReceipt(
+  database: DatabaseContext,
+  authenticated: AuthenticatedVoiceIntent,
+): Promise<VoiceCareSemanticResultV1 | VoiceCareSemanticResultV2 | null> {
+  const receipt = await database.pool.query<{
+    request_digest: Buffer;
+    result_json: Record<string, unknown>;
+  }>(
+    `select request_digest, result_json from voice_care_intent_receipts
+      where device_id = $1 and request_id = $2`,
+    [authenticated.device.id, authenticated.intent.requestId],
+  );
+  const existing = receipt.rows[0];
+  if (!existing) return null;
+  if (!sameDigest(existing.request_digest, authenticated.requestDigest)) {
+    return closedResult('rejected', authenticated.intent.schemaVersion);
+  }
+  return authenticated.intent.schemaVersion === 2
+    ? VoiceCareSemanticResultV2Schema.parse(existing.result_json)
+    : VoiceCareSemanticResultV1Schema.parse(existing.result_json);
+}
+
 export interface VoiceCareIntentService {
   accept(raw: Uint8Array, acceptedAt: Date, traceId: string, signal: AbortSignal): Promise<VoiceCareSemanticResultV1 | VoiceCareSemanticResultV2>;
 }
@@ -61,6 +84,11 @@ export function createVoiceCareIntentService(
         throw error;
       }
       try {
+        // A committed receipt is an authoritative idempotent response. Check it
+        // before the rate/active coordinator so a client can recover a lost
+        // response even after the device has exhausted its attempt window.
+        const replay = await replayReceipt(database, authenticated);
+        if (replay !== null) return replay;
         return await coordinator.run(authenticated.device.id, acceptedAt, signal, async () => {
           const client = await database.pool.connect();
           try {

@@ -91,6 +91,15 @@ describeDatabase('Voice Care v2 multi-component feeding', () => {
       { event_count: 1, liquid_type: 'expressed_breast_milk', amount_ml: 60, duration_minutes: null },
       { event_count: 1, liquid_type: 'formula', amount_ml: 30, duration_minutes: null },
     ]);
+    // Exhaust the per-device attempt window after the commit. A replay of the
+    // committed request must still recover its authoritative receipt rather
+    // than being hidden behind the rate limiter.
+    for (let index = 0; index < 25; index += 1) {
+      const extra = await postVoiceIntent(context, signedVoiceIntentV2(fixture, {
+        payload: { mode: 'unknown', startedAt: M2_TEST_NOW.toISOString() },
+      }).raw);
+      expect(extra.json()).toMatchObject({ code: 'accepted_pending' });
+    }
     expect((await postVoiceIntent(context, confirmRaw)).json()).toEqual(confirm);
   });
 
